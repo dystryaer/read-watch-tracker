@@ -323,11 +323,11 @@ Die Auth-Tabellen kommen von der Auth-Bibliothek (§11).
 ### 5.3 Regeln
 
 **Titel-Normalisierung** (`core/normalize.ts`, `normalizeTitle`), in dieser Reihenfolge:
-1. Unicode-Kompatibilitätszerlegung (NFKD), lateinische Diakritika entfernen (`Tōkyō` → `Tokyo`), wieder zusammensetzen (NFKC). Vollbreite Zeichen und Ligaturen werden dabei zu normalen Zeichen.
-2. Unsichtbare Formatzeichen entfernen (Zero-Width-Space, weiches Trennzeichen, BOM).
-3. Kleinschreibung.
-4. Rausch-Suffixe am Ende entfernen, auch mehrere hintereinander: `(manga)`, `(manhwa)`, `(manhua)`, `(webtoon)`, `(official)`, `(remastered)`, `(german dub)`, `(english dub)`, `(dub)`, jeweils auch in `[…]`. Bliebe danach nichts übrig, bleibt das Suffix stehen.
-5. Apostrophe ersatzlos entfernen (`'`, `’`, `‘`, `´`, `` ` ``, `ʼ`): `Swordmaster’s` → `swordmasters`.
+1. Apostrophe ersatzlos entfernen (`'`, `’`, `‘`, `´`, `` ` ``, `ʼ`, `＇`): `Swordmaster’s` → `swordmasters`. Das passiert vor Schritt 2, weil NFKD `´` sonst in Leerzeichen plus Akzent zerlegt.
+2. Unicode-Kompatibilitätszerlegung (NFKD), lateinische Diakritika entfernen (`Tōkyō` → `Tokyo`), wieder zusammensetzen (NFKC). Vollbreite Zeichen und Ligaturen werden dabei zu normalen Zeichen.
+3. Unsichtbare Formatzeichen entfernen (Zero-Width-Space, weiches Trennzeichen, BOM).
+4. Kleinschreibung.
+5. Rausch-Suffixe am Ende entfernen, auch mehrere hintereinander: `(manga)`, `(manhwa)`, `(manhua)`, `(webtoon)`, `(official)`, `(remastered)`, `(german dub)`, `(english dub)`, `(dub)`, jeweils auch in `[…]`. Bliebe danach nichts übrig, bleibt das Suffix stehen.
 6. Tausendertrenner zwischen Ziffern entfernen: `10,000` und `10.000` → `10000`.
 7. Alle übrigen Satz- und Sonderzeichen (Bindestriche, Gedankenstriche, Doppelpunkte, Klammern …) werden zu Leerzeichen; Leerraum zusammenfassen und trimmen.
 
@@ -699,7 +699,7 @@ Siehe §7.9. Der Backfill füllt einen Teil der 63 Lücken für alles, was in de
 
 | Bereich | Wahl | Begründung |
 |---|---|---|
-| Sprache | TypeScript (strict), Node 22 LTS, pnpm-Workspaces | ein Typensystem für Web, API, Extension und Core |
+| Sprache | TypeScript 6.0 (strict), Node ≥ 22 LTS, pnpm-Workspaces | ein Typensystem für Web, API, Extension und Core. TypeScript 7 erst, wenn typescript-eslint es unterstützt (aktuell `<6.1`). |
 | Web + API | Next.js (App Router), Tailwind CSS | Web-App und API in einem Deploy; läuft auf Vercel und in Docker |
 | DB | PostgreSQL 16+, Drizzle ORM + drizzle-kit, `pg_trgm` | Standard-Postgres → `pg_dump`-portabel; typsichere Migrationen |
 | Cloud (jetzt) | Neon (Postgres, Free Tier), Vercel Hobby | 0 €/Monat; Neon pausiert bei Inaktivität und wacht automatisch auf |
@@ -723,7 +723,7 @@ pnpm dev                                       # Web-App + API lokal auf http://
 pnpm --filter @rwt/extension dev               # Extension im Dev-Modus (WXT)
 pnpm --filter @rwt/extension build             # Build → apps/extension/.output/chrome-mv3 (in Brave entpackt laden)
 pnpm test                                      # Unit- + Integrationstests (Vitest)
-pnpm test -- --coverage                        # mit Coverage-Report
+pnpm test --coverage                           # mit Coverage-Report (core: Schwelle 90 %)
 pnpm test:e2e                                  # Playwright: Web-App + Extension gegen Fixture-Seiten
 pnpm lint                                      # ESLint
 pnpm typecheck                                 # tsc --noEmit in allen Paketen
