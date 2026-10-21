@@ -51,6 +51,10 @@ export async function ingestEvents(
     }
     results.push({ id: event.id, outcome });
   }
+
+  // A library page counts as synced even when every entry on it was known already (SPEC §9.1).
+  const synced = new Set(batch.filter((event) => event.kind === "library_sync" && knownService(event.source.key)).map((event) => event.source.key));
+  if (synced.size > 0) await db.update(sources).set({ lastLibrarySyncAt: now }).where(inArray(sources.key, [...synced]));
   return results;
 }
 

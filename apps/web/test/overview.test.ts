@@ -257,15 +257,20 @@ describe("webnovelReminder (SPEC §9.1)", () => {
   const days = (n: number) => new Date(NOW.getTime() - n * 86_400_000);
 
   it("reminds when the last WebNovel sync is older than 7 days", () => {
-    expect(webnovelReminder({ lastSync: days(9), readingLightNovels: true }, NOW)).toBe("WebNovel zuletzt vor 9 Tagen synchronisiert.");
+    expect(webnovelReminder({ lastSync: days(9), readsOnWebnovel: true }, NOW)).toBe("WebNovel zuletzt vor 9 Tagen synchronisiert.");
+  });
+
+  it("starts right after 7 days, not after 8", () => {
+    expect(webnovelReminder({ lastSync: days(7), readsOnWebnovel: true }, NOW)).toBeNull();
+    expect(webnovelReminder({ lastSync: days(7 + 1 / 24), readsOnWebnovel: true }, NOW)).toBe("WebNovel zuletzt vor 7 Tagen synchronisiert.");
   });
 
   it("stays quiet within 7 days", () => {
-    expect(webnovelReminder({ lastSync: days(6), readingLightNovels: true }, NOW)).toBeNull();
+    expect(webnovelReminder({ lastSync: days(6), readsOnWebnovel: true }, NOW)).toBeNull();
   });
 
-  it("reminds once light novels are read but WebNovel was never synced", () => {
-    expect(webnovelReminder({ lastSync: null, readingLightNovels: true }, NOW)).toBe("WebNovel wurde noch nie synchronisiert.");
-    expect(webnovelReminder({ lastSync: null, readingLightNovels: false }, NOW)).toBeNull();
+  it("reminds people who read on WebNovel but never synced it, and nobody else", () => {
+    expect(webnovelReminder({ lastSync: null, readsOnWebnovel: true }, NOW)).toBe("WebNovel wurde noch nie synchronisiert.");
+    expect(webnovelReminder({ lastSync: null, readsOnWebnovel: false }, NOW)).toBeNull();
   });
 });

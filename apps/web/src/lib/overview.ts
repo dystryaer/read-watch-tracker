@@ -174,8 +174,8 @@ const REMIND_AFTER_DAYS = 7;
 const DAY_MS = 86_400_000;
 
 /** The WebNovel hint on the core screen (SPEC §9.1), or null when no reminder is due. */
-export function webnovelReminder(status: { lastSync: Date | null; readingLightNovels: boolean }, now: Date): string | null {
-  if (status.lastSync === null) return status.readingLightNovels ? "WebNovel wurde noch nie synchronisiert." : null;
-  const days = Math.floor((now.getTime() - status.lastSync.getTime()) / DAY_MS);
-  return days > REMIND_AFTER_DAYS ? `WebNovel zuletzt vor ${days} Tagen synchronisiert.` : null;
+export function webnovelReminder(status: { lastSync: Date | null; readsOnWebnovel: boolean }, now: Date): string | null {
+  if (status.lastSync === null) return status.readsOnWebnovel ? "WebNovel wurde noch nie synchronisiert." : null;
+  const age = now.getTime() - status.lastSync.getTime();
+  return age > REMIND_AFTER_DAYS * DAY_MS ? `WebNovel zuletzt vor ${Math.floor(age / DAY_MS)} Tagen synchronisiert.` : null;
 }

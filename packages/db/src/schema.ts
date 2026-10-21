@@ -47,6 +47,8 @@ export const sources = pgTable("sources", {
   ruleEndSelector: text("rule_end_selector"),
   ruleNextUrlTemplate: text("rule_next_url_template"),
   ruleUpdatedAt: timestamptz("rule_updated_at"),
+  /** When a library page of this app or service last came in, unchanged ones included (SPEC §9.1). */
+  lastLibrarySyncAt: timestamptz("last_library_sync_at"),
   createdAt: createdAt(),
 });
 

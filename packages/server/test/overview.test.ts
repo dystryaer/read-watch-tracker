@@ -1,7 +1,8 @@
-import { type DbHandle, events, pendingMatches, workLinks, works } from "@rwt/db";
+import { type DbHandle, pendingMatches, workLinks, works } from "@rwt/db";
 import { createTestDb, resetDb } from "@rwt/db/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { ingestEvents } from "../src/ingest";
 import { countOpenPending, listOverview, webnovelSyncStatus } from "../src/overview";
 import { seedLink, seedSource, seedWork } from "./helpers";
 
@@ -120,35 +121,41 @@ describe("listOverview – series URL", () => {
 });
 
 describe("webnovelSyncStatus", () => {
-  it("knows when the WebNovel library was last synced and whether light novels are being read", async () => {
-    const source = await seedSource(handle.db, { key: "webnovel", kind: "app" });
-    await seedWork(handle.db, { title: "Shadow Slave", type: "light_novel" });
-    const synced = new Date("2026-10-10T12:00:00.000Z");
-    for (const receivedAt of [new Date("2026-10-01T12:00:00.000Z"), synced]) {
-      await handle.db.insert(events).values({
-        id: crypto.randomUUID(),
-        kind: "library_sync",
-        sourceId: source.id,
-        chapter: 1,
-        occurredAt: receivedAt,
-        receivedAt,
-        outcome: "applied",
-      });
-    }
-    await handle.db.insert(events).values({
-      id: crypto.randomUUID(),
-      kind: "read",
-      sourceId: source.id,
-      chapter: 2,
-      occurredAt: new Date("2026-10-20T12:00:00.000Z"),
-      receivedAt: new Date("2026-10-20T12:00:00.000Z"),
-      outcome: "applied",
-    });
-
-    expect(await webnovelSyncStatus(handle.db)).toEqual({ lastSync: synced, readingLightNovels: true });
+  const T1 = new Date("2026-10-01T12:00:00.000Z");
+  const T2 = new Date("2026-10-10T12:00:00.000Z");
+  const libraryEvent = (id: string, chapter: number) => ({
+    id,
+    occurredAt: T1.toISOString(),
+    kind: "library_sync" as const,
+    source: { key: "webnovel", externalKey: "22196546206090805", rawTitle: "Shadow Slave" },
+    position: { unit: "chapter" as const, chapter },
   });
 
-  it("reports no sync and no light novels on an empty tracker", async () => {
-    expect(await webnovelSyncStatus(handle.db)).toEqual({ lastSync: null, readingLightNovels: false });
+  it("knows when the WebNovel library last came in, also when nothing in it changed", async () => {
+    const first = libraryEvent(crypto.randomUUID(), 1204);
+    await ingestEvents(handle.db, null, [first], T1);
+    // Opened again days later: the same ids, stored as duplicates – it was synced all the same.
+    await ingestEvents(handle.db, null, [first], T2);
+
+    expect((await webnovelSyncStatus(handle.db)).lastSync).toEqual(T2);
+  });
+
+  it("does not count other events of WebNovel as a library sync", async () => {
+    await ingestEvents(handle.db, null, [{ ...libraryEvent(crypto.randomUUID(), 1204), kind: "read" }], T2);
+    expect((await webnovelSyncStatus(handle.db)).lastSync).toBeNull();
+  });
+
+  it("asks for a sync only from people who read on WebNovel", async () => {
+    await seedWork(handle.db, { title: "Lord of Mysteries", type: "light_novel", status: "reading" });
+    expect((await webnovelSyncStatus(handle.db)).readsOnWebnovel).toBe(false);
+
+    const source = await seedSource(handle.db, { key: "webnovel", kind: "app", defaultMediaType: "light_novel" });
+    const work = await seedWork(handle.db, { title: "Shadow Slave", type: "light_novel", status: "reading" });
+    await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: "22196546206090805", externalTitle: "Shadow Slave" });
+    expect((await webnovelSyncStatus(handle.db)).readsOnWebnovel).toBe(true);
+  });
+
+  it("reports no sync and no WebNovel reading on an empty tracker", async () => {
+    expect(await webnovelSyncStatus(handle.db)).toEqual({ lastSync: null, readsOnWebnovel: false });
   });
 });

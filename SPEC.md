@@ -621,7 +621,7 @@ Vollautomatik ist hier ausdrücklich nicht nötig. Ziel ist: **Aktualisieren mit
 | **B: Schnell-Update** | Web-App als PWA auf dem iPhone, Kapitel `[+]` (§9.3) | 2 Taps |
 | **C: iOS-Kurzbefehl** | In der WebNovel-App „Teilen“ → Kurzbefehl „Lesestand“ (§9.4) | 3 Taps |
 
-**Erinnerung:** Ist der letzte WebNovel-Sync älter als 7 Tage, zeigt der Core-Screen einen dezenten Hinweis mit Link zur WebNovel-Bibliothek.
+**Erinnerung:** Ist der letzte WebNovel-Sync älter als 7 Tage, zeigt der Core-Screen einen dezenten Hinweis mit Link zur WebNovel-Bibliothek. Als Sync zählt jedes Öffnen der Bibliothek, auch wenn sich nichts geändert hat (`sources.last_library_sync_at`). Den Hinweis sieht nur, wer ein Werk liest, das mit WebNovel verknüpft ist.
 
 ### 9.2 Kindle (E-Books)
 
