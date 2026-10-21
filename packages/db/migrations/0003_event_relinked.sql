@@ -1,0 +1,1 @@
+ALTER TABLE "events" ADD COLUMN "relinked" boolean DEFAULT false NOT NULL;

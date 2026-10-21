@@ -172,6 +172,8 @@ export const events = pgTable(
     receivedAt: timestamptz("received_at").notNull().defaultNow(),
     workId: uuid("work_id").references(() => works.id, { onDelete: "set null" }),
     outcome: eventOutcome("outcome").notNull(),
+    // This event re-recognized its series under a new key (SPEC §5.3 step 4); shown in the history.
+    relinked: boolean("relinked").notNull().default(false),
   },
   (table) => [
     index("events_work_time").on(table.workId, table.occurredAt),

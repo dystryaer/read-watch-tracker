@@ -20,6 +20,8 @@ export interface SiteSummary {
   linkCount: number;
   domains: { domain: string; isCurrent: boolean }[];
   rule: SiteRuleFields;
+  /** Why the devices skip this site's stored rule (e.g. after stricter checks), or null. */
+  ruleProblem: string | null;
 }
 
 type SourceRow = typeof sources.$inferSelect;
@@ -48,7 +50,13 @@ async function summarize(db: Db, rows: SourceRow[]): Promise<SiteSummary[]> {
       .filter((domain) => domain.sourceId === row.id)
       .map(({ domain, isCurrent }) => ({ domain, isCurrent })),
     rule: storedRuleFields(row),
+    ruleProblem: ruleProblemOf(row),
   }));
+}
+
+function ruleProblemOf(row: SourceRow): string | null {
+  const parsed = parseRuleFields(storedRuleFields(row));
+  return parsed.ok ? null : (Object.values(parsed.errors)[0] ?? null);
 }
 
 /** Websites the extension can track (SPEC §7.2), for the settings page. */

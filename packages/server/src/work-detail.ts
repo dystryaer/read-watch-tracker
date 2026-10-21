@@ -34,6 +34,9 @@ export interface WorkDetail {
     episode: number | null;
     percent: number | null;
     url: string | null;
+    externalKey: string | null;
+    /** The event re-recognized the series under a new key (SPEC §5.3 step 4). */
+    relinked: boolean;
     sourceName: string | null;
     deviceName: string | null;
   }[];
@@ -70,6 +73,8 @@ export async function getWorkDetail(db: Db, workId: string): Promise<WorkDetail 
       episode: events.episode,
       percent: events.percent,
       url: events.url,
+      externalKey: events.externalKey,
+      relinked: events.relinked,
       sourceName: sources.name,
       deviceName: devices.name,
     })

@@ -30,6 +30,9 @@ export default async function SitesPage() {
                   {site.domains.find((d) => d.isCurrent)?.domain ?? site.domains[0]?.domain ?? "keine Domain"}
                   {site.domains.length > 1 ? ` (+${site.domains.length - 1} alte)` : ""} · {site.linkCount} Titel · {Object.keys(site.rule).length > 0 ? "eigene Regel" : "generisch"}
                 </p>
+                {site.ruleProblem ? (
+                  <p className="text-red-700 dark:text-red-400">Regel ungültig: Die Extension überspringt diese Seite.</p>
+                ) : null}
               </div>
               <ActionForm
                 action={setTrackingAction}

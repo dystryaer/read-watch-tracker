@@ -157,3 +157,21 @@ describe("listRecentSiteUrls", () => {
     expect(await listRecentSiteUrls(handle.db, source.id)).toEqual(["https://a.example/x/chapter-2", "https://a.example/x/chapter-1"]);
   });
 });
+
+describe("getSite – rule problems", () => {
+  it("names the problem of a stored rule the devices would skip", async () => {
+    await seedSource(handle.db, { key: "site:old", ruleChapterPattern: String.raw`(?:-\d)*(\d+)` }, ["old.example"]);
+
+    const site = await getSite(handle.db, "site:old");
+
+    expect(site?.ruleProblem).toMatch(/nur mit \? optional/);
+  });
+
+  it("reports no problem for a valid or empty rule", async () => {
+    await seedSource(handle.db, { key: "site:ok", ruleChapterPattern: String.raw`/c(\d+)` }, ["ok.example"]);
+    await seedSource(handle.db, { key: "site:plain" }, ["plain.example"]);
+
+    expect((await getSite(handle.db, "site:ok"))?.ruleProblem).toBeNull();
+    expect((await getSite(handle.db, "site:plain"))?.ruleProblem).toBeNull();
+  });
+});

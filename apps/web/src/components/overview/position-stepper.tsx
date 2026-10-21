@@ -17,13 +17,26 @@ export function PositionStepper({ workId, initial }: { workId: string; initial: 
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // True from the first click until its save has answered.
+  const pending = useRef(false);
+  const serverValue = useRef(initial.value);
 
   useEffect(() => () => clearTimeout(timer.current), []);
+
+  // A new value from the server (e.g. an event from a device) is shown unless a click of mine is
+  // still on its way. Never remounting keeps a click made during a save from being dropped.
+  useEffect(() => {
+    serverValue.current = initial.value;
+    if (pending.current) return;
+    latest.current = initial.value;
+    setValue(initial.value);
+  }, [initial.value]);
 
   function change(delta: 1 | -1) {
     const next = stepPosition(initial.unit, latest.current, delta);
     if (next === null || next === latest.current) return;
     latest.current = next;
+    pending.current = true;
     setValue(next);
     setError(null);
     clearTimeout(timer.current);
@@ -34,10 +47,13 @@ export function PositionStepper({ workId, initial }: { workId: string; initial: 
             ? { unit: "chapter" as const, chapter: next }
             : { unit: "episode" as const, season: initial.season, episode: next };
         const result = await setPositionAction({ workId, position });
+        // A later click restarted the timer: its own save will answer.
+        if (latest.current !== next) return;
+        pending.current = false;
         if (!result.ok) {
           setError(result.error);
-          latest.current = initial.value;
-          setValue(initial.value);
+          latest.current = serverValue.current;
+          setValue(serverValue.current);
         }
       });
     }, DEBOUNCE_MS);

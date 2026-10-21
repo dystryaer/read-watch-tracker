@@ -98,7 +98,9 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
   Akz.: Fixture-Manga-Seite + Fake-API: Event erst am Kapitelende; nicht freigeschaltete Seite → 0 Requests; Offline-Queue ohne Duplikate; `docs/setup-extension.md`, `docs/deploy.md`, `docs/server-umzug.md`, `docker-compose.yml`, `Dockerfile`
 
 ### Abnahme M1
-- [ ] volle Testsuite · [ ] Code-Review (5 Achsen) · [ ] Security-Review (XSS, untrusted data) · [ ] Befunde behoben
+- [x] volle Testsuite · [x] Code-Review (5 Achsen) · [x] Security-Review (XSS, untrusted data) · [x] Befunde behoben
+  Stand 2026-10-21: typecheck + lint sauber, 794 Unit/Integration-Tests, 19 E2E, Coverage 92,6 %.
+  Offen zur Entscheidung: Domain-Umzüge, die ein Gerät meldet, gelten laut §7.2 sofort („ohne erneute Bestätigung“); der Security-Review empfiehlt eine Bestätigung in der Web-App. Bewusst nicht geändert, solange nicht entschieden. Hingenommen (Info): Live-Test der Regel ohne Worker-Timeout (durch Form-Prüfung + 512-Zeichen-Grenze entschärft), Rate-Limits pro Instanz im Speicher, 2 moderate Advisories nur in Dev-Werkzeugen, Docker-Images ohne Digest.
 
 ---
 
@@ -126,7 +128,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
   Akz.: `docs/setup-shield.md`, `docs/spikes/s1-shield-metadata.md`, `docs/testing/shield-checkliste.md`
 
 - [ ] **T35 Web: Streaming-Darstellung** · S
-  Akz.: `S1 · F14`, Öffnen-Link zur Serienseite, Film = gesehen
+  Akz.: `S1 · F14`, Öffnen-Link zur Serienseite, Film = gesehen; URLs von Streaming-Quellen nur auf den bekannten Domains des Dienstes übernehmen (wie bei Websites, Security-Review M1)
 
 ### Abnahme M2
 - [ ] volle Testsuite inkl. Gradle · [ ] Code-Review · [ ] Security-Review · [ ] Befunde behoben

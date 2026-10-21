@@ -22,6 +22,13 @@
       "when": 1792542809318,
       "tag": "0002_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792551332116,
+      "tag": "0003_event_relinked",
+      "breakpoints": true
     }
   ]
 }

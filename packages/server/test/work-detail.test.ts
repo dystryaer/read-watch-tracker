@@ -73,6 +73,13 @@ describe("getWorkDetail", () => {
   it("returns null for an unknown work", async () => {
     expect(await getWorkDetail(handle.db, randomUUID())).toBeNull();
   });
+
+  it("tells which event re-recognized the series under a new key", async () => {
+    const work = await seedWork(handle.db, { title: "Overgeared" });
+    await seedEvent(work.id, { externalKey: "overgeared-new", relinked: true });
+
+    expect((await getWorkDetail(handle.db, work.id))?.events[0]).toMatchObject({ relinked: true, externalKey: "overgeared-new" });
+  });
 });
 
 describe("updateWorkMeta", () => {

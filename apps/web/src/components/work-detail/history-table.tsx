@@ -26,7 +26,14 @@ export function HistoryTable({ events }: { events: WorkDetail["events"] }) {
               <td className="py-2 pr-4">{eventKindLabel(event.kind)}</td>
               <td className="py-2 pr-4 tabular-nums">{positionText(event)}</td>
               <td className="py-2 pr-4">{[event.sourceName, event.deviceName].filter(Boolean).join(" · ") || "Web-App"}</td>
-              <td className="py-2">{eventOutcomeLabel(event.outcome)}</td>
+              <td className="py-2">
+                {eventOutcomeLabel(event.outcome)}
+                {event.relinked ? (
+                  <span className="block text-xs break-words text-zinc-600 dark:text-zinc-400">
+                    Neuer Schlüssel „{event.externalKey}“ automatisch wiedererkannt
+                  </span>
+                ) : null}
+              </td>
             </tr>
           ))}
         </tbody>

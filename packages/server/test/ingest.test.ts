@@ -235,6 +235,18 @@ describe("ingestEvents – re-recognition after a key change (§5.3 step 4)", ()
     expect(links.map((l) => l.externalKey).sort()).toEqual(["overgeared", "overgeared-new-slug"]);
   });
 
+  it("marks the event that re-recognized the series, for the hint in the history", async () => {
+    await seedLinkedOvergeared();
+    const renamed = chapterEvent({ source: { externalKey: "overgeared-new-slug" }, chapter: 345 });
+    const later = chapterEvent({ source: { externalKey: "overgeared-new-slug" }, chapter: 346 });
+
+    await ingestEvents(handle.db, null, [renamed, later], NOW);
+
+    const stored = await handle.db.select({ id: events.id, relinked: events.relinked }).from(events);
+    expect(stored.find((event) => event.id === renamed.id)?.relinked).toBe(true);
+    expect(stored.find((event) => event.id === later.id)?.relinked).toBe(false);
+  });
+
   it("matches titles after normalization", async () => {
     const source = await seedSource(handle.db, { key: "site:asura" });
     const work = await seedWork(handle.db, { title: "Swordmaster's Youngest Son", chapter: 1 });

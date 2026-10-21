@@ -78,6 +78,12 @@ export default async function SitePage({
 
       <section className="border-t border-zinc-200 py-5 dark:border-zinc-800">
         <h2 className="mb-3 text-base font-semibold">Seitenregel</h2>
+        {site.ruleProblem ? (
+          <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-400">
+            Die gespeicherte Regel ist ungültig ({site.ruleProblem}). Bis sie korrigiert ist, überspringt die Extension
+            diese Seite.
+          </p>
+        ) : null}
         <RuleEditor
           siteKey={site.key}
           domains={site.domains.map((domain) => domain.domain)}

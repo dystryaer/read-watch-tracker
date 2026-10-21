@@ -63,8 +63,13 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
 
   // Step 3 (exact link) wins over an earlier "ignore"; step 4 (same title) must not undo one.
   let work = await findExactLink(db, source.id, key);
+  let relinked = false;
   const ignored = !work && (await isIgnored(db, source.id, key));
-  if (!work && !ignored) work = await reRecognize(db, source.id, event, urls.seriesUrl);
+  if (!work && !ignored) {
+    const recognized = await reRecognize(db, source.id, event, urls.seriesUrl);
+    work = recognized?.work ?? null;
+    relinked = recognized?.relinked ?? false;
+  }
 
   let outcome: EventOutcome;
   if (work) {
@@ -106,6 +111,7 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
       receivedAt: now,
       workId: work?.id ?? null,
       outcome,
+      relinked,
     })
     // The idempotency gate under concurrency: the second writer of an id waits, then backs out.
     .onConflictDoNothing()
@@ -179,7 +185,12 @@ async function findExactLink(db: Db, sourceId: string, externalKey: string): Pro
  * Step 4: a confirmed series whose title is exactly the same on this source is re-recognized
  * under the new key – only when that is unambiguous.
  */
-async function reRecognize(db: Db, sourceId: string, event: ProgressEvent, seriesUrl: string | null): Promise<Work | null> {
+async function reRecognize(
+  db: Db,
+  sourceId: string,
+  event: ProgressEvent,
+  seriesUrl: string | null,
+): Promise<{ work: Work; relinked: boolean } | null> {
   const titleKey = normalizeTitle(event.source.rawTitle);
   if (titleKey === "" || event.position.unit === "none") return null;
 
@@ -198,7 +209,7 @@ async function reRecognize(db: Db, sourceId: string, event: ProgressEvent, serie
   const [match] = sameTitle;
   if (!match || sameTitle.length > 1) return null;
 
-  await db
+  const created = await db
     .insert(workLinks)
     .values({
       workId: match.work.id,
@@ -208,8 +219,9 @@ async function reRecognize(db: Db, sourceId: string, event: ProgressEvent, serie
       externalTitleNormalized: titleKey,
       seriesUrl,
     })
-    .onConflictDoNothing();
-  return match.work;
+    .onConflictDoNothing()
+    .returning({ id: workLinks.id });
+  return { work: match.work, relinked: created.length > 0 };
 }
 
 async function isIgnored(db: Db, sourceId: string, externalKey: string): Promise<boolean> {
