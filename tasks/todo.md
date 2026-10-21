@@ -131,7 +131,9 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
   Akz.: `S1 · F14`, Öffnen-Link zur Serienseite, Film = gesehen; URLs von Streaming-Quellen nur auf den bekannten Domains des Dienstes übernehmen (wie bei Websites, Security-Review M1)
 
 ### Abnahme M2
-- [ ] volle Testsuite inkl. Gradle · [ ] Code-Review · [ ] Security-Review · [ ] Befunde behoben
+- [x] volle Testsuite inkl. Gradle · [x] Code-Review · [x] Security-Review · [x] Befunde behoben
+  Stand 2026-10-21: typecheck + lint sauber, 955 Unit/Integration-Tests (Coverage 92,8 %), 22 E2E, 110 JUnit-Tests, Debug-/Release-APK, Android-Lint.
+  Hingenommen: Adapter und Shield-Mappings gegen synthetische Seiten/Metadaten (A10, Spikes S1–S3 offen); Token im Klartext in privaten Preferences (Backups ausgeschlossen); `chrome.storage.local` für Content-Scripts lesbar (galt schon für den Reader); Gradle-Wrapper-JAR ohne CI-Prüfung (kein CI vorhanden); deutsche UI ohne Android-String-Ressourcen; targetSdk 36.
 
 ---
 
