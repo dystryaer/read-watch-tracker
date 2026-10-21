@@ -17,6 +17,7 @@ function row(overrides: Partial<OverviewRow> = {}): OverviewRow {
     percent: null,
     lastUrl: null,
     lastProgressAt: null,
+    latestChapter: null,
     source: null,
     seriesUrl: null,
     aliases: [],
@@ -159,9 +160,9 @@ describe("filterAndSort", () => {
     toOverviewItem(row({ title: "Ärger im Turm", chapter: null }), NOW),
     toOverviewItem(row({ title: "Frieren", type: "anime", chapter: null, episode: 14, lastProgressAt: hoursAgo(20) }), NOW),
     toOverviewItem(row({ title: "Solo Leveling", status: "completed", chapter: 200, aliases: ["Only I Level Up"] }), NOW),
-    toOverviewItem(row({ title: "Shadow Slave", type: "light_novel", chapter: 1204, lastProgressAt: hoursAgo(72) }), NOW),
+    toOverviewItem(row({ title: "Shadow Slave", type: "light_novel", chapter: 1204, latestChapter: 1207, lastProgressAt: hoursAgo(72) }), NOW),
   ];
-  const base = { tab: "all", status: "reading", query: "", unknownOnly: false, sort: "recent" } as const;
+  const base = { tab: "all", status: "reading", query: "", unknownOnly: false, newOnly: false, sort: "recent" } as const;
   const titles = (list: OverviewItem[]) => list.map((item) => item.title);
 
   it("shows works being read, most recent first, never-active ones last", () => {
@@ -194,6 +195,10 @@ describe("filterAndSort", () => {
   it("filters by status", () => {
     expect(titles(filterAndSort(items, { ...base, status: "completed" }))).toEqual(["Solo Leveling"]);
     expect(filterAndSort(items, { ...base, status: "all" })).toHaveLength(5);
+  });
+
+  it("shows only works with new chapters (SPEC §4.2, M4)", () => {
+    expect(titles(filterAndSort(items, { ...base, newOnly: true }))).toEqual(["Shadow Slave"]);
   });
 
   it("shows only works with unknown position", () => {
@@ -285,5 +290,20 @@ describe("keepOrder", () => {
 
   it("drops rows that left the list and adds new ones at the end", () => {
     expect(keepOrder(["a", "b", "c"], [item("d"), item("c"), item("a")])).toEqual([item("a"), item("c"), item("d")]);
+  });
+});
+
+describe("new chapters (M4)", () => {
+  it("counts whole chapters beyond the one read", () => {
+    expect(toOverviewItem(row({ chapter: 344, latestChapter: 347 }), NOW).newChapters).toBe(3);
+    expect(toOverviewItem(row({ chapter: 344.5, latestChapter: 345 }), NOW).newChapters).toBe(1);
+  });
+
+  it("shows nothing when the series page has no newer chapter, or a position is unknown", () => {
+    expect(toOverviewItem(row({ chapter: 347, latestChapter: 347 }), NOW).newChapters).toBeNull();
+    expect(toOverviewItem(row({ chapter: 350, latestChapter: 347 }), NOW).newChapters).toBeNull();
+    expect(toOverviewItem(row({ chapter: 344, latestChapter: 344.5 }), NOW).newChapters).toBeNull();
+    expect(toOverviewItem(row({ chapter: null, latestChapter: 347 }), NOW).newChapters).toBeNull();
+    expect(toOverviewItem(row({ chapter: 344, latestChapter: null }), NOW).newChapters).toBeNull();
   });
 });

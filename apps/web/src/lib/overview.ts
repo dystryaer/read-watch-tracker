@@ -11,6 +11,8 @@ export interface OverviewFilter {
   status: StatusFilter;
   query: string;
   unknownOnly: boolean;
+  /** Only works whose series page shows chapters beyond the one read (M4). */
+  newOnly: boolean;
   sort: SortOrder;
 }
 
@@ -33,6 +35,8 @@ export interface OverviewItem {
   /** Normalized title and aliases, one per line. */
   searchText: string;
   lastProgressAt: number | null;
+  /** "3 neu": whole chapters on the series page beyond the one read (SPEC §4.2, M4); null for none. */
+  newChapters: number | null;
 }
 
 export const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
@@ -136,7 +140,14 @@ export function toOverviewItem(row: OverviewRow, now: Date): OverviewItem {
     continueLink: continueLink(row),
     searchText: [row.title, ...row.aliases].map(normalizeTitle).join("\n"),
     lastProgressAt: row.lastProgressAt?.getTime() ?? null,
+    newChapters: newChapterCount(row.chapter, row.latestChapter),
   };
+}
+
+function newChapterCount(chapter: number | null, latest: number | null): number | null {
+  if (chapter === null || latest === null) return null;
+  const count = Math.floor(latest) - Math.floor(chapter);
+  return count > 0 ? count : null;
 }
 
 const byTitle = (a: OverviewItem, b: OverviewItem) => a.title.localeCompare(b.title, "de", { sensitivity: "base" });
@@ -149,6 +160,7 @@ export function filterAndSort(items: OverviewItem[], filter: OverviewFilter): Ov
       (tabTypes === null || tabTypes.includes(item.type)) &&
       (filter.status === "all" || item.status === filter.status) &&
       (!filter.unknownOnly || item.positionUnknown) &&
+      (!filter.newOnly || item.newChapters !== null) &&
       (query === "" || item.searchText.includes(query)),
   );
   if (filter.sort === "title") return visible.sort(byTitle);

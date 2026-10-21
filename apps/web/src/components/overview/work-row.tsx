@@ -5,12 +5,18 @@ import { PositionStepper } from "./position-stepper";
 /** One work in the core screen list (SPEC §4.1): title, position, source, activity, continue link. */
 export function WorkRow({ item, actions }: { item: OverviewItem; actions?: ReactNode }) {
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-zinc-200 py-3 sm:grid-cols-[minmax(0,1fr)_10rem_11rem_7rem_auto] dark:border-zinc-800">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-zinc-200 py-3 sm:grid-cols-[minmax(0,1fr)_10rem_11rem_7rem_9rem] dark:border-zinc-800">
       <div className="min-w-0">
         <a href={`/works/${item.id}`} className="block truncate font-medium hover:underline">
           {item.title}
         </a>
         <span className="text-xs text-zinc-500 dark:text-zinc-400">{item.typeLabel}</span>
+        {item.newChapters !== null ? (
+          <span className="ml-2 rounded bg-teal-100 px-1.5 py-0.5 text-xs font-medium text-teal-900 dark:bg-teal-900/40 dark:text-teal-100">
+            <span aria-hidden="true">{item.newChapters} neu</span>
+            <span className="sr-only">{item.newChapters === 1 ? "1 neues Kapitel" : `${item.newChapters} neue Kapitel`}</span>
+          </span>
+        ) : null}
       </div>
 
       <div className="text-right sm:text-left">

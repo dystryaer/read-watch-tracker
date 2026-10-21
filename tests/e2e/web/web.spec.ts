@@ -250,6 +250,26 @@ test("the quick update saves the next chapter of a light novel and an e-book's p
   await expect(page.getByRole("listitem").filter({ hasText: "Project Hail Mary" }).getByText("40,5 %")).toBeVisible();
 });
 
+test("new chapters reported by the extension show as a badge and through a filter", async ({ page, request }) => {
+  // Overgeared was read up to chapter 347 above; its series page now lists 350.
+  const reported = await request.post("/api/v1/latest-chapters", {
+    data: { items: [{ sourceKey: "site:asuracomic-net", externalKey: "overgeared", latestChapter: 350 }] },
+    headers: { authorization: `Bearer ${token}` },
+  });
+  expect(await reported.json()).toEqual({ updated: 1 });
+
+  await login(page);
+  await page.goto("/");
+  const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Overgeared", exact: true }) });
+  await expect(row.getByText("3 neue Kapitel")).toBeAttached();
+  await page.getByRole("checkbox", { name: "Neue Kapitel" }).check();
+  await expect(page.getByRole("link", { name: "Overgeared", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Shadow Slave", exact: true })).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Overgeared", exact: true }).click();
+  await expect(page.getByText("Neuestes Kapitel laut Serienseite: Kap. 350")).toBeVisible();
+});
+
 test("the statistics count this week's chapters as text, with decorative bars", async ({ page }) => {
   await login(page);
   await page.getByRole("link", { name: "Statistik" }).click();

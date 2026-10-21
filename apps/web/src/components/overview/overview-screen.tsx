@@ -47,6 +47,7 @@ export function OverviewScreen({
     status: "reading",
     query: "",
     unknownOnly: false,
+    newOnly: false,
     sort: "recent",
   });
   // Typing stays responsive; the list follows a moment later.
@@ -149,6 +150,15 @@ export function OverviewScreen({
               className="size-4 accent-teal-700"
             />
             Stand unbekannt
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={filter.newOnly}
+              onChange={(event) => update({ newOnly: event.target.checked })}
+              className="size-4 accent-teal-700"
+            />
+            Neue Kapitel
           </label>
         </div>
       </div>

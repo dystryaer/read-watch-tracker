@@ -3,7 +3,7 @@ import { and, count, desc, eq, isNull } from "drizzle-orm";
 
 type WorkColumns = Pick<
   typeof works.$inferSelect,
-  "id" | "type" | "title" | "status" | "chapter" | "season" | "episode" | "percent" | "lastUrl" | "lastProgressAt"
+  "id" | "type" | "title" | "status" | "chapter" | "season" | "episode" | "percent" | "lastUrl" | "lastProgressAt" | "latestChapter"
 >;
 
 export interface OverviewRow extends WorkColumns {
@@ -35,6 +35,7 @@ export async function listOverview(db: Db): Promise<OverviewRow[]> {
         percent: works.percent,
         lastUrl: works.lastUrl,
         lastProgressAt: works.lastProgressAt,
+        latestChapter: works.latestChapter,
         lastSourceId: works.lastSourceId,
       },
       source: {

@@ -7,7 +7,7 @@ import { ActionForm } from "@/components/action-form";
 import { HistoryTable } from "@/components/work-detail/history-table";
 import { getAuthorizedDb } from "@/lib/dal";
 import { positionText } from "@/lib/format";
-import { MEDIA_TYPE_LABELS } from "@/lib/overview";
+import { formatRelative, MEDIA_TYPE_LABELS } from "@/lib/overview";
 import { mergeAction, setPositionFormAction, setStatusFormAction, unlinkAction, updateMetaAction } from "./actions";
 
 const inputClass =
@@ -42,6 +42,11 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
       <p className="mt-1 mb-4 text-sm text-zinc-600 dark:text-zinc-400">
         {MEDIA_TYPE_LABELS[work.type]} · {STATUS_LABELS[work.status]} · {positionText(work)}
       </p>
+      {unit === "chapter" && work.latestChapter !== null && work.latestChapterAt !== null ? (
+        <p className="-mt-2 mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+          Neuestes Kapitel laut Serienseite: Kap. {work.latestChapter} (geprüft {formatRelative(work.latestChapterAt, new Date())})
+        </p>
+      ) : null}
 
       <Section title="Titel und Typ">
         <ActionForm action={updateMetaAction} submitLabel="Speichern">
