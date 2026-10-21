@@ -140,7 +140,7 @@ Der einzige Hauptbildschirm. Er beantwortet die Frage: *Wo stehe ich, und wie ko
 | **Sortierung** | `Zuletzt aktiv` (Standard; Titel ohne Aktivität stehen unten) · `Titel A–Z` |
 | **Suche** | Clientseitige Volltextsuche über Titel und Aliasse, normalisiert (Groß-/Kleinschreibung, Apostrophe, Satzzeichen egal). |
 | **Stand** | `Kap. 216`, `Kap. 105.5`, `S1 · F14`, `43 %`, oder `Kap. ?` (unbekannt, optisch hervorgehoben). |
-| **Quelle** | Favicon + Domain bzw. Dienstname der *zuletzt genutzten* Quelle. `– keine Seite` bei importierten Titeln ohne Sichtung. |
+| **Quelle** | Buchstaben-Badge + Domain bzw. Dienstname der *zuletzt genutzten* Quelle. Favicons werden bewusst nicht geladen, damit keine externen Requests entstehen. `– keine Seite` bei importierten Titeln ohne Sichtung. |
 | **[−][+]** | Inline-Stepper für Kapitel und Folgen. Speichert entprellt (500 ms) als manuelle Änderung. |
 | **Weiterlesen ›** | Öffnet das nächste Kapitel in einem neuen Tab (Regeln in §4.4). Fehlt, wenn keine URL bekannt ist. |
 | **Zeile anklicken** | Öffnet die Detailansicht (§4.3). |
@@ -253,7 +253,7 @@ Check-Constraint: Nur die zum `type` passenden Positionsspalten dürfen gesetzt 
 |---|---|---|
 | `domain` | text PK | z. B. `asuracomic.net` |
 | `source_id` | uuid FK → sources | |
-| `is_current` | bool | genau eine aktuelle Domain pro Quelle. Sie wird für „Weiterlesen“ und das Favicon verwendet. |
+| `is_current` | bool | genau eine aktuelle Domain pro Quelle. Sie wird für „Weiterlesen“ und das Quellen-Badge verwendet. |
 | `added_at` | timestamptz | |
 
 **`work_links`**: das Gedächtnis für „einmal bestätigen, dann merken“
@@ -307,7 +307,7 @@ Check-Constraint: Nur die zum `type` passenden Positionsspalten dürfen gesetzt 
 | `token_hash` | text | SHA-256 des Tokens. Der Klartext wird nie gespeichert. |
 | `created_at`, `last_seen_at`, `revoked_at` | timestamptz | |
 
-`pairing_codes`: `code` (6 Zeichen, ohne verwechselbare Zeichen), `poll_secret_hash`, `device_kind`, `device_name`, `expires_at` (10 min), `approved_device_id` null, `token_ciphertext` null (wird genau einmal abgeholt und danach gelöscht).
+`pairing_codes`: `code` (6 Zeichen, ohne verwechselbare Zeichen), `poll_secret_hash`, `device_kind`, `device_name`, `expires_at` (10 min), `approved_device_id` null, `token_issued_at` null. Das Token wird erst beim ersten Poll nach der Freigabe erzeugt; gespeichert wird nur sein Hash am Gerät. Ein zweiter Poll bekommt kein Token mehr.
 
 Die Auth-Tabellen kommen von der Auth-Bibliothek (§11).
 
@@ -376,7 +376,7 @@ Funktioniert wie der OAuth-Device-Flow und ist für TV-Fernbedienungen gemacht, 
 
 1. Der Client ruft `POST /pairing` auf und zeigt den Code groß an (z. B. `K7P-3QX`), dazu einen QR-Code auf `<APP_URL>/pair?code=K7P3QX`.
 2. Ich öffne die Web-App (eingeloggt), gebe den Code ein und bestätige den Gerätenamen.
-3. Der Client fragt alle 3 s `POST /pairing/poll` ab und erhält das Token. Gespeichert wird es lokal: in der Extension unter `chrome.storage.local`, auf der Shield in EncryptedSharedPreferences.
+3. Der Client fragt alle 3 s `POST /pairing/poll` ab und erhält das Token. Gespeichert wird es lokal: in der Extension unter `chrome.storage.local`, auf der Shield in privaten SharedPreferences.
 
 **iPhone-Kurzbefehl:** Ein Kurzbefehl kann den Poll-Ablauf nicht sinnvoll abbilden. Unter „Einstellungen → Geräte → iPhone-Kurzbefehl hinzufügen“ erzeugt die Web-App deshalb direkt ein `phone`-Token und zeigt es einmalig an. Beim Hinzufügen des vorbereiteten Kurzbefehls fragt iOS das Token ab (Import-Frage). Anleitung: `docs/setup-iphone.md`.
 
@@ -584,7 +584,8 @@ Eine kleine Android-TV-App (Kotlin), per adb sideloaded. Sie liest über die off
 ### 8.4 Zuverlässigkeit
 
 - Android bindet den Listener nach einem Neustart automatisch. Bei `onListenerDisconnected` ruft die App `requestRebind` auf.
-- Die Outbox liegt in Room. Geleert wird sie per WorkManager (Constraint: Netzwerk verbunden) mit Backoff.
+- Die Outbox ist eine Datei-Queue im privaten App-Speicher (Logik im JVM-Modul `apps/shield/logic`, testbar ohne Android). Geleert wird sie per WorkManager (Constraint: Netzwerk verbunden) mit Backoff.
+- Das Geräte-Token liegt in privaten SharedPreferences. EncryptedSharedPreferences ist abgekündigt; der App-Sandbox-Schutz reicht für ein widerrufbares Token.
 - Der Statusscreen zeigt: gekoppelt ✓/✗ · Listener-Berechtigung ✓/✗ · letzte 10 Events · Outbox-Größe · „Nicht erkannt“-Liste.
 
 ### 8.5 Spike S1 (vor dem Bau, Timebox 1 Tag)
