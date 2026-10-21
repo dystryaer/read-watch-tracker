@@ -7,6 +7,7 @@ import {
   handleConfig,
   handleEnableSource,
   handleEvents,
+  handleIgnoreSeries,
   handlePairingPoll,
   handlePairingStart,
 } from "../src/api/handlers";
@@ -211,5 +212,35 @@ describe("POST /api/v1/sources/enable", () => {
       context,
     );
     expect(response.status).toBe(401);
+  });
+});
+
+describe("POST /api/v1/ignore", () => {
+  it("ignores a series for the extension", async () => {
+    await seedSource(handle.db, { key: "site:asura" });
+    const response = await handleIgnoreSeries(
+      post("/api/v1/ignore", { sourceKey: "site:asura", externalKey: "news", rawTitle: "News" }),
+      context,
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("answers 404 for an unknown source", async () => {
+    const response = await handleIgnoreSeries(post("/api/v1/ignore", { sourceKey: "site:x", externalKey: "a", rawTitle: "A" }), context);
+    expect(response.status).toBe(404);
+  });
+
+  it("answers 400 for a malformed request", async () => {
+    const response = await handleIgnoreSeries(post("/api/v1/ignore", { sourceKey: "<x>", externalKey: "", rawTitle: "" }), context);
+    expect(response.status).toBe(400);
+  });
+
+  it("is reserved for the browser extension", async () => {
+    const shield = await createDeviceWithToken(handle.db, { kind: "shield", name: "Shield" });
+    const response = await handleIgnoreSeries(
+      post("/api/v1/ignore", { sourceKey: "site:asura", externalKey: "a", rawTitle: "A" }, { authorization: `Bearer ${shield.token}` }),
+      context,
+    );
+    expect(response.status).toBe(403);
   });
 });

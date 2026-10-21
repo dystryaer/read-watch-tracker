@@ -1,0 +1,24 @@
+:root {
+  color-scheme: light dark;
+  --accent: #0f766e;
+  --danger: #b91c1c;
+  --muted: #71717a;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+body { margin: 0; width: 320px; }
+main { padding: 12px 14px; display: grid; gap: 10px; }
+h1 { font-size: 15px; margin: 0; }
+p { margin: 0; }
+hr { border: 0; border-top: 1px solid #d4d4d8; margin: 2px 0; }
+label { display: flex; align-items: center; gap: 6px; }
+input[type="text"], select { font: inherit; padding: 3px 6px; border: 1px solid #a1a1aa; border-radius: 6px; flex: 1; min-width: 0; }
+button { font: inherit; padding: 5px 10px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+button.secondary { background: transparent; color: inherit; border: 1px solid #a1a1aa; }
+button.danger { background: transparent; color: var(--danger); border: 1px solid currentColor; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.muted { color: var(--muted); }
+.ok { color: var(--accent); font-weight: 600; }
+.error { color: var(--danger); }
+a { color: var(--accent); }

@@ -23,6 +23,7 @@ export {
   handleConfig,
   handleEnableSource,
   handleEvents,
+  handleIgnoreSeries,
   handlePairingPoll,
   handlePairingStart,
 } from "./api/handlers";
@@ -34,3 +35,4 @@ export { setManualPosition, setWorkStatus, WorkNotFoundError, WorkPositionMismat
 export { getWorkDetail, listMergeCandidates, MergeIncompatibleError, mergeWorks, unlinkWork, updateWorkMeta, type WorkDetail } from "./work-detail";
 export { listOpenMatches, type OpenMatch } from "./inbox";
 export { addSiteDomain, getSite, listRecentSiteUrls, listSites, renameSite, type RuleUpdateResult, setSiteTracking, SiteDomainError, type SiteRuleFields, type SiteSummary, updateSiteRule } from "./site-admin";
+export { ignoreSeries } from "./ignore";

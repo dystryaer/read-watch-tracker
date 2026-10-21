@@ -7,7 +7,7 @@ import {
   PairingStartResponse,
   type ProgressEvent,
 } from "@rwt/core";
-import type { z } from "zod";
+import { z } from "zod";
 
 export type PostEventsResult =
   | { ok: true; results: EventResult[] }
@@ -112,6 +112,9 @@ export function createApiClient(fetchFn: Fetch) {
 
     enableSource: (apiUrl: string, token: string, body: { origin: string; name?: string; moveFromSourceKey?: string }) =>
       call(`${apiUrl}/api/v1/sources/enable`, json(body, token), EnableSourceResponse),
+
+    ignoreSeries: (apiUrl: string, token: string, body: { sourceKey: string; externalKey: string; rawTitle: string }) =>
+      call(`${apiUrl}/api/v1/ignore`, json(body, token), z.object({ ok: z.literal(true) })),
   };
 }
 

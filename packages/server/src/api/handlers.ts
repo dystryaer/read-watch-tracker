@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   EnableSourceRequest,
+  IgnoreSeriesRequest,
   type EventResult,
   PairingPollRequest,
   PairingStartRequest,
@@ -10,6 +11,7 @@ import type { Db } from "@rwt/db";
 import { authenticateDevice, type DeviceSummary, pollPairing, startPairing } from "../devices";
 import { RateLimiter } from "../http/rate-limit";
 import { bearerToken, clientAddress, errorResponse, jsonResponse, type Parsed, readJsonBody } from "../http/request";
+import { ignoreSeries } from "../ignore";
 import { ingestEvents } from "../ingest";
 import { buildDeviceConfig, enableSource, SourceConflictError, SourceNotFoundError } from "../sources";
 
@@ -133,4 +135,25 @@ export async function handleEnableSource(request: Request, context: ApiContext):
     if (error instanceof SourceConflictError) return errorResponse("domain_taken", 409);
     throw error;
   }
+}
+
+/** POST /api/v1/ignore – "Falsch erkannt? Serie ignorieren" from the extension popup. */
+export async function handleIgnoreSeries(request: Request, context: ApiContext): Promise<Response> {
+  const device = await authenticate(request, context);
+  if (!device.ok) return device.response;
+  if (device.value.kind !== "extension") return errorResponse("forbidden", 403);
+  if (!context.limiters.sources.allow(device.value.id)) return tooManyRequests();
+
+  const body = await readJsonBody(request, MAX_SMALL_BODY_BYTES);
+  if (!body.ok) return body.response;
+  const input = IgnoreSeriesRequest.safeParse(body.value);
+  if (!input.success) return errorResponse("invalid_request", 400);
+
+  try {
+    await ignoreSeries(context.db, input.data, context.now?.());
+  } catch (error) {
+    if (error instanceof SourceNotFoundError) return errorResponse("source_not_found", 404);
+    throw error;
+  }
+  return jsonResponse({ ok: true });
 }

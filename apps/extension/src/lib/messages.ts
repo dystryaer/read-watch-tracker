@@ -36,7 +36,6 @@ export const ExtensionPageMessage = z.discriminatedUnion("type", [
     name: cleanText(100).optional(),
     moveFromSourceKey: SourceKey.optional(),
   }),
-  z.object({ type: z.literal("popup:disable-site"), tabId: TabId }),
   z.object({ type: z.literal("popup:ignore-series"), tabId: TabId }),
   z.object({ type: z.literal("options:sync-now") }),
 ]);
@@ -60,3 +59,26 @@ export function classifySender(sender: SenderLike, extensionId: string): SenderK
   if (sender.url?.startsWith(`chrome-extension://${extensionId}/`)) return { kind: "page" };
   return { kind: "foreign" };
 }
+
+/** What the popup shows for the active tab; built by the background. */
+export const PopupStatus = z.object({
+  ok: z.literal(true),
+  paired: z.boolean(),
+  apiUrl: HttpUrlSchema.nullable(),
+  page: z
+    .object({
+      origin: HttpUrlSchema,
+      domain: z.string().max(253),
+      site: z.object({ sourceKey: SourceKey, domains: z.array(z.string().max(253)) }).nullable(),
+      permission: z.boolean(),
+      detection: Detection.nullable(),
+      counted: z.boolean(),
+      ignored: z.boolean(),
+    })
+    .nullable(),
+  sites: z.array(z.object({ sourceKey: SourceKey, domains: z.array(z.string().max(253)) })),
+  outbox: z.object({ queued: z.number().int(), lastSyncAt: z.number().nullable(), lastError: z.string().nullable() }),
+});
+export type PopupStatus = z.infer<typeof PopupStatus>;
+
+export const ActionReply = z.union([z.object({ ok: z.literal(true) }).loose(), z.object({ ok: z.literal(false), error: z.string().max(300).optional() })]);

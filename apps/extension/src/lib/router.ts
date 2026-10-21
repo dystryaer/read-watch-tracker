@@ -1,9 +1,9 @@
-import { DEFAULT_THRESHOLDS, type DeviceConfig, ProgressEvent, type SiteRule } from "@rwt/core";
+import { DEFAULT_THRESHOLDS, type DeviceConfig, normalizeDomain, parseHttpUrl, ProgressEvent, type SiteRule } from "@rwt/core";
 import type { ApiClient } from "./api-client";
 import { classifySender, ContentMessage, type Detection, ExtensionPageMessage } from "./messages";
 import type { Outbox } from "./outbox";
 import type { RecentReads } from "./recent";
-import { loadCachedConfig } from "./settings";
+import { loadCachedConfig, loadSettings } from "./settings";
 import { findSiteForUrl } from "./sites";
 import type { Store } from "./storage";
 
@@ -12,16 +12,26 @@ export interface TabState {
   sourceKey: string | null;
   detection: Detection | null;
   counted: boolean;
+  ignored?: boolean;
+}
+
+/** The browser APIs the router needs, so tests can pass fakes. */
+export interface BrowserApis {
+  tabs: { get(tabId: number): Promise<{ url?: string }> };
+  permissions: { contains(permissions: { origins: string[] }): Promise<boolean> };
+  /** Starts the reader script in a tab right away (after a site was enabled). */
+  injectReader(tabId: number): Promise<unknown>;
 }
 
 export interface RouterDeps {
   extensionId: string;
   store: Store;
-  outbox: Pick<Outbox, "enqueue" | "flush">;
+  outbox: Pick<Outbox, "enqueue" | "flush" | "state">;
   recent: Pick<RecentReads, "claim">;
-  api: Partial<Pick<ApiClient, "enableSource">>;
+  api: Pick<ApiClient, "enableSource" | "ignoreSeries">;
   sync: () => Promise<unknown>;
-  browser: unknown;
+  browser: BrowserApis;
+  onUnauthorized: () => void;
   now?: () => number;
 }
 
@@ -107,12 +117,93 @@ export function createRouter(deps: RouterDeps) {
     }
   }
 
+  async function tabUrl(tabId: number): Promise<URL | null> {
+    try {
+      return parseHttpUrl((await deps.browser.tabs.get(tabId)).url);
+    } catch {
+      return null;
+    }
+  }
+
+  async function popupStatus(tabId: number) {
+    const [settings, current, outbox] = await Promise.all([loadSettings(deps.store), config(), deps.outbox.state()]);
+    const url = await tabUrl(tabId);
+    const site = url ? findSiteForUrl(current, url.href) : undefined;
+    const state = tabs.get(tabId);
+    const sameTab = state && url && parseHttpUrl(state.url)?.hostname === url.hostname;
+    return {
+      ok: true,
+      paired: settings.apiUrl !== null && settings.deviceToken !== null,
+      apiUrl: settings.apiUrl,
+      page: url
+        ? {
+            origin: url.origin,
+            domain: normalizeDomain(url.hostname),
+            site: site ? { sourceKey: site.sourceKey, domains: site.domains } : null,
+            permission: await deps.browser.permissions.contains({ origins: [`${url.origin}/*`] }),
+            detection: sameTab ? state.detection : null,
+            counted: sameTab ? state.counted : false,
+            ignored: sameTab ? (state.ignored ?? false) : false,
+          }
+        : null,
+      sites: (current?.sites ?? []).map(({ sourceKey, domains }) => ({ sourceKey, domains })),
+      outbox: { queued: outbox.events.length, lastSyncAt: outbox.lastSyncAt, lastError: outbox.lastError },
+    };
+  }
+
+  function refusal(result: { kind: string; status?: number }): string {
+    if (result.kind === "unauthorized") return "Dieses Gerät ist nicht mehr gekoppelt.";
+    if (result.status === 404) return "Die gewählte Seite gibt es im Tracker nicht mehr.";
+    if (result.status === 409) return "Diese Domain gehört bereits zu einer anderen Seite.";
+    if (result.kind === "rejected") return "Der Tracker hat die Anfrage abgelehnt.";
+    return "Der Tracker ist gerade nicht erreichbar.";
+  }
+
   async function handlePage(message: ExtensionPageMessage) {
     switch (message.type) {
       case "options:sync-now":
         return { ok: true, result: await deps.sync() };
-      default:
-        return { ok: false };
+
+      case "popup:status":
+        return popupStatus(message.tabId);
+
+      case "popup:enable-site": {
+        const { apiUrl, deviceToken } = await loadSettings(deps.store);
+        const url = await tabUrl(message.tabId);
+        if (!apiUrl || !deviceToken) return { ok: false, error: "Bitte zuerst in den Einstellungen koppeln." };
+        if (!url) return { ok: false, error: "Diese Seite kann nicht getrackt werden." };
+        const result = await deps.api.enableSource(apiUrl, deviceToken, {
+          origin: url.origin,
+          ...(message.name ? { name: message.name } : {}),
+          ...(message.moveFromSourceKey ? { moveFromSourceKey: message.moveFromSourceKey } : {}),
+        });
+        if (!result.ok) {
+          if (result.kind === "unauthorized") deps.onUnauthorized();
+          return { ok: false, error: refusal(result) };
+        }
+        await deps.sync(); // registers the reader for the new domain
+        try {
+          await deps.browser.injectReader(message.tabId);
+        } catch {
+          // e.g. the tab navigated away; the registered script takes over on the next page load
+        }
+        return { ok: true };
+      }
+
+      case "popup:ignore-series": {
+        const { apiUrl, deviceToken } = await loadSettings(deps.store);
+        const state = tabs.get(message.tabId);
+        if (!apiUrl || !deviceToken) return { ok: false, error: "Bitte zuerst in den Einstellungen koppeln." };
+        if (!state?.detection || !state.sourceKey) return { ok: false, error: "Hier wurde keine Serie erkannt." };
+        const result = await deps.api.ignoreSeries(apiUrl, deviceToken, {
+          sourceKey: state.sourceKey,
+          externalKey: state.detection.seriesKey,
+          rawTitle: state.detection.title ?? state.detection.seriesKey,
+        });
+        if (!result.ok) return { ok: false, error: refusal(result) };
+        tabs.set(message.tabId, { ...state, ignored: true });
+        return { ok: true };
+      }
     }
   }
 

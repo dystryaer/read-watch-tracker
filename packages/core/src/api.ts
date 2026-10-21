@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { cleanText, EventOutcome, HttpUrlSchema, SourceKey } from "./event";
+import { cleanText, EventOutcome, HttpUrlSchema, MAX_TEXT_LENGTH, SourceKey } from "./event";
 import { parseHttpUrl } from "./safe-url";
 import { SiteRule } from "./site-rule";
 
@@ -70,5 +70,11 @@ export const EnableSourceResponse = z.object({
   domains: z.array(z.string().max(253)).max(50),
 });
 export type EnableSourceResponse = z.infer<typeof EnableSourceResponse>;
+
+export const IgnoreSeriesRequest = z.object({
+  sourceKey: SourceKey,
+  externalKey: cleanText(MAX_TEXT_LENGTH),
+  rawTitle: cleanText(MAX_TEXT_LENGTH),
+});
 
 export const ApiError = z.object({ error: z.string().max(100) });

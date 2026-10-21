@@ -7,7 +7,8 @@ export default defineConfig({
   manifest: {
     name: "Read-Watch-Tracker",
     description: "Merkt sich, bei welchem Kapitel du auf welcher Seite stehst.",
-    permissions: ["storage", "alarms", "scripting"],
+    // activeTab: read the URL of the tab the user opened the popup on – nothing else.
+    permissions: ["storage", "alarms", "scripting", "activeTab"],
     optional_permissions: ["history"],
     // No fixed host permissions: each site (and the tracker's own API) is granted on a click.
     optional_host_permissions: ["https://*/*", "http://*/*"],

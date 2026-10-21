@@ -2,7 +2,7 @@ import type { DeviceConfig, ProgressEvent } from "@rwt/core";
 import { describe, expect, it, vi } from "vitest";
 import { RecentReads } from "../src/lib/recent";
 import { createRouter } from "../src/lib/router";
-import { saveCachedConfig } from "../src/lib/settings";
+import { saveCachedConfig, saveSettings } from "../src/lib/settings";
 import { createStore } from "../src/lib/storage";
 import { fakeStorage } from "./fakes";
 
@@ -19,29 +19,42 @@ const chapterUrl = "https://asuracomic.net/series/overgeared/chapter/345";
 const content = (url = chapterUrl) => ({ id: EXT, tab: { id: 4 }, url });
 const page = { id: EXT, url: `chrome-extension://${EXT}/popup.html` };
 
-async function setup() {
+const paired = { apiUrl: "https://tracker.example", deviceToken: "T".repeat(43), deviceName: "Brave", pairing: null };
+
+async function setup(options: { paired?: boolean; tabUrl?: string; permission?: boolean } = {}) {
   const store = createStore(fakeStorage());
   await saveCachedConfig(store, { config, etag: null, fetchedAt: 0 });
+  if (options.paired !== false) await saveSettings(store, paired);
   const queued: ProgressEvent[] = [];
   const outbox = {
     enqueue: vi.fn(async (event: ProgressEvent) => {
       queued.push(event);
     }),
     flush: vi.fn(async () => ({ sent: 0, remaining: 0 })),
-    state: vi.fn(),
+    state: vi.fn(async () => ({ events: queued, attempts: 0, nextAttemptAt: null, lastSyncAt: 5, lastError: null, dropped: 0 })),
   };
   const sync = vi.fn(async () => "updated");
+  const api = {
+    enableSource: vi.fn(async () => ({ ok: true as const, value: { sourceKey: "site:new-example", name: "new.example", domains: ["new.example"] } })),
+    ignoreSeries: vi.fn(async () => ({ ok: true as const, value: { ok: true as const } })),
+  };
+  const browser = {
+    tabs: { get: vi.fn(async () => ({ url: options.tabUrl ?? chapterUrl })) },
+    permissions: { contains: vi.fn(async () => options.permission ?? true) },
+    injectReader: vi.fn(async () => []),
+  };
   const route = createRouter({
     extensionId: EXT,
     store,
     outbox,
     recent: new RecentReads(store),
-    api: { enableSource: vi.fn() },
+    api,
     sync,
-    browser: { tabs: { get: vi.fn() }, permissions: { contains: vi.fn() } },
+    browser,
+    onUnauthorized: vi.fn(),
     now: () => Date.parse("2026-10-21T20:00:00.000Z"),
   });
-  return { route, queued, outbox, sync };
+  return { route, queued, outbox, sync, api, browser };
 }
 
 describe("router – reader script", () => {
@@ -165,5 +178,90 @@ describe("router – extension pages", () => {
     const { route, sync } = await setup();
     expect(await route({ type: "options:sync-now" }, { id: "x".repeat(32), url: "chrome-extension://x/" })).toEqual({ ok: false });
     expect(sync).not.toHaveBeenCalled();
+  });
+});
+
+describe("router – popup", () => {
+  it("describes an enabled site with the tab's detection", async () => {
+    const { route } = await setup();
+    await route({ type: "reader:detected", url: chapterUrl, detection }, content());
+
+    const status = await route({ type: "popup:status", tabId: 4 }, page);
+
+    expect(status).toMatchObject({
+      ok: true,
+      paired: true,
+      page: {
+        origin: "https://asuracomic.net",
+        domain: "asuracomic.net",
+        site: { sourceKey: "site:asura" },
+        permission: true,
+        detection,
+        counted: false,
+        ignored: false,
+      },
+      outbox: { queued: 0, lastSyncAt: 5, lastError: null },
+    });
+  });
+
+  it("describes a site that is not enabled and lists sites to move from", async () => {
+    const { route } = await setup({ tabUrl: "https://new.example/manga/x/chapter-1", permission: false });
+    const status = await route({ type: "popup:status", tabId: 4 }, page);
+    expect(status).toMatchObject({ page: { site: null, permission: false, domain: "new.example" } });
+    expect((status as { sites: unknown[] }).sites).toHaveLength(2);
+  });
+
+  it("has no page for non-http tabs", async () => {
+    const { route } = await setup({ tabUrl: "chrome://extensions" });
+    expect(await route({ type: "popup:status", tabId: 4 }, page)).toMatchObject({ page: null });
+  });
+
+  it("enables the tab's site on the server, resyncs and starts the reader right away", async () => {
+    const { route, api, sync, browser } = await setup({ tabUrl: "https://new.example/manga/x/chapter-1" });
+
+    const result = await route({ type: "popup:enable-site", tabId: 4, name: "New" }, page);
+
+    expect(result).toEqual({ ok: true });
+    expect(api.enableSource).toHaveBeenCalledWith(paired.apiUrl, paired.deviceToken, { origin: "https://new.example", name: "New" });
+    expect(sync).toHaveBeenCalled();
+    expect(browser.injectReader).toHaveBeenCalledWith(4);
+  });
+
+  it("passes a domain move on to the server", async () => {
+    const { route, api } = await setup({ tabUrl: "https://asurascans.com/series/x/chapter/1" });
+    await route({ type: "popup:enable-site", tabId: 4, moveFromSourceKey: "site:asura" }, page);
+    expect(api.enableSource).toHaveBeenCalledWith(paired.apiUrl, paired.deviceToken, {
+      origin: "https://asurascans.com",
+      moveFromSourceKey: "site:asura",
+    });
+  });
+
+  it("explains a refused domain move", async () => {
+    const { route, api } = await setup({ tabUrl: "https://asurascans.com/" });
+    api.enableSource.mockResolvedValueOnce({ ok: false, kind: "rejected", message: "x", status: 409 } as never);
+    expect(await route({ type: "popup:enable-site", tabId: 4, moveFromSourceKey: "site:asura" }, page)).toEqual({
+      ok: false,
+      error: "Diese Domain gehört bereits zu einer anderen Seite.",
+    });
+  });
+
+  it("refuses to enable a site while unpaired", async () => {
+    const { route, api } = await setup({ paired: false });
+    expect(await route({ type: "popup:enable-site", tabId: 4 }, page)).toMatchObject({ ok: false });
+    expect(api.enableSource).not.toHaveBeenCalled();
+  });
+
+  it("ignores the detected series of the tab", async () => {
+    const { route, api } = await setup();
+    await route({ type: "reader:detected", url: chapterUrl, detection }, content());
+
+    expect(await route({ type: "popup:ignore-series", tabId: 4 }, page)).toEqual({ ok: true });
+
+    expect(api.ignoreSeries).toHaveBeenCalledWith(paired.apiUrl, paired.deviceToken, {
+      sourceKey: "site:asura",
+      externalKey: "overgeared",
+      rawTitle: "Overgeared",
+    });
+    expect(await route({ type: "popup:status", tabId: 4 }, page)).toMatchObject({ page: { ignored: true } });
   });
 });

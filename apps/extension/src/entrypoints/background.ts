@@ -42,7 +42,13 @@ export default defineBackground(() => {
     recent: new RecentReads(store),
     api,
     sync,
-    browser,
+    // Only these browser APIs are used for routing.
+    browser: {
+      tabs: { get: (tabId) => browser.tabs.get(tabId) },
+      permissions: { contains: (permissions) => browser.permissions.contains(permissions) },
+      injectReader: (tabId) => browser.scripting.executeScript({ target: { tabId }, files: ["/reader.js"] }),
+    },
+    onUnauthorized: () => void onUnauthorized(),
   });
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     route(message, sender).then(sendResponse, () => sendResponse({ ok: false }));

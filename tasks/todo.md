@@ -85,7 +85,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T23 Lese-Engine (DOM) + Kapitelende** · M · Abh. T04, T21
   Akz.: SPEC §7.3–7.4: Titel-Selektor/Fallbacks, drei Ende-Signale, 12-h-Dedupe, URL-Wechsel ohne Reload · Prüfung: happy-dom-Tests mit synthetischem Reader-Korpus (Long-Strip, seitenweise, Next-Link)
 
-- [ ] **T24 Popup + Seite freischalten + Umzug** · M · Abh. T22, T23
+- [x] **T24 Popup + Seite freischalten + Umzug** · M · Abh. T22, T23
   Akz.: Status des Tabs (nur `textContent`), „Diese Seite tracken“ → Permission → Content-Script registrieren → `/sources/enable`; Umzug wählbar; „Serie ignorieren“
 
 - [ ] **T25 Verlaufs-Backfill** · S · Abh. T23, T24
