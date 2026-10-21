@@ -10,3 +10,5 @@ next-env.d.ts
 *.tsbuildinfo
 .output/
 .wxt/
+test-results/
+playwright-report/

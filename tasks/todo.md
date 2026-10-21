@@ -91,7 +91,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T25 Verlaufs-Backfill** · S · Abh. T23, T24
   Akz.: `history` nur auf Klick; 90 Tage; nur freigeschaltete (auch alte) Domains; max. Kapitel pro Serie als `backfill`
 
-- [ ] **T26 E2E: Web** · M · Abh. T13–T18
+- [x] **T26 E2E: Web** · M · Abh. T13–T18
   Akz.: Ersteinrichtung, Login, Kopplung, Ingest per API → Inbox → bestätigen → Liste; Weiterlesen-Link; Stepper; **XSS-Payload-Titel als Text dargestellt**; 375 px ohne horizontales Scrollen
 
 - [ ] **T27 E2E: Extension + Doku** · M · Abh. T24, T25
