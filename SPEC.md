@@ -597,7 +597,7 @@ Eine kleine Android-TV-App (Kotlin), per adb sideloaded. Sie liest über die off
 
 Ein Debug-Build loggt alle Metadaten-Keys und PlaybackStates als JSON. Damit schaue ich je eine Folge in Prime Video, Crunchyroll, Netflix und Disney+. Zusätzlich wird geprüft, ob Disney+ im Web eine auslesbare Verlaufsseite hat (Fallback, §7.6).
 
-- Die Samples werden als Fixtures unter `apps/shield/src/test/resources/fixtures/<paket>/` gespeichert.
+- Die Samples werden als Fixtures unter `apps/shield/logic/src/test/resources/fixtures/<paket>/` gespeichert. Anleitung: `docs/spikes/s1-shield-metadata.md`; der Logger steckt nur im Debug-Build (`SpikeLogger`).
 - **Entscheidung pro Dienst:** Liefern die Metadaten Serie und Folge, wird ein Mapping gebaut. Liefern sie das nicht, wird der Dienst auf der Shield ignoriert und der Verlaufs-Sync am Desktop ist der offizielle Pfad. Das Ergebnis wird in `docs/spikes/s1-shield-metadata.md` dokumentiert.
 
 ### 8.6 Akzeptanzkriterien Shield
@@ -739,7 +739,7 @@ pnpm import:excel "C:\Users\hasse\Downloads\Reading List.xlsx" --dry-run
 docker compose up -d                           # lokale Postgres + Web wie auf späterem Server
 
 # Shield (in apps/shield; unter Windows gradlew.bat)
-./gradlew test                                 # JUnit inkl. Mapping-Fixtures und Vertragstest
+./gradlew test assembleDebug                   # JUnit (Logik, geteilte Folgen-Fixtures, Vertragstest gegen event.schema.json) + Debug-APK
 ./gradlew assembleRelease                      # APK bauen
 adb connect <shield-ip>:5555
 adb install -r app/build/outputs/apk/release/app-release.apk

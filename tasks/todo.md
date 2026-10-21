@@ -115,16 +115,16 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T30 Extension: Verlaufsseiten-Sync** · M · Abh. T29
   Akz.: Crunchyroll, Prime, Netflix als `library_sync`-Batch; tolerant gegenüber DOM-Änderungen (unverifiziert, A10); Server verarbeitet `library_sync`
 
-- [ ] **T31 Android-SDK + Gradle-Gerüst** · M
+- [x] **T31 Android-SDK + Gradle-Gerüst** · M
   Akz.: SDK in `%LOCALAPPDATA%\Android\Sdk`, Lizenzen akzeptiert (Freigabe liegt vor); Gradle-Wrapper; Module `logic` (JVM) + `app` (Android); `gradlew test assembleDebug` grün
 
-- [ ] **T32 Shield-Logik (JVM)** · M · Abh. T31, T28
+- [x] **T32 Shield-Logik (JVM)** · M · Abh. T31, T28
   Akz.: Paket-Mappings für 4 Dienste, Gesehen-Regel (85 %, Metadatenwechsel, einmal pro Folge), Payload + **Vertragstest gegen `event.schema.json`**, Datei-Outbox-Logik, validiertes Laden
 
-- [ ] **T33 Shield-App (Android)** · M · Abh. T32
+- [x] **T33 Shield-App (Android)** · M · Abh. T32
   Akz.: `MediaWatcherService`, Kopplungs- und Statusscreen, Flush per WorkManager, Debug-Logger für Spike S1, „Nicht erkannt“-Liste; Build grün
 
-- [ ] **T34 Shield-Doku + Spike-S1-Anleitung** · S
+- [x] **T34 Shield-Doku + Spike-S1-Anleitung** · S
   Akz.: `docs/setup-shield.md`, `docs/spikes/s1-shield-metadata.md`, `docs/testing/shield-checkliste.md`
 
 - [x] **T35 Web: Streaming-Darstellung** · S
