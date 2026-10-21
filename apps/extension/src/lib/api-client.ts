@@ -3,6 +3,7 @@ import {
   EnableSourceResponse,
   type EventResult,
   EventResultsResponse,
+  type LatestChaptersRequest,
   LatestChaptersResponse,
   PairingPollResponse,
   PairingStartResponse,
@@ -124,7 +125,7 @@ export function createApiClient(fetchFn: Fetch) {
     getSeriesWatch: (apiUrl: string, token: string) =>
       call(`${apiUrl}/api/v1/series-watch`, { headers: { authorization: `Bearer ${token}` } }, SeriesWatchResponse),
 
-    postLatestChapters: (apiUrl: string, token: string, items: { sourceKey: string; externalKey: string; latestChapter: number }[]) =>
+    postLatestChapters: (apiUrl: string, token: string, items: LatestChaptersRequest["items"]) =>
       call(`${apiUrl}/api/v1/latest-chapters`, json({ items }, token), LatestChaptersResponse),
   };
 }
