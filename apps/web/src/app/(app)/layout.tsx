@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/(auth)/actions";
+import { RefreshOnReturn } from "@/components/refresh-on-return";
 import { requireSession } from "@/lib/auth";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -25,6 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           </form>
         </nav>
       </header>
+      <RefreshOnReturn />
       {children}
     </div>
   );

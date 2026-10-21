@@ -2,7 +2,7 @@ import { type DbHandle, events, works } from "@rwt/db";
 import { createTestDb, resetDb } from "@rwt/db/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { setManualPosition, setWorkStatus, WorkNotFoundError, WorkPositionMismatchError } from "../src/manual";
+import { setManualPosition, setWorkStatus, WorkNotFoundError, WorkPositionChangedError, WorkPositionMismatchError } from "../src/manual";
 import { seedWork } from "./helpers";
 
 let handle: DbHandle;
@@ -71,6 +71,38 @@ describe("setManualPosition", () => {
     await expect(
       setManualPosition(handle.db, crypto.randomUUID(), { unit: "chapter", chapter: 1 }, NOW),
     ).rejects.toThrow(WorkNotFoundError);
+  });
+
+  it("refuses a step from a position that moved meanwhile, e.g. an app resumed with an old screen", async () => {
+    const work = await seedWork(handle.db, { title: "Shadow Slave", type: "light_novel", chapter: 1210 });
+
+    await expect(
+      setManualPosition(handle.db, work.id, { unit: "chapter", chapter: 1206 }, NOW, { expected: { unit: "chapter", chapter: 1205 } }),
+    ).rejects.toThrow(WorkPositionChangedError);
+
+    expect((await workById(work.id))?.chapter).toBe(1210);
+    expect(await handle.db.select().from(events)).toHaveLength(0);
+  });
+
+  it("takes the step when the position is still the one it started from", async () => {
+    const novel = await seedWork(handle.db, { title: "Shadow Slave", type: "light_novel", chapter: 1205 });
+    const unknown = await seedWork(handle.db, { title: "Lord of Mysteries", type: "light_novel" });
+    const anime = await seedWork(handle.db, { title: "Frieren", type: "anime", season: 2, episode: 3 });
+
+    await setManualPosition(handle.db, novel.id, { unit: "chapter", chapter: 1206 }, NOW, { expected: { unit: "chapter", chapter: 1205 } });
+    await setManualPosition(handle.db, unknown.id, { unit: "chapter", chapter: 1 }, NOW, { expected: null });
+    await setManualPosition(handle.db, anime.id, { unit: "episode", season: 2, episode: 4 }, NOW, { expected: { unit: "episode", season: 2, episode: 3 } });
+
+    expect((await workById(novel.id))?.chapter).toBe(1206);
+    expect((await workById(unknown.id))?.chapter).toBe(1);
+    expect((await workById(anime.id))?.episode).toBe(4);
+  });
+
+  it("refuses a step from an unknown position when a device set one meanwhile", async () => {
+    const work = await seedWork(handle.db, { title: "Shadow Slave", type: "light_novel", chapter: 1210 });
+    await expect(setManualPosition(handle.db, work.id, { unit: "chapter", chapter: 1 }, NOW, { expected: null })).rejects.toThrow(
+      WorkPositionChangedError,
+    );
   });
 });
 

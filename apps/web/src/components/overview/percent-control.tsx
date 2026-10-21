@@ -2,30 +2,48 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { setPositionAction } from "@/app/(app)/work-actions";
+import { useDebouncedSave } from "./use-debounced-save";
 
-const DEBOUNCE_MS = 500;
 const percentFormat = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 });
 
 /**
  * E-book progress on the quick-update screen (SPEC §9.3): the label follows the slider at once,
- * the final value is saved 500 ms after the last change – like the chapter stepper.
+ * the final value is saved 500 ms after the last change – like the chapter stepper, including the
+ * check against the value the slider started from.
  */
 export function PercentControl({ workId, title, initial }: { workId: string; title: string; initial: number | null }) {
   const [value, setValue] = useState(initial ?? 0);
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pending = useRef(false);
   const latest = useRef(initial ?? 0);
+  const base = useRef(initial);
   const serverValue = useRef(initial);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const scheduleSave = useDebouncedSave(() => {
+    const next = latest.current;
+    const expected = base.current === null ? null : { unit: "percent" as const, percent: base.current };
+    base.current = next;
+    startSaving(async () => {
+      const result = await setPositionAction({ workId, position: { unit: "percent", percent: next }, expected });
+      // A later change restarted the timer: its own save will answer.
+      if (latest.current !== next) return;
+      pending.current = false;
+      if (!result.ok) {
+        setError(result.error);
+        base.current = serverValue.current;
+        setValue(serverValue.current ?? 0);
+      }
+    });
+  });
 
   // A new value from the server is shown unless a change of mine is still on its way.
   useEffect(() => {
     serverValue.current = initial;
-    if (!pending.current) setValue(initial ?? 0);
+    if (pending.current) return;
+    base.current = initial;
+    setValue(initial ?? 0);
   }, [initial]);
 
   function change(next: number) {
@@ -34,21 +52,10 @@ export function PercentControl({ workId, title, initial }: { workId: string; tit
     setTouched(true);
     setValue(next);
     setError(null);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      startSaving(async () => {
-        const result = await setPositionAction({ workId, position: { unit: "percent", percent: next } });
-        // A later change restarted the timer: its own save will answer.
-        if (latest.current !== next) return;
-        pending.current = false;
-        if (!result.ok) {
-          setError(result.error);
-          setValue(serverValue.current ?? 0);
-        }
-      });
-    }, DEBOUNCE_MS);
+    scheduleSave();
   }
 
+  const unknown = initial === null && !touched;
   return (
     <div className="flex items-center gap-3">
       <input
@@ -59,11 +66,11 @@ export function PercentControl({ workId, title, initial }: { workId: string; tit
         value={value}
         onChange={(event) => change(Number(event.currentTarget.value))}
         aria-label={`Fortschritt von ${title}`}
-        aria-valuetext={`${percentFormat.format(value)} %`}
+        aria-valuetext={unknown ? "Stand unbekannt" : `${percentFormat.format(value)} %`}
         className="w-40 accent-teal-700"
       />
       <span aria-live="polite" className="min-w-14 text-right text-sm tabular-nums">
-        {initial === null && !touched ? "? %" : `${percentFormat.format(value)} %`}
+        {unknown ? "? %" : `${percentFormat.format(value)} %`}
         {saving ? <span className="sr-only"> wird gespeichert</span> : null}
       </span>
       {error ? (

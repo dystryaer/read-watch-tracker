@@ -15,7 +15,7 @@ export function WorkRow({ item, actions }: { item: OverviewItem; actions?: React
 
       <div className="text-right sm:text-left">
         {item.stepper ? (
-          <PositionStepper key={item.id} workId={item.id} initial={item.stepper} />
+          <PositionStepper key={item.id} workId={item.id} title={item.title} initial={item.stepper} />
         ) : item.positionUnknown ? (
           <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-sm font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
             {item.positionLabel}

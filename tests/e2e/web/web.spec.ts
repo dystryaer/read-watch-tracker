@@ -25,6 +25,11 @@ function chapterEvent(externalKey: string, rawTitle: string, chapter: number) {
   };
 }
 
+/** Resolves when a Server Action (a stepper's or slider's save) has answered. */
+function actionAnswered(page: import("@playwright/test").Page) {
+  return page.waitForResponse((response) => response.request().method() === "POST" && response.request().headers()["next-action"] !== undefined);
+}
+
 async function postEvents(request: APIRequestContext, events: unknown[]) {
   const response = await request.post("/api/v1/events", { data: { events }, headers: { authorization: `Bearer ${token}` } });
   expect(response.status()).toBe(200);
@@ -152,10 +157,11 @@ test("the stepper saves the chapter after quick clicks", async ({ page }) => {
   await login(page);
   await page.goto("/");
   const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Overgeared", exact: true }) });
+  const saved = actionAnswered(page);
   await row.getByRole("button", { name: "Ein Kapitel weiter" }).click();
   await row.getByRole("button", { name: "Ein Kapitel weiter" }).click();
   await expect(row.getByText("Kap. 347")).toBeVisible();
-  await page.waitForTimeout(1500); // debounce + save
+  await saved;
 
   await page.reload();
   await expect(
@@ -224,12 +230,20 @@ test("the quick update saves the next chapter of a light novel and an e-book's p
   await page.goto("/quick");
   const novel = page.getByRole("listitem").filter({ hasText: "Shadow Slave" });
   await expect(novel.getByText("Kap. 12")).toBeVisible();
+  // Leaving right after the tap loses nothing: the waiting save is sent when the list goes away.
+  const novelSaved = actionAnswered(page);
   await novel.getByRole("button", { name: "Ein Kapitel weiter" }).click();
+  await page.getByRole("link", { name: "Alle Titel" }).click();
+  await novelSaved;
+
+  await page.goto("/quick");
+  await expect(page.getByRole("listitem").filter({ hasText: "Shadow Slave" }).getByText("Kap. 13")).toBeVisible();
   const slider = page.getByRole("slider", { name: "Fortschritt von Project Hail Mary" });
+  const percentSaved = actionAnswered(page);
   await slider.focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("listitem").filter({ hasText: "Project Hail Mary" }).getByText("40,5 %")).toBeVisible();
-  await page.waitForTimeout(1500); // debounce + save
+  await percentSaved;
 
   await page.reload();
   await expect(page.getByRole("listitem").filter({ hasText: "Shadow Slave" }).getByText("Kap. 13")).toBeVisible();

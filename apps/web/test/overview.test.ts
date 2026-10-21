@@ -1,6 +1,6 @@
 import type { OverviewRow } from "@rwt/server";
 import { describe, expect, it } from "vitest";
-import { filterAndSort, formatRelative, type OverviewItem, quickUpdateItems, toOverviewItem, webnovelReminder } from "../src/lib/overview";
+import { filterAndSort, formatRelative, keepOrder, type OverviewItem, quickUpdateItems, toOverviewItem, webnovelReminder } from "../src/lib/overview";
 
 const NOW = new Date("2026-10-21T20:00:00.000Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
@@ -272,5 +272,18 @@ describe("webnovelReminder (SPEC §9.1)", () => {
   it("reminds people who read on WebNovel but never synced it, and nobody else", () => {
     expect(webnovelReminder({ lastSync: null, readsOnWebnovel: true }, NOW)).toBe("WebNovel wurde noch nie synchronisiert.");
     expect(webnovelReminder({ lastSync: null, readsOnWebnovel: false }, NOW)).toBeNull();
+  });
+});
+
+describe("keepOrder", () => {
+  const item = (id: string, label = id) => ({ id, label });
+
+  it("keeps rows where they were when the page opened, with fresh data", () => {
+    const fresh = [item("b", "b saved"), item("a"), item("c")];
+    expect(keepOrder(["a", "b", "c"], fresh)).toEqual([item("a"), item("b", "b saved"), item("c")]);
+  });
+
+  it("drops rows that left the list and adds new ones at the end", () => {
+    expect(keepOrder(["a", "b", "c"], [item("d"), item("c"), item("a")])).toEqual([item("a"), item("c"), item("d")]);
   });
 });

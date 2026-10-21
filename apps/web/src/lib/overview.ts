@@ -170,6 +170,16 @@ export function quickUpdateItems(items: OverviewItem[]): OverviewItem[] {
     .slice(0, QUICK_LIMIT);
 }
 
+/**
+ * Keeps rows where they were when the page opened, filled with fresh data: a save re-sorts the
+ * list by recency, and the row must not move away under the finger. New rows go to the end.
+ */
+export function keepOrder<T extends { id: string }>(order: readonly string[], items: readonly T[]): T[] {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const known = new Set(order);
+  return [...order.flatMap((id) => byId.get(id) ?? []), ...items.filter((item) => !known.has(item.id))];
+}
+
 const REMIND_AFTER_DAYS = 7;
 const DAY_MS = 86_400_000;
 

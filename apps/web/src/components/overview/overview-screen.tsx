@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
-import { filterAndSort, type OverviewFilter, type OverviewItem, type SortOrder, type StatusFilter, type Tab } from "@/lib/overview";
+import { filterAndSort, keepOrder, type OverviewFilter, type OverviewItem, type SortOrder, type StatusFilter, type Tab } from "@/lib/overview";
 import { WorkRow } from "./work-row";
 
 const TABS: { value: Tab; label: string }[] = [
@@ -51,7 +51,12 @@ export function OverviewScreen({
   });
   // Typing stays responsive; the list follows a moment later.
   const deferredFilter = useDeferredValue(filter);
-  const visible = useMemo(() => filterAndSort(items, deferredFilter), [items, deferredFilter]);
+  const sorted = useMemo(() => filterAndSort(items, deferredFilter), [items, deferredFilter]);
+  // The order is taken when the filter changes, not on every save: "Zuletzt aktiv" would move a
+  // row stepped forward to the top, away from under the finger.
+  const [order, setOrder] = useState({ filter: deferredFilter, ids: sorted.map((item) => item.id) });
+  if (order.filter !== deferredFilter) setOrder({ filter: deferredFilter, ids: sorted.map((item) => item.id) });
+  const visible = keepOrder(order.ids, sorted);
   const update = (patch: Partial<OverviewFilter>) => setFilter((current) => ({ ...current, ...patch }));
 
   return (

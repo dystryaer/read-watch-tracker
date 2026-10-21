@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { fitsMediaType, type Position } from "@rwt/core";
+import { comparePositions, fitsMediaType, type Position } from "@rwt/core";
 import { type Db, events, works } from "@rwt/db";
 import { eq } from "drizzle-orm";
-import { positionColumns } from "./work-progress";
+import { currentPosition, positionColumns } from "./work-progress";
 
 export type WorkStatus = (typeof works.$inferSelect)["status"];
 
@@ -20,15 +20,37 @@ export class WorkPositionMismatchError extends Error {
   }
 }
 
+/** The position changed since the screen was loaded (another device, an app resumed from the background). */
+export class WorkPositionChangedError extends Error {
+  constructor() {
+    super("Position changed meanwhile");
+    this.name = "WorkPositionChangedError";
+  }
+}
+
+function samePosition(a: Position | null, b: Position | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.unit === b.unit && comparePositions(a, b) === 0;
+}
+
 /**
  * A change made in the web app (stepper, detail page). Unlike device events it may move the
- * position backwards (SPEC §5.3); it is logged as a "manual" event for the history.
+ * position backwards (SPEC §5.3); it is logged as a "manual" event for the history. With `expected`
+ * – the position a stepper started from – a step from an outdated screen is refused instead of
+ * moving the work back.
  */
-export async function setManualPosition(db: Db, workId: string, position: Position, now = new Date()): Promise<void> {
+export async function setManualPosition(
+  db: Db,
+  workId: string,
+  position: Position,
+  now = new Date(),
+  { expected }: { expected?: Position | null } = {},
+): Promise<void> {
   await db.transaction(async (tx) => {
-    const [work] = await tx.select().from(works).where(eq(works.id, workId));
+    const [work] = await tx.select().from(works).where(eq(works.id, workId)).for("update");
     if (!work) throw new WorkNotFoundError();
     if (position.unit === "none" || !fitsMediaType(work.type, position)) throw new WorkPositionMismatchError();
+    if (expected !== undefined && !samePosition(currentPosition(work), expected)) throw new WorkPositionChangedError();
 
     const columns = positionColumns(position, work);
     await tx

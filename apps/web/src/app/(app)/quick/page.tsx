@@ -1,8 +1,7 @@
 import { listOverview } from "@rwt/server";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PercentControl } from "@/components/overview/percent-control";
-import { PositionStepper } from "@/components/overview/position-stepper";
+import { QuickList } from "@/components/overview/quick-list";
 import { getAuthorizedDb } from "@/lib/dal";
 import { quickUpdateItems, toOverviewItem } from "@/lib/overview";
 
@@ -21,25 +20,7 @@ export default async function QuickUpdatePage() {
           Noch keine Light Novels oder E-Books.
         </p>
       ) : (
-        <ul className="divide-y divide-zinc-200 border-y border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-          {items.map((item) => (
-            <li key={item.id} className="flex flex-col gap-2 py-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <Link href={`/works/${item.id}`} className="min-w-0 truncate font-medium hover:underline">
-                  {item.title}
-                </Link>
-                <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{item.typeLabel}</span>
-              </div>
-              <div className="flex justify-center">
-                {item.stepper ? (
-                  <PositionStepper key={item.id} workId={item.id} initial={item.stepper} />
-                ) : (
-                  <PercentControl key={item.id} workId={item.id} title={item.title} initial={item.percent} />
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+        <QuickList items={items.map(({ id, title, typeLabel, stepper, percent }) => ({ id, title, typeLabel, stepper, percent }))} />
       )}
       <p className="mt-4 text-sm">
         <Link href="/" className="underline">
