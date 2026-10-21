@@ -148,7 +148,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T38 Schnell-Update-PWA** · M
   Akz.: Manifest, Icons, iOS-Meta; 8 zuletzt aktive LN/E-Books; Stepper/Prozent; ≤ 2 Taps
 
-- [ ] **T39 Extension: WebNovel- und Kindle-Bibliothek** · M · Abh. T36
+- [x] **T39 Extension: WebNovel- und Kindle-Bibliothek** · M · Abh. T36
   Akz.: `library_sync` aus Bibliotheksseiten (unverifiziert, A10)
 
 - [ ] **T40 WebNovel-Erinnerung** · XS

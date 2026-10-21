@@ -238,6 +238,31 @@ test("opening the Crunchyroll history sends the latest episode per series, and o
   await context.unroute("https://www.crunchyroll.com/**");
 });
 
+test("opening the WebNovel library sends the chapter of every listed book", async () => {
+  await context.route("https://www.webnovel.com/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><head><title>Bibliothek</title></head><body><ul>
+<li class="library-item"><a href="/book/shadow-slave_22196546206090805"><h3>Shadow Slave</h3></a><span>Chapter 1204</span></li>
+<li class="library-item"><a href="/book/lord-of-mysteries_11022733006234505"><h3>Lord of Mysteries</h3></a><span>Chapter 812</span></li>
+</ul></body></html>`,
+    }),
+  );
+  const synced = () => api.events.filter((event) => event.source.key === "webnovel");
+
+  const page = await context.newPage();
+  await page.goto("https://www.webnovel.com/library");
+
+  await expect.poll(() => synced().length, { timeout: 10_000 }).toBe(2);
+  expect(synced().map((event) => [event.kind, event.source.externalKey, event.position])).toEqual([
+    ["library_sync", "22196546206090805", { unit: "chapter", chapter: 1204 }],
+    ["library_sync", "11022733006234505", { unit: "chapter", chapter: 812 }],
+  ]);
+  await page.close();
+  await context.unroute("https://www.webnovel.com/**");
+});
+
 test("events read while the tracker is unreachable are delivered later, once", async () => {
   api.eventsMode = "unavailable";
   const page = await context.newPage();

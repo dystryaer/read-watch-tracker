@@ -1,13 +1,12 @@
 import { browser } from "wxt/browser";
 import { defineContentScript } from "wxt/utils/define-content-script";
 import { z } from "zod";
+import { syncOnChanges } from "@/lib/page-sync";
 import { readHistory } from "@/streaming/history";
 import { detectFromMediaMetadata, detectStream, STREAMING_MATCHES, type StreamDetection } from "@/streaming/services";
 import { watchVideos } from "@/streaming/watch-video";
 
 const CHECK_MS = 2000;
-const HISTORY_DEBOUNCE_MS = 1500;
-const HISTORY_MAX_WAIT_MS = 10_000;
 
 // The background's answers are validated like any other input.
 const Hello = z.object({ ok: z.literal(true), watchedPercent: z.number().min(1).max(100) });
@@ -57,25 +56,10 @@ export default defineContentScript({
     setInterval(report, CHECK_MS);
 
     // History pages (SPEC §7.6): the visible entries go over as one batch, again when more load.
-    // Pages that change constantly still get read at least every ten seconds.
-    let synced: string | undefined;
-    let syncTimer: ReturnType<typeof setTimeout> | undefined;
-    let firstChangeAt: number | undefined;
-    const syncHistory = () => {
-      firstChangeAt = undefined;
-      const entries = readHistory(document, new URL(location.href));
-      if (!entries || entries.length === 0) return;
-      const fingerprint = JSON.stringify(entries);
-      if (fingerprint === synced) return;
-      synced = fingerprint;
-      void browser.runtime.sendMessage({ type: "stream:library", url: location.href, entries });
-    };
-    new MutationObserver(() => {
-      clearTimeout(syncTimer);
-      firstChangeAt ??= Date.now();
-      const waited = Date.now() - firstChangeAt;
-      syncTimer = setTimeout(syncHistory, waited >= HISTORY_MAX_WAIT_MS ? 0 : HISTORY_DEBOUNCE_MS);
-    }).observe(document.body, { childList: true, subtree: true });
-    syncHistory();
+    syncOnChanges(
+      document,
+      () => readHistory(document, new URL(location.href)),
+      (entries) => void browser.runtime.sendMessage({ type: "stream:library", url: location.href, entries }),
+    );
   },
 });

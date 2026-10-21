@@ -29,6 +29,16 @@ export const StreamDetection = z
   .refine((detection) => (detection.kind === "movie") === (detection.episode === null), "an episode needs a number, a movie none");
 export type StreamDetection = z.infer<typeof StreamDetection>;
 
+/** A book on the WebNovel or Kindle library page (SPEC §9): WebNovel in chapters, Kindle in percent. */
+export const LibraryEntry = z.object({
+  externalKey: z.string().regex(/^[A-Za-z0-9]{1,40}$/),
+  title: cleanText(MAX_TEXT_LENGTH),
+  chapter: z.number().min(0).max(99999.99).optional(),
+  percent: z.number().min(0).max(100).optional(),
+  seriesUrl: HttpUrlSchema.nullable(),
+});
+export type LibraryEntry = z.infer<typeof LibraryEntry>;
+
 /** Sent by the reader script on an enabled manga site, or the streaming script on a service's pages. */
 export const ContentMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("reader:hello"), url: HttpUrlSchema }),
@@ -52,6 +62,7 @@ export const ContentMessage = z.discriminatedUnion("type", [
       )
       .max(500),
   }),
+  z.object({ type: z.literal("library:sync"), url: HttpUrlSchema, entries: z.array(LibraryEntry).max(500) }),
 ]);
 export type ContentMessage = z.infer<typeof ContentMessage>;
 

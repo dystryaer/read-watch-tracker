@@ -9,12 +9,13 @@ import {
   type SiteRule,
   streamingSeriesKey,
 } from "@rwt/core";
+import { isLibraryPage, type LibraryService, libraryServiceForUrl } from "../library/pages";
 import { type HistoryEntry, isHistoryPage, latestPerSeries } from "../streaming/history";
 import { serviceForUrl, type StreamingServiceKey } from "../streaming/services";
 import { deterministicEventId } from "./event-id";
 import type { ApiClient } from "./api-client";
 import { backfillEventId } from "./backfill";
-import { classifySender, ContentMessage, type Detection, ExtensionPageMessage } from "./messages";
+import { classifySender, ContentMessage, type Detection, ExtensionPageMessage, type LibraryEntry } from "./messages";
 import type { Outbox } from "./outbox";
 import type { RecentReads } from "./recent";
 import { loadCachedConfig, loadSettings } from "./settings";
@@ -140,6 +141,30 @@ export function createRouter(deps: RouterDeps) {
       });
       if (event.success) events.push(event.data);
     }
+    return queueOnce(events);
+  }
+
+  /** library_sync events for a WebNovel (chapters) or Kindle (percent) library page; other units are skipped. */
+  async function syncAppLibrary(app: LibraryService, entries: LibraryEntry[]): Promise<number> {
+    const events: ProgressEvent[] = [];
+    for (const { externalKey, title, chapter, percent, seriesUrl } of entries) {
+      const position =
+        app === "webnovel" ? (chapter === undefined ? null : { unit: "chapter", chapter }) : percent === undefined ? null : { unit: "percent", percent };
+      if (!position) continue;
+      const event = ProgressEvent.safeParse({
+        id: await deterministicEventId(["library", app, externalKey, chapter ?? percent ?? ""]),
+        occurredAt: new Date(now()).toISOString(),
+        kind: "library_sync",
+        source: { key: app, externalKey, rawTitle: title, ...(seriesUrl && isServiceUrl(app, seriesUrl) ? { seriesUrl } : {}) },
+        position,
+      });
+      if (event.success) events.push(event.data);
+    }
+    return queueOnce(events);
+  }
+
+  /** Deterministic ids repeat when a page is opened again: what was sent in the last 12 hours is not queued again. */
+  async function queueOnce(events: ProgressEvent[]): Promise<number> {
     const fresh = await deps.recent.claimMany(events.map((event) => `library|${event.id}`), now());
     const unsent = events.filter((event) => fresh.has(`library|${event.id}`));
     if (unsent.length > 0) {
@@ -194,6 +219,15 @@ export function createRouter(deps: RouterDeps) {
         const outcome = await countWatched(state);
         if (outcome === "none") return { ok: false };
         return outcome === "duplicate" ? { ok: true, duplicate: true } : { ok: true };
+      }
+
+      case "library:sync": {
+        // A library page (SPEC §9.1/§9.2) is read by the page itself, on the app's own domain.
+        const pageUrl = topFrame && senderUrl ? parseHttpUrl(senderUrl) : null;
+        const app = pageUrl ? libraryServiceForUrl(pageUrl) : undefined;
+        const reported = parseHttpUrl(message.url);
+        if (!pageUrl || !app || !isLibraryPage(pageUrl) || !reported || libraryServiceForUrl(reported) !== app) return { ok: false };
+        return { ok: true, queued: await syncAppLibrary(app, message.entries) };
       }
 
       case "stream:library": {

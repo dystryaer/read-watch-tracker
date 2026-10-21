@@ -547,3 +547,66 @@ describe("router – history sync", () => {
     expect(queued).toHaveLength(0);
   });
 });
+
+describe("router – app libraries (WebNovel, Kindle)", () => {
+  const webnovelLibrary = "https://www.webnovel.com/library";
+  const kindleLibrary = "https://read.amazon.com/kindle-library";
+  const sender = (url: string, frameId = 0) => ({ id: EXT, tab: { id: 11, url }, url, frameId });
+  const shadowSlave = {
+    externalKey: "22196546206090805",
+    title: "Shadow Slave",
+    chapter: 1204,
+    seriesUrl: "https://www.webnovel.com/book/shadow-slave_22196546206090805",
+  };
+  const hailMary = { externalKey: "B08FHBV4ZX", title: "Project Hail Mary", percent: 43, seriesUrl: null };
+
+  it("queues the chapter of every WebNovel book as library_sync", async () => {
+    const { route, queued } = await setup();
+
+    expect(await route({ type: "library:sync", url: webnovelLibrary, entries: [shadowSlave] }, sender(webnovelLibrary))).toEqual({ ok: true, queued: 1 });
+
+    expect(queued).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        occurredAt: "2026-10-21T20:00:00.000Z",
+        kind: "library_sync",
+        source: { key: "webnovel", externalKey: "22196546206090805", rawTitle: "Shadow Slave", seriesUrl: shadowSlave.seriesUrl },
+        position: { unit: "chapter", chapter: 1204 },
+      },
+    ]);
+  });
+
+  it("queues the percentage of every Kindle book", async () => {
+    const { route, queued } = await setup();
+    await route({ type: "library:sync", url: kindleLibrary, entries: [hailMary] }, sender(kindleLibrary));
+
+    expect(queued.map((event) => [event.source.key, event.source.externalKey, event.position])).toEqual([
+      ["kindle", "B08FHBV4ZX", { unit: "percent", percent: 43 }],
+    ]);
+  });
+
+  it("does not queue the same books again soon", async () => {
+    const { route } = await setup();
+    await route({ type: "library:sync", url: webnovelLibrary, entries: [shadowSlave] }, sender(webnovelLibrary));
+
+    expect(await route({ type: "library:sync", url: webnovelLibrary, entries: [shadowSlave] }, sender(webnovelLibrary))).toEqual({ ok: true, queued: 0 });
+  });
+
+  it("skips entries in the other app's unit", async () => {
+    const { route, queued } = await setup();
+    const inPercent = { externalKey: shadowSlave.externalKey, title: shadowSlave.title, percent: 50, seriesUrl: shadowSlave.seriesUrl };
+    await route({ type: "library:sync", url: webnovelLibrary, entries: [inPercent] }, sender(webnovelLibrary));
+    expect(queued).toHaveLength(0);
+  });
+
+  it.each([
+    ["a manga page", content()],
+    ["a frame inside the library", sender(webnovelLibrary, 3)],
+    ["a WebNovel page that is no library", sender("https://www.webnovel.com/book/shadow-slave_22196546206090805")],
+    ["a streaming page", sender("https://www.netflix.com/viewingactivity")],
+  ])("refuses a library from %s", async (_name, from) => {
+    const { route, queued } = await setup();
+    expect(await route({ type: "library:sync", url: from.url, entries: [shadowSlave] }, from)).toEqual({ ok: false });
+    expect(queued).toHaveLength(0);
+  });
+});
