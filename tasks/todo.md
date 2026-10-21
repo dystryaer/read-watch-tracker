@@ -182,4 +182,8 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
   Akz.: Badge „3 neu“ in der Liste, Filter „Neue Kapitel“, Detailseite nennt das neueste Kapitel (SPEC §4.2)
 
 ### Abnahme M4
-- [ ] volle Testsuite · [ ] Code-Review · [ ] Security-Review · [ ] Befunde behoben
+- [x] volle Testsuite inkl. Gradle · [x] Code-Review · [x] Security-Review · [x] Befunde behoben
+  Stand 2026-10-21: typecheck + lint sauber, 1210 Unit/Integration-Tests (Coverage 93,3 %, core 98,3 %), 29 E2E, 110 JUnit-Tests, Debug-/Release-APK, Android-Lint.
+  Behoben (Code-Review): Alarme werden nur angelegt, wenn sie fehlen (sonst feuerte „new-chapters“ nie); Serie vor dem Abruf belegen, 20-s-Timeout; unzugestellte Ergebnisse merken statt Seiten neu abrufen; offline ohne Strafe; eine Serienseite pro Werk (zuletzt genutzte Quelle); Statistik gegen den bisher höchsten Stand (keine Aufblähung durch Zusammenführen), Berliner Tag aus der DB; Teil-Listen nicht melden; nie geprüfte Serien zuerst; Back-off an die URL gebunden.
+  Behoben (Security-Review): Weiterleitungen werden nicht verfolgt (kein Abruf beliebiger Hosts, auch nicht im Heimnetz), nur https; höchstens 3 Abrufe pro Host und Lauf; Parser mit Vorfilter und 1-s-Budget; `/latest-chapters` prüft Einträge einzeln und schreibt nur an Werke, die `/series-watch` liefern würde; kein Cookie, Referer oder Origin (E2E).
+  Hingenommen: Seitenregel-Muster mit mehreren unbeschränkten Quantoren bleiben erlaubt (vom Besitzer geschrieben; ein einzelnes `exec` lässt sich nicht unterbrechen); Serienseiten, die per JavaScript laden oder `<base href>`/Links ohne Anführungszeichen nutzen, liefern nichts; Prüfung ist voreingestellt an (Doku + Option); ein Extension-Token kann die Liste der gelesenen Serien lesen.
