@@ -1,6 +1,6 @@
 "use server";
 
-import { DeviceName } from "@rwt/core";
+import { cleanTextValue, DeviceName } from "@rwt/core";
 import { approvePairing, createDeviceWithToken, PairingCodeInvalidError, revokeDevice } from "@rwt/server";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
@@ -40,7 +40,10 @@ export async function revokeDeviceAction(_previous: FormState, formData: FormDat
 
 export type PhoneTokenState = { token: string; name: string } | { error: string } | null;
 
-const PhoneInput = z.object({ name: z.preprocess((value) => (value === "" || value === null ? "iPhone" : value), DeviceName) });
+// An empty or blank name (only spaces or invisible characters) means the default name.
+const PhoneInput = z.object({
+  name: z.preprocess((value) => (value === null || (typeof value === "string" && cleanTextValue(value) === "") ? "iPhone" : value), DeviceName),
+});
 
 /**
  * A phone token for the iOS shortcut (SPEC §6.2): shortcuts cannot poll a pairing, so the token is

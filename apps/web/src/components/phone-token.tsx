@@ -49,8 +49,8 @@ export function PhoneTokenForm({ action }: { action: (previous: PhoneTokenState,
           </button>
         </div>
         <p>
-          Beim Hinzufügen des Kurzbefehls „Lesestand“ fragt iOS nach Adresse und Token: Adresse{" "}
-          <code className="font-mono">{origin}</code>, Token wie oben. Widerrufen lässt er sich jederzeit unter „Gekoppelte Geräte“.
+          Im Kurzbefehl „Lesestand“ die Adresse <code className="font-mono">{origin}</code> und diesen Token eintragen (Anleitung: „iPhone
+          einrichten“ in der Dokumentation). Widerrufen lässt er sich jederzeit unter „Gekoppelte Geräte“.
         </p>
         {origin?.startsWith("http:") ? (
           <p className="font-medium text-red-700 dark:text-red-400">

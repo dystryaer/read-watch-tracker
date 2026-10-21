@@ -10,7 +10,7 @@ Light Novels (WebNovel-App) und E-Books (Kindle-App) aktualisierst du halbautoma
 
 ## 1. Schnell-Update auf den Homescreen
 
-1. In Safari deinen Tracker öffnen und anmelden.
+1. In Safari deinen Tracker öffnen, anmelden und auf **Schnell-Update** gehen. Manche iOS-Versionen merken sich für das Icon die gerade offene Seite statt der Startseite der App.
 2. **Teilen → Zum Home-Bildschirm**. Name „Lesestand“ übernehmen.
 3. Das Icon öffnet die Web-App im Vollbild direkt auf **Schnell-Update**: die 8 zuletzt aktiven Light Novels und E-Books, mit `[+]` für das nächste Kapitel bzw. einem Regler für Prozent. Gespeichert wird automatisch eine halbe Sekunde nach der letzten Änderung.
 
