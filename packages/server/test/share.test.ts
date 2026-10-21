@@ -1,9 +1,10 @@
-import { type DbHandle, events, pendingMatches, sources } from "@rwt/db";
+import { type DbHandle, events, pendingMatches, sources, workLinks } from "@rwt/db";
 import { createTestDb, resetDb } from "@rwt/db/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createDeviceWithToken } from "../src/devices";
-import { confirmShare, ShareNotFoundError, ShareValueError, startShare } from "../src/share";
+import { ingestEvents } from "../src/ingest";
+import { confirmShare, ShareNotFoundError, ShareUsedError, ShareValueError, startShare } from "../src/share";
 import { seedLink, seedSource, seedWork } from "./helpers";
 
 let handle: DbHandle;
@@ -64,7 +65,7 @@ describe("startShare", () => {
   it("names an unknown book after the shared text, without a position", async () => {
     const share = await startShare(handle.db, phone, { text: "„Project Hail Mary“ von Andy Weir https://read.amazon.com/kp/kshare?asin=B08FHBV4ZX&id=x" }, NOW);
 
-    expect(share).toMatchObject({ title: "Project Hail Mary von Andy Weir", unit: "percent", current: null, suggested: null, needsMatch: true });
+    expect(share).toMatchObject({ title: "Project Hail Mary", unit: "percent", current: null, suggested: null, needsMatch: true });
     const [source] = await handle.db.select().from(sources).where(eq(sources.key, "kindle"));
     expect(source).toMatchObject({ kind: "app", defaultMediaType: "ebook" });
   });
@@ -76,6 +77,38 @@ describe("startShare", () => {
 
     const onlyControls = await startShare(handle.db, phone, { text: `${rlo}${nul} ${SHADOW_SLAVE}` }, NOW);
     expect(onlyControls?.title).toBe("WebNovel 22196546206090805");
+  });
+
+  it("keeps the title of a waiting card when the share brings none, so the card keeps its candidates", async () => {
+    const work = await seedWork(handle.db, { title: "Shadow Slave", type: "light_novel" });
+    await ingestEvents(handle.db, null, [
+      {
+        id: crypto.randomUUID(),
+        occurredAt: NOW.toISOString(),
+        kind: "library_sync",
+        source: { key: "webnovel", externalKey: "22196546206090805", rawTitle: "Shadow Slave" },
+        position: { unit: "chapter", chapter: 1200 },
+      },
+    ], NOW);
+
+    const share = await startShare(handle.db, phone, { url: SHADOW_SLAVE, text: SHADOW_SLAVE }, NOW);
+    await confirmShare(handle.db, phone, { shareId: share?.shareId ?? "", chapter: 1205 }, NOW);
+
+    expect(share?.title).toBe("Shadow Slave");
+    const [card] = await handle.db.select().from(pendingMatches);
+    expect(card).toMatchObject({ rawTitle: "Shadow Slave", eventCount: 2, candidates: [expect.objectContaining({ workId: work.id })] });
+  });
+
+  it("asks in the unit of the work the book was assigned to", async () => {
+    const source = await seedSource(handle.db, { key: "kindle", kind: "app", defaultMediaType: "ebook" });
+    const work = await seedWork(handle.db, { title: "Overlord", type: "light_novel", chapter: 812 });
+    await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: "B08FHBV4ZX", externalTitle: "Overlord" });
+
+    const share = await startShare(handle.db, phone, { url: HAIL_MARY }, NOW);
+    expect(share).toMatchObject({ unit: "chapter", current: 812, suggested: 813 });
+
+    const result = await confirmShare(handle.db, phone, { shareId: share?.shareId ?? "", chapter: 813 }, NOW);
+    expect(result).toMatchObject({ outcome: "applied", message: "Overlord → Kap. 813 gespeichert" });
   });
 
   it("falls back to the service and key when the share has no text", async () => {
@@ -117,8 +150,17 @@ describe("confirmShare", () => {
     expect(await confirmShare(handle.db, phone, { shareId: share?.shareId ?? "", chapter: 1205 }, NOW)).toEqual({
       outcome: "no_change",
       title: "Shadow Slave",
-      message: "Shadow Slave steht schon weiter – nichts geändert",
+      message: "Shadow Slave steht schon bei Kap. 1210 – nichts geändert",
     });
+  });
+
+  it("names the saved position also when the same number is confirmed again", async () => {
+    await linkedShadowSlave(1205);
+    const share = await startShare(handle.db, phone, { url: SHADOW_SLAVE }, NOW);
+
+    expect((await confirmShare(handle.db, phone, { shareId: share?.shareId ?? "", chapter: 1205 }, NOW)).message).toBe(
+      "Shadow Slave steht schon bei Kap. 1205 – nichts geändert",
+    );
   });
 
   it("keeps the number of an unknown book at an inbox card", async () => {
@@ -131,12 +173,22 @@ describe("confirmShare", () => {
     expect(card).toMatchObject({ externalKey: "22196546206090805", rawTitle: "Shadow Slave", eventCount: 1 });
   });
 
-  it("uses a share only once", async () => {
+  it("uses a share only once and says so when the shortcut sends again", async () => {
     await linkedShadowSlave();
     const share = await startShare(handle.db, phone, { url: SHADOW_SLAVE }, NOW);
     await confirmShare(handle.db, phone, { shareId: share?.shareId ?? "", chapter: 1205 }, NOW);
 
-    await expect(confirmShare(handle.db, phone, { shareId: share?.shareId ?? "", chapter: 1206 }, NOW)).rejects.toThrow(ShareNotFoundError);
+    await expect(confirmShare(handle.db, phone, { shareId: share?.shareId ?? "", chapter: 1206 }, NOW)).rejects.toThrow(ShareUsedError);
+    expect(await handle.db.select().from(events)).toHaveLength(1);
+  });
+
+  it("keeps the book's link at the work, so the overview can open it", async () => {
+    await linkedShadowSlave(1204);
+    const share = await startShare(handle.db, phone, { url: SHADOW_SLAVE }, NOW);
+    await confirmShare(handle.db, phone, { shareId: share?.shareId ?? "", chapter: 1205 }, NOW);
+
+    const [link] = await handle.db.select().from(workLinks);
+    expect(link?.seriesUrl).toBe("https://www.webnovel.com/book/22196546206090805");
   });
 
   it("refuses a share of another device, an expired one and an unknown id", async () => {

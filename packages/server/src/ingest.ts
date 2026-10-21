@@ -169,28 +169,28 @@ async function resolveSource(db: Db, input: ProgressEvent["source"]): Promise<So
     if (byDomain) return byDomain.source;
   }
 
-  const [byKey] = await db.select().from(sources).where(eq(sources.key, input.key));
+  return sourceByKey(db, input.key);
+}
+
+/** The source with this key, created on first use: with the fixed name and kind of a known service. */
+export async function sourceByKey(db: Db, key: string): Promise<Source> {
+  const [byKey] = await db.select().from(sources).where(eq(sources.key, key));
   if (byKey) return byKey;
 
-  const service = knownService(input.key);
+  const service = knownService(key);
   const [created] = await db
     .insert(sources)
-    .values({
-      key: input.key,
-      name: service?.name ?? input.key,
-      kind: service?.kind ?? "website",
-      defaultMediaType: service?.defaultMediaType ?? null,
-    })
+    .values({ key, name: service?.name ?? key, kind: service?.kind ?? "website", defaultMediaType: service?.defaultMediaType ?? null })
     .onConflictDoNothing()
     .returning();
   if (created) return created;
-  const [existing] = await db.select().from(sources).where(eq(sources.key, input.key));
-  if (!existing) throw new Error(`Source ${input.key} could not be created`);
+  const [existing] = await db.select().from(sources).where(eq(sources.key, key));
+  if (!existing) throw new Error(`Source ${key} could not be created`);
   return existing;
 }
 
 /** Step 3: the key is linked to a work. */
-async function findExactLink(db: Db, sourceId: string, externalKey: string): Promise<Work | null> {
+export async function findExactLink(db: Db, sourceId: string, externalKey: string): Promise<Work | null> {
   const [linked] = await db
     .select({ work: works })
     .from(workLinks)

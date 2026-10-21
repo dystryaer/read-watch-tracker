@@ -283,6 +283,16 @@ describe("share endpoints (iOS shortcut)", () => {
     expect(await response.json()).toMatchObject({ error: "unknown_link", message: expect.stringContaining("WebNovel") });
   });
 
+  it("says a share was saved already when the shortcut sends twice", async () => {
+    const share = await (await handleShare(asPhone("/api/v1/share", book), context)).json();
+    await handleShareConfirm(asPhone("/api/v1/share/confirm", { shareId: share.shareId, chapter: 12 }), context);
+
+    const again = await handleShareConfirm(asPhone("/api/v1/share/confirm", { shareId: share.shareId, chapter: 12 }), context);
+
+    expect(again.status).toBe(409);
+    expect(await again.json()).toMatchObject({ error: "share_used", message: expect.stringContaining("gespeichert") });
+  });
+
   it("explains an expired or used share", async () => {
     const response = await handleShareConfirm(asPhone("/api/v1/share/confirm", { shareId: crypto.randomUUID(), chapter: 1 }), context);
     expect(response.status).toBe(404);
@@ -302,7 +312,7 @@ describe("share endpoints (iOS shortcut)", () => {
   });
 
   it("accepts phone tokens only", async () => {
-    const response = await handleShare(post("/api/v1/share", book), context);
+    const response = await handleShare(post("/api/v1/share", book, { authorization: `Bearer ${token}` }), context);
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ error: "forbidden", message: expect.stringContaining("iPhone") });
   });

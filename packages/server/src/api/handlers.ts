@@ -16,7 +16,7 @@ import { RateLimiter } from "../http/rate-limit";
 import { bearerToken, clientAddress, errorResponse, jsonResponse, type Parsed, readJsonBody } from "../http/request";
 import { ignoreSeries } from "../ignore";
 import { ingestEvents } from "../ingest";
-import { confirmShare, ShareNotFoundError, ShareValueError, startShare } from "../share";
+import { confirmShare, ShareNotFoundError, ShareUsedError, ShareValueError, startShare } from "../share";
 import { buildDeviceConfig, enableSource, ServiceDomainError, SourceConflictError, SourceNotFoundError } from "../sources";
 
 const MINUTE = 60_000;
@@ -246,6 +246,7 @@ async function shareConfirm(request: Request, context: ApiContext): Promise<Resp
     return jsonResponse(await confirmShare(context.db, device.value.id, input.data, context.now?.()));
   } catch (error) {
     if (error instanceof ShareNotFoundError) return shareError("share_not_found", 404, "Das ist abgelaufen. Bitte das Buch noch einmal teilen.");
+    if (error instanceof ShareUsedError) return shareError("share_used", 409, "Schon gespeichert. Für eine andere Zahl das Buch noch einmal teilen.");
     if (error instanceof ShareValueError) return shareError("invalid_value", 400, "Diese Zahl passt nicht zu dem Buch.");
     throw error;
   }

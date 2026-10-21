@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAppBookKey, parseAsin, parseShare, parseWebnovelBookId } from "../src/share";
+import { isAppBookKey, parseAsin, parseShare, parseWebnovelBookId, sharedTitle } from "../src/share";
 
 describe("parseWebnovelBookId", () => {
   it.each([
@@ -101,5 +101,45 @@ describe("trailing punctuation after a shared link", () => {
   it("is cut off however long it is", () => {
     expect(parseShare({ text: `Lies das: https://www.amazon.de/dp/B08FHBV4ZX${".".repeat(1500)}` })).toEqual({ source: "kindle", externalKey: "B08FHBV4ZX" });
     expect(parseWebnovelBookId(`(https://www.webnovel.com/book/22196546206090805).`)).toBe("22196546206090805");
+  });
+});
+
+describe("sharedTitle", () => {
+  const WEBNOVEL = "https://www.webnovel.com/book/shadow-slave_22196546206090805";
+
+  it("takes the quoted title and leaves the author out", () => {
+    expect(sharedTitle({ text: "„Project Hail Mary“ von Andy Weir https://read.amazon.com/kp/kshare?asin=B08FHBV4ZX" })).toBe("Project Hail Mary");
+    expect(sharedTitle({ text: "“Project Hail Mary” by Andy Weir" })).toBe("Project Hail Mary");
+  });
+
+  it("reads the title from a WebNovel link, also inside chatty text", () => {
+    expect(sharedTitle({ url: WEBNOVEL, text: WEBNOVEL })).toBe("Shadow Slave");
+    expect(sharedTitle({ text: `Ich lese gerade Shadow Slave auf WebNovel: ${WEBNOVEL} – schau mal rein` })).toBe("Shadow Slave");
+  });
+
+  it("reads the title from an Amazon product link", () => {
+    expect(sharedTitle({ url: "https://www.amazon.de/Project-Hail-Mary-Andy-Weir-ebook/dp/B08FHBV4ZX" })).toBe("Project Hail Mary Andy Weir");
+  });
+
+  it("falls back to the text around a link without a title", () => {
+    expect(sharedTitle({ text: "Shadow Slave – https://m.webnovel.com/book/22196546206090805" })).toBe("Shadow Slave");
+  });
+
+  it("finds none in a bare link", () => {
+    const bare = "https://m.webnovel.com/book/22196546206090805";
+    expect(sharedTitle({ url: bare, text: bare })).toBeNull();
+    expect(sharedTitle({})).toBeNull();
+  });
+
+  it("cleans control and bidi characters like every other title", () => {
+    const [nul, rlo] = [String.fromCharCode(0), String.fromCharCode(0x202e)];
+    expect(sharedTitle({ text: `Shadow${nul}Slave${rlo} https://m.webnovel.com/book/22196546206090805` })).toBe("Shadow Slave");
+    expect(sharedTitle({ text: `${rlo}${nul} https://m.webnovel.com/book/22196546206090805` })).toBeNull();
+  });
+
+  it("caps the title length and ignores oversized input", () => {
+    expect(sharedTitle({ text: `„${"a".repeat(299)}“` })).toHaveLength(299);
+    expect(sharedTitle({ text: "x".repeat(400) })?.length).toBe(300);
+    expect(sharedTitle({ text: "x".repeat(5000) })).toBeNull();
   });
 });

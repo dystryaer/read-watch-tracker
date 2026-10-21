@@ -1,3 +1,4 @@
+import { cleanTextValue, MAX_TEXT_LENGTH } from "./event";
 import { MAX_URL_LENGTH, parseHttpUrl } from "./safe-url";
 import { normalizeDomain } from "./services";
 
@@ -66,6 +67,70 @@ export function parseAsin(input: string): string | null {
     }
   }
   return null;
+}
+
+// Opening and closing quotation marks of German, English and French texts.
+const QUOTED_TITLE = /[„“"«‚‘]([^„“”"«»‚‘’\n]{1,300})[“”"»‘’]/u;
+const QUOTE_MARKS = /[„“”"«»‚‘’]/gu;
+const TITLE_SEPARATORS = new Set(" :–—-|·");
+const WEBNOVEL_SLUG = /^(.+)_\d{8,20}$/;
+
+function trimSeparators(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && TITLE_SEPARATORS.has(value.charAt(start))) start++;
+  while (end > start && TITLE_SEPARATORS.has(value.charAt(end - 1))) end--;
+  return value.slice(start, end);
+}
+
+function asTitle(value: string): string | null {
+  const title = trimSeparators(cleanTextValue(value)).slice(0, MAX_TEXT_LENGTH).trim();
+  return title === "" ? null : title;
+}
+
+function titleFromSlug(slug: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(slug);
+  } catch {
+    return null;
+  }
+  return /\p{L}/u.test(decoded) ? asTitle(decoded.replace(/[-_]+/g, " ")) : null;
+}
+
+/** "shadow-slave" in `/book/shadow-slave_<id>`, "Project-Hail-Mary" in `/Project-Hail-Mary/dp/<ASIN>`. */
+function slugTitle(url: URL): string | null {
+  const host = normalizeDomain(url.hostname);
+  const segments = url.pathname.split("/").filter(Boolean);
+  if (WEBNOVEL_HOSTS.has(host) && segments[0] === "book") {
+    const slug = WEBNOVEL_SLUG.exec(segments[1] ?? "")?.[1];
+    const title = slug ? titleFromSlug(slug) : null;
+    return title?.replace(/(^|\s)(\p{Ll})/gu, (_match, space: string, letter: string) => space + letter.toUpperCase()) ?? null;
+  }
+  if (AMAZON_HOST.test(host)) {
+    const dp = segments.indexOf("dp");
+    const slug = dp > 0 ? segments[dp - 1] : undefined;
+    return slug ? titleFromSlug(slug.replace(/-ebook$/i, "")) : null;
+  }
+  return null;
+}
+
+/**
+ * The book's title in a share, for the inbox card of a book the tracker does not know yet: a
+ * quoted title first (leaves the author out), then the link's slug, then the text around the link.
+ */
+export function sharedTitle(input: { url?: string; text?: string }): string | null {
+  const text = input.text !== undefined && input.text.length <= MAX_INPUT_LENGTH ? cleanTextValue(input.text) : "";
+  const quoted = QUOTED_TITLE.exec(text)?.[1];
+  if (quoted) {
+    const title = asTitle(quoted);
+    if (title) return title;
+  }
+  for (const url of [...urlsIn(input.url ?? ""), ...urlsIn(text)]) {
+    const title = slugTitle(url);
+    if (title) return title;
+  }
+  return asTitle(text.replace(URL_IN_TEXT, " ").replace(QUOTE_MARKS, ""));
 }
 
 /** The book behind a share from the WebNovel or Kindle app: the URL first, then the text. */
