@@ -156,6 +156,16 @@ describe("mergeWorks", () => {
     expect(event?.workId).toBe(target.id);
   });
 
+  it("keeps the newest chapter that was checked last", async () => {
+    const into = await seedWork(handle.db, { title: "Overgeared", chapter: 10, latestChapter: 12, latestChapterAt: new Date("2026-10-01T00:00:00Z") });
+    const from = await seedWork(handle.db, { title: "Overgeared (2)", chapter: 8, latestChapter: 15, latestChapterAt: new Date("2026-10-20T00:00:00Z") });
+
+    await mergeWorks(handle.db, from.id, into.id, NOW);
+
+    const [merged] = await handle.db.select().from(works).where(eq(works.id, into.id));
+    expect(merged).toMatchObject({ latestChapter: 15, latestChapterAt: new Date("2026-10-20T00:00:00Z") });
+  });
+
   it("refuses to merge works that count progress differently", async () => {
     const manhwa = await seedWork(handle.db, { title: "Solo Leveling", type: "manhwa" });
     const anime = await seedWork(handle.db, { title: "Solo Leveling", type: "anime" });

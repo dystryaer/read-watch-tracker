@@ -52,6 +52,49 @@ describe("progressStats (SPEC §4.8)", () => {
     expect(weeks[0]).toEqual({ start: "2026-10-26", chapters: 1, episodes: 3 });
   });
 
+  it("puts events into Berlin weeks, also across the change from summer time", async () => {
+    const work = await seedWork(handle.db, { title: "Solo Leveling" });
+    await logEvent({ workId: work.id, chapter: 10, occurredAt: new Date("2026-10-20T12:00:00Z") });
+    // Sunday 25 Oct, 23:30 UTC is Monday 00:30 in Berlin; 21:00 UTC is still Sunday.
+    await logEvent({ workId: work.id, chapter: 12, occurredAt: new Date("2026-10-25T21:00:00Z") });
+    await logEvent({ workId: work.id, chapter: 13, occurredAt: new Date("2026-10-25T23:30:00Z") });
+
+    const { weeks } = await progressStats(handle.db, NOW);
+
+    expect(weeks[0]?.chapters).toBe(1);
+    expect(weeks[1]?.chapters).toBe(3);
+  });
+
+  it("does not inflate a merged history: steps count from the highest chapter so far", async () => {
+    const work = await seedWork(handle.db, { title: "Overgeared" });
+    // Two histories after a merge: 141–142 on one site, a re-read 1–2 on another, interleaved.
+    for (const [chapter, minute] of [[141, 1], [1, 2], [142, 3], [2, 4]] as const) {
+      await logEvent({ workId: work.id, chapter, occurredAt: new Date(`2026-10-27T12:0${minute}:00Z`) });
+    }
+
+    expect((await progressStats(handle.db, NOW)).weeks[0]?.chapters).toBe(2);
+  });
+
+  it("counts a chapter stepped back and read again only once", async () => {
+    const work = await seedWork(handle.db, { title: "Overgeared" });
+    await logEvent({ workId: work.id, chapter: 10, occurredAt: new Date("2026-10-27T12:00:00Z") });
+    await logEvent({ workId: work.id, kind: "manual", chapter: 11, occurredAt: new Date("2026-10-27T12:01:00Z") });
+    await logEvent({ workId: work.id, kind: "manual", chapter: 10, occurredAt: new Date("2026-10-27T12:02:00Z") });
+    await logEvent({ workId: work.id, chapter: 11, occurredAt: new Date("2026-10-27T12:03:00Z") });
+
+    expect((await progressStats(handle.db, NOW)).weeks[0]?.chapters).toBe(2);
+  });
+
+  it("orders events of the same moment by arrival", async () => {
+    const work = await seedWork(handle.db, { title: "Overgeared" });
+    const at = new Date("2026-10-27T12:00:00Z");
+    await logEvent({ workId: work.id, chapter: 12, occurredAt: at, receivedAt: new Date("2026-10-27T12:00:02Z") });
+    await logEvent({ workId: work.id, chapter: 10, occurredAt: at, receivedAt: new Date("2026-10-27T12:00:01Z") });
+
+    // 10 arrived first (counts 1), then 12 (counts 2).
+    expect((await progressStats(handle.db, NOW)).weeks[0]?.chapters).toBe(3);
+  });
+
   it("leaves out events without a work (pending cards)", async () => {
     await logEvent({ chapter: 10, outcome: "pending", occurredAt: new Date("2026-10-27T12:00:00Z") });
     const { weeks } = await progressStats(handle.db, NOW);

@@ -5,6 +5,7 @@ import {
   IgnoreSeriesRequest,
   type EventResult,
   LatestChaptersRequest,
+  type SeriesWatchResponse,
   PairingPollRequest,
   PairingStartRequest,
   parseEventBatch,
@@ -38,10 +39,17 @@ export interface ApiLimiters {
   pairingStart: RateLimiter;
   pairingPoll: RateLimiter;
   shares: RateLimiter;
+  newChapters: RateLimiter;
 }
 
 export function createApiLimiters(
-  overrides: { eventsPerMinute?: number; pairingStartsPerMinute?: number; authFailuresPerMinute?: number; sharesPerMinute?: number } = {},
+  overrides: {
+    eventsPerMinute?: number;
+    pairingStartsPerMinute?: number;
+    authFailuresPerMinute?: number;
+    sharesPerMinute?: number;
+    newChaptersPerMinute?: number;
+  } = {},
 ): ApiLimiters {
   return {
     // Wrong tokens per client address: guessing is hopeless (256 bit), but each try costs a query.
@@ -53,6 +61,8 @@ export function createApiLimiters(
     // Devices poll every 3 s while a code is shown.
     pairingPoll: new RateLimiter({ limit: 40, windowMs: MINUTE }),
     shares: new RateLimiter({ limit: overrides.sharesPerMinute ?? 30, windowMs: MINUTE }),
+    // The extension asks for the watch list at most every 6 hours and reports once an hour.
+    newChapters: new RateLimiter({ limit: overrides.newChaptersPerMinute ?? 10, windowMs: MINUTE }),
   };
 }
 
@@ -183,8 +193,8 @@ export async function handleSeriesWatch(request: Request, context: ApiContext): 
   const device = await authenticate(request, context);
   if (!device.ok) return device.response;
   if (device.value.kind !== "extension") return errorResponse("forbidden", 403);
-  if (!context.limiters.config.allow(device.value.id)) return tooManyRequests();
-  return jsonResponse({ series: await seriesToWatch(context.db) });
+  if (!context.limiters.newChapters.allow(device.value.id)) return tooManyRequests();
+  return jsonResponse({ series: await seriesToWatch(context.db) } satisfies SeriesWatchResponse);
 }
 
 /** POST /api/v1/latest-chapters – M4: the newest chapters the extension found on series pages. */
@@ -192,7 +202,7 @@ export async function handleLatestChapters(request: Request, context: ApiContext
   const device = await authenticate(request, context);
   if (!device.ok) return device.response;
   if (device.value.kind !== "extension") return errorResponse("forbidden", 403);
-  if (!context.limiters.sources.allow(device.value.id)) return tooManyRequests();
+  if (!context.limiters.newChapters.allow(device.value.id)) return tooManyRequests();
 
   const body = await readJsonBody(request, MAX_LATEST_BODY_BYTES);
   if (!body.ok) return body.response;

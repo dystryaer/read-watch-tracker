@@ -57,6 +57,49 @@ describe("seriesToWatch (SPEC §7.11)", () => {
   });
 });
 
+describe("seriesToWatch – one page per work", () => {
+  it("watches only the site I read the work on last, so two sites cannot fight over the badge", async () => {
+    const asura = await seedSource(handle.db, { key: "site:asura", trackingEnabled: true }, ["asuracomic.net"]);
+    const slow = await seedSource(handle.db, { key: "site:slow", trackingEnabled: true }, ["slow.example"]);
+    const work = await seedWork(handle.db, { title: "Solo Leveling", chapter: 200, lastSourceId: asura.id });
+    await seedLink(handle.db, { workId: work.id, sourceId: slow.id, externalKey: "solo", externalTitle: "Solo", seriesUrl: "https://slow.example/solo" });
+    await seedLink(handle.db, {
+      workId: work.id,
+      sourceId: asura.id,
+      externalKey: "solo-leveling",
+      externalTitle: "Solo Leveling",
+      seriesUrl: "https://asuracomic.net/series/solo-leveling",
+    });
+
+    expect((await seriesToWatch(handle.db)).map((series) => series.sourceKey)).toEqual(["site:asura"]);
+  });
+
+  it("still watches one page when the last source is no enabled website", async () => {
+    const asura = await asura_();
+    const slow = await seedSource(handle.db, { key: "site:slow", trackingEnabled: true }, ["slow.example"]);
+    const work = await seedWork(handle.db, { title: "Solo Leveling", chapter: 200 });
+    for (const [source, key] of [[asura, "solo-leveling"], [slow, "solo"]] as const) {
+      await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: key, externalTitle: key, seriesUrl: `https://${source.key === "site:slow" ? "slow.example" : "asuracomic.net"}/${key}` });
+    }
+
+    expect(await seriesToWatch(handle.db)).toHaveLength(1);
+  });
+
+  it("lists recently read works first and never-active ones last", async () => {
+    const source = await asura_();
+    for (const [title, lastProgressAt] of [["never", null], ["old", new Date("2026-01-01T00:00:00Z")], ["recent", new Date("2026-10-20T00:00:00Z")]] as const) {
+      const work = await seedWork(handle.db, { title, chapter: 1, lastProgressAt });
+      await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: title, externalTitle: title, seriesUrl: `https://asuracomic.net/series/${title}` });
+    }
+
+    expect((await seriesToWatch(handle.db)).map((series) => series.externalKey)).toEqual(["recent", "old", "never"]);
+  });
+
+  async function asura_() {
+    return seedSource(handle.db, { key: "site:asura", trackingEnabled: true }, ["asuracomic.net"]);
+  }
+});
+
 describe("recordLatestChapters", () => {
   it("stores the newest chapter at the linked work and ignores unknown series", async () => {
     const source = await asura();

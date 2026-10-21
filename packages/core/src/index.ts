@@ -24,14 +24,6 @@ export {
   type RuleFields,
   SiteRule,
 } from "./site-rule";
-export {
-  bucketProgress,
-  type MonthBucket,
-  type ProgressGain,
-  type ProgressStep,
-  STATS_TIME_ZONE,
-  stepGain,
-  type WeekBucket,
-} from "./stats";
+export { bucketProgress, type MonthBucket, type ProgressStep, STATS_TIME_ZONE, type WeekBucket } from "./stats";
 export { isServiceHost, isServiceUrl, type KnownService, knownService, normalizeDomain, serviceKeyForUrl } from "./services";
 export * from "./api";

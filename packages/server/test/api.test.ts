@@ -414,6 +414,15 @@ describe("new chapter endpoints (M4, SPEC §7.11)", () => {
     expect((await handleLatestChapters(post("/api/v1/latest-chapters", body), context)).status).toBe(400);
   });
 
+  it("refuses oversized reports and too many requests", async () => {
+    const oversized = await handleLatestChapters(post("/api/v1/latest-chapters", `{"items":["${"x".repeat(200_000)}"]}`), context);
+    expect(oversized.status).toBe(413);
+
+    const limited: ApiContext = { ...context, limiters: createApiLimiters({ newChaptersPerMinute: 1 }) };
+    await handleSeriesWatch(get(), limited);
+    expect((await handleSeriesWatch(get(), limited)).status).toBe(429);
+  });
+
   it("serves extensions only", async () => {
     const shield = (await createDeviceWithToken(handle.db, { kind: "shield", name: "Shield" })).token;
     const phone = (await createDeviceWithToken(handle.db, { kind: "phone", name: "iPhone" })).token;

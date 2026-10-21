@@ -168,7 +168,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 ## M4 – optional (`feat/m4-extras`)
 
 - [x] **T42 Statistiken** · M
-  - T42a core: `progressDeltas` + `bucketProgress` (Woche Mo–So, Monat, `Europe/Berlin`), TDD
+  - T42a core: `stepGain` + `bucketProgress` (Woche Mo–So, Monat, `Europe/Berlin`), TDD
   - T42b server: `progressStats(db, now)` über `lag()` je Werk; web: `/stats` (Tabelle + CSS-Balken), Navigation, E2E
   Akz.: Kapitel/Folgen pro Woche (12) und Monat (12) aus `events`; Fortschritt statt Event-Zahl; erstes Event zählt 1; ohne Chart-Bibliothek (SPEC §4.8)
 

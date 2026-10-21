@@ -142,6 +142,8 @@ export async function mergeWorks(db: Db, fromId: string, intoId: string, now = n
       fromPosition && (!intoPosition || comparePositions(fromPosition, intoPosition) > 0) ? fromPosition : null;
     const fromIsMoreRecent =
       from.lastProgressAt !== null && (into.lastProgressAt === null || from.lastProgressAt > into.lastProgressAt);
+    const fromCheckedLater =
+      from.latestChapterAt !== null && (into.latestChapterAt === null || from.latestChapterAt > into.latestChapterAt);
 
     await tx
       .update(works)
@@ -150,6 +152,7 @@ export async function mergeWorks(db: Db, fromId: string, intoId: string, now = n
         ...(fromIsMoreRecent
           ? { lastProgressAt: from.lastProgressAt, lastUrl: from.lastUrl, lastSourceId: from.lastSourceId }
           : {}),
+        ...(fromCheckedLater ? { latestChapter: from.latestChapter, latestChapterAt: from.latestChapterAt } : {}),
         updatedAt: now,
       })
       .where(eq(works.id, intoId));
