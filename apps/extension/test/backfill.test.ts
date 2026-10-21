@@ -56,5 +56,7 @@ describe("backfillEventId", () => {
     expect(z.uuid().safeParse(a).success).toBe(true);
     expect(await backfillEventId("site:asura", "overgeared", 345)).toBe(a);
     expect(await backfillEventId("site:asura", "overgeared", 346)).not.toBe(a);
+    // Pinned: ids of backfills already sent must stay the same across refactorings.
+    expect(a).toBe("b1c89809-7523-8afe-a247-d37a656a48da");
   });
 });

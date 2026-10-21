@@ -519,6 +519,8 @@ Pro (Serie, Kapitel) wird höchstens 1 Event in 12 h gesendet.
 
 Gelesen wird nur, was die Seite mir eingeloggt ohnehin anzeigt. Zugangsdaten werden weder gespeichert noch serverseitig verwendet.
 
+Umsetzung (M2, `apps/extension/src/streaming/history.ts`): Die Adapter lesen Karten nach Inhalt statt nach Klassennamen (erstes Folgen-Label, davor der Serientitel, Datumsangaben übersprungen), mit generischen Karten-Selektoren als Rückfall, falls eine Seite ihr Markup ändert. Pro Serie geht nur die weiteste Folge als `library_sync` an den Server, mit deterministischer Event-ID; ein erneutes Öffnen der Seite zählt also nichts doppelt. Einträge ohne Folgennummer werden übersprungen. Achtung: Der Netflix-Aktivitätenverlauf nennt meist nur den Folgentitel („Dark: Staffel 2: „Lügen““), daher liefert er voraussichtlich nur selten Positionen; das klärt Spike S1. Alle Verlaufs-Adapter gelten bis zu echten Seitenproben als unverifiziert (A10).
+
 ### 7.7 Outbox und Zuverlässigkeit
 
 - Jedes Event bekommt beim Erzeugen eine UUID und landet in der Outbox in `chrome.storage.local`.

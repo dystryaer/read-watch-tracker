@@ -176,6 +176,33 @@ test("an episode watched to the end on Netflix reaches the tracker as one event"
   await context.unroute("https://www.netflix.com/**");
 });
 
+test("opening the Crunchyroll history sends the latest episode per series, and only once", async () => {
+  await context.route("https://www.crunchyroll.com/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><head><title>Verlauf</title></head><body>
+<div class="history-card"><h4>Frieren</h4><h3>S1 E7 - Ein Ort</h3></div>
+<div class="history-card"><h4>Frieren</h4><h3>S1 E6 - Ein Held</h3></div>
+<div class="history-card"><h4>Dandadan</h4><h3>E12 - Das Haus</h3></div></body></html>`,
+    }),
+  );
+  const synced = () => api.events.filter((event) => event.kind === "library_sync" && event.source.key === "crunchyroll");
+
+  const page = await context.newPage();
+  await page.goto("https://www.crunchyroll.com/history");
+  await expect.poll(() => synced().length, { timeout: 10_000 }).toBe(2);
+  await page.reload();
+  await page.waitForTimeout(3000);
+
+  expect(synced().map((event) => [event.source.externalKey, event.position])).toEqual([
+    ["frieren", { unit: "episode", season: 1, episode: 7 }],
+    ["dandadan", { unit: "episode", season: null, episode: 12 }],
+  ]);
+  await page.close();
+  await context.unroute("https://www.crunchyroll.com/**");
+});
+
 test("events read while the tracker is unreachable are delivered later, once", async () => {
   api.eventsMode = "unavailable";
   const page = await context.newPage();

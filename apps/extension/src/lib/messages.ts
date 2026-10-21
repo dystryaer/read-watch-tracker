@@ -36,6 +36,19 @@ export const ContentMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("stream:hello"), url: HttpUrlSchema }),
   z.object({ type: z.literal("stream:detected"), url: HttpUrlSchema, detection: StreamDetection.nullable() }),
   z.object({ type: z.literal("stream:watched"), url: HttpUrlSchema }),
+  z.object({
+    type: z.literal("stream:library"),
+    url: HttpUrlSchema,
+    entries: z
+      .array(
+        z.object({
+          seriesTitle: cleanText(MAX_TEXT_LENGTH),
+          season: z.number().int().min(1).max(999).nullable(),
+          episode: z.number().int().min(1).max(99999),
+        }),
+      )
+      .max(500),
+  }),
 ]);
 export type ContentMessage = z.infer<typeof ContentMessage>;
 

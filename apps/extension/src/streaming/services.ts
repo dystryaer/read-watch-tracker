@@ -106,7 +106,7 @@ export function detectStream(doc: Document, url: URL): StreamDetection | null {
 }
 
 // Where an episode label starts inside a combined title such as "Frieren S1 E5".
-const LABEL_START = /(?<![\p{L}\d])(?:s\d|season|staffel|episode|folge|ep\.?\s*\d|e\d|\d{1,3}x\d)/iu;
+export const LABEL_START = /(?<![\p{L}\d])(?:s\d|season|staffel|episode|folge|ep\.?\s*\d|e\d|\d{1,3}x\d)/iu;
 
 /**
  * Detection from `navigator.mediaSession.metadata`, which players fill in different ways: the

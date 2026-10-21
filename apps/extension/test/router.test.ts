@@ -436,3 +436,42 @@ describe("router – desktop streaming", () => {
     expect(await route({ type: "stream:detected", url: watchUrl, detection: broken }, netflix())).toEqual({ ok: false });
   });
 });
+
+describe("router – history sync", () => {
+  const historyUrl = "https://www.crunchyroll.com/history";
+  const crunchyroll = (url = historyUrl, frameId = 0) => ({ id: EXT, tab: { id: 9 }, url, frameId });
+  const entries = [
+    { seriesTitle: "Frieren", season: 1, episode: 5 },
+    { seriesTitle: "Frieren", season: 1, episode: 7 },
+    { seriesTitle: "Dandadan (German Dub)", season: null, episode: 12 },
+  ];
+
+  it("queues the latest episode per series as library_sync events", async () => {
+    const { route, queued } = await setup();
+
+    expect(await route({ type: "stream:library", url: historyUrl, entries }, crunchyroll())).toEqual({ ok: true, queued: 2 });
+
+    expect(queued.map((event) => [event.kind, event.source.key, event.source.externalKey, event.position])).toEqual([
+      ["library_sync", "crunchyroll", "frieren", { unit: "episode", season: 1, episode: 7 }],
+      ["library_sync", "crunchyroll", "dandadan", { unit: "episode", season: null, episode: 12 }],
+    ]);
+  });
+
+  it("sends the same ids when the history is opened again, so the server counts nothing twice", async () => {
+    const first = await setup();
+    const second = await setup();
+    await first.route({ type: "stream:library", url: historyUrl, entries }, crunchyroll());
+    await second.route({ type: "stream:library", url: historyUrl, entries }, crunchyroll());
+
+    expect(second.queued.map((event) => event.id)).toEqual(first.queued.map((event) => event.id));
+  });
+
+  it.each([
+    ["a page that is no streaming service", content()],
+    ["a frame inside the page", crunchyroll(historyUrl, 4)],
+  ])("refuses a history from %s", async (_name, sender) => {
+    const { route, queued } = await setup();
+    expect(await route({ type: "stream:library", url: historyUrl, entries }, sender)).toEqual({ ok: false });
+    expect(queued).toHaveLength(0);
+  });
+});

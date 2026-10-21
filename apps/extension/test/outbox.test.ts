@@ -192,6 +192,15 @@ describe("Outbox.enqueueMany", () => {
     expect((await outbox.state()).events).toHaveLength(2000);
   });
 
+  it("does not queue an event whose id is already waiting", async () => {
+    const { outbox } = setup(acceptAll);
+    const same = event(1);
+    await outbox.enqueueMany([same, event(2)]);
+    await outbox.enqueueMany([same]);
+
+    expect((await outbox.state()).events.map((queued) => queued.id)).toHaveLength(2);
+  });
+
   it("keeps the limit and counts what it dropped", async () => {
     const { outbox } = setup(acceptAll);
     await outbox.enqueueMany(Array.from({ length: OUTBOX_LIMIT + 3 }, (_, i) => event(i)));

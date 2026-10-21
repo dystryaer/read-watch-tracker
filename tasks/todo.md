@@ -112,7 +112,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T29 Extension: Desktop-Streaming** · M · Abh. T28
   Akz.: Media-Session + `<video>`; `watched` bei ≥ 85 % oder `ended`, einmal pro Folge; Parser für Prime, Crunchyroll, Netflix, Disney+ (unverifiziert, A10)
 
-- [ ] **T30 Extension: Verlaufsseiten-Sync** · M · Abh. T29
+- [x] **T30 Extension: Verlaufsseiten-Sync** · M · Abh. T29
   Akz.: Crunchyroll, Prime, Netflix als `library_sync`-Batch; tolerant gegenüber DOM-Änderungen (unverifiziert, A10); Server verarbeitet `library_sync`
 
 - [ ] **T31 Android-SDK + Gradle-Gerüst** · M

@@ -1,4 +1,5 @@
 import { detectChapterFromUrl, type DeviceConfig, MAX_TEXT_LENGTH } from "@rwt/core";
+import { deterministicEventId } from "./event-id";
 import type { Detection } from "./messages";
 import { findSiteForUrl } from "./sites";
 
@@ -50,15 +51,7 @@ export function collectBackfill(items: HistoryItem[], config: DeviceConfig): Bac
   return [...best.values()];
 }
 
-/**
- * Deterministic event id (UUID version 8 from SHA-256), so running the backfill twice sends the
- * same ids and the server treats the second run as duplicates.
- */
-export async function backfillEventId(sourceKey: string, seriesKey: string, chapter: number): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`backfill\n${sourceKey}\n${seriesKey}\n${chapter}`));
-  const bytes = new Uint8Array(digest).slice(0, 16);
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80; // version 8
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80; // RFC 4122 variant
-  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+/** Running the backfill twice sends the same ids, so the server treats the second run as duplicates. */
+export function backfillEventId(sourceKey: string, seriesKey: string, chapter: number): Promise<string> {
+  return deterministicEventId(["backfill", sourceKey, seriesKey, chapter]);
 }

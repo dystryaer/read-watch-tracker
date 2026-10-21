@@ -55,11 +55,15 @@ export class Outbox {
     return this.enqueueMany([event]);
   }
 
-  /** Queues several events with one storage write (a backfill brings thousands). */
+  /**
+   * Queues several events with one storage write (a backfill brings thousands). An event whose
+   * id is already waiting is skipped: deterministic ids repeat when a history page is reopened.
+   */
   enqueueMany(events: ProgressEvent[]): Promise<void> {
     return this.exclusive(async () => {
       const state = await this.load();
-      state.events.push(...events);
+      const waiting = new Set(state.events.map((event) => event.id));
+      state.events.push(...events.filter((event) => !waiting.has(event.id)));
       const overflow = state.events.length - OUTBOX_LIMIT;
       if (overflow > 0) {
         state.events.splice(0, overflow);

@@ -8,7 +8,9 @@ import {
   type SiteRule,
   streamingSeriesKey,
 } from "@rwt/core";
+import { latestPerSeries } from "../streaming/history";
 import { serviceForUrl } from "../streaming/services";
+import { deterministicEventId } from "./event-id";
 import type { ApiClient } from "./api-client";
 import { backfillEventId } from "./backfill";
 import { classifySender, ContentMessage, type Detection, ExtensionPageMessage } from "./messages";
@@ -133,6 +135,30 @@ export function createRouter(deps: RouterDeps) {
         const state = await deps.streamStates.get(tabId);
         if (!service || state?.service !== service.key || !state.detection) return { ok: false };
         return (await countWatched(state)) === "duplicate" ? { ok: true, duplicate: true } : { ok: true };
+      }
+
+      case "stream:library": {
+        // A history page (SPEC §7.6) is read by the page itself, never by a frame inside it.
+        const topFrame = sender.frameId === undefined || sender.frameId === 0;
+        if (!service || !topFrame || serviceForUrl(message.url)?.key !== service.key) return { ok: false };
+        const events = await Promise.all(
+          latestPerSeries(message.entries).map(async ({ seriesTitle, season, episode }) => {
+            const externalKey = streamingSeriesKey(seriesTitle) || seriesTitle;
+            return ProgressEvent.parse({
+              // The same history entry always gets the same id, however often the page is opened.
+              id: await deterministicEventId(["library", service.key, externalKey, season ?? "", episode]),
+              occurredAt: new Date(now()).toISOString(),
+              kind: "library_sync",
+              source: { key: service.key, externalKey, rawTitle: seriesTitle },
+              position: { unit: "episode", season, episode },
+            });
+          }),
+        );
+        if (events.length > 0) {
+          await deps.outbox.enqueueMany(events);
+          void deps.outbox.flush();
+        }
+        return { ok: true, queued: events.length };
       }
 
       case "reader:hello":

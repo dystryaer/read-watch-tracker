@@ -361,6 +361,23 @@ describe("ingestEvents – other media", () => {
     expect((await workById(work.id))?.status).toBe("completed");
   });
 
+  it("applies a history batch (library_sync) to linked series and files unknown ones in the inbox", async () => {
+    const source = await seedSource(handle.db, { key: "crunchyroll", kind: "streaming" });
+    const work = await seedWork(handle.db, { title: "Frieren", type: "anime", season: 1, episode: 3 });
+    await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: "frieren", externalTitle: "Frieren" });
+    const synced = (externalKey: string, episode: number) =>
+      chapterEvent({
+        kind: "library_sync",
+        source: { key: "crunchyroll", externalKey, rawTitle: externalKey, url: undefined },
+        position: { unit: "episode", season: 1, episode },
+      });
+
+    const results = await ingestEvents(handle.db, null, [synced("frieren", 7), synced("dandadan", 12)], NOW);
+
+    expect(results.map((result) => result.outcome)).toEqual(["applied", "pending"]);
+    expect(await workById(work.id)).toMatchObject({ season: 1, episode: 7 });
+  });
+
   it("advances an e-book percentage", async () => {
     const source = await seedSource(handle.db, { key: "kindle", kind: "app" });
     const work = await seedWork(handle.db, { title: "Project Hail Mary", type: "ebook", percent: 40 });
