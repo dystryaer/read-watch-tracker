@@ -9,6 +9,7 @@ import type { Store } from "./storage";
 
 export interface TabState {
   url: string;
+  sourceKey: string | null;
   detection: Detection | null;
   counted: boolean;
 }
@@ -49,40 +50,59 @@ export function createRouter(deps: RouterDeps) {
     return site && senderSite?.sourceKey === site.sourceKey ? site : undefined;
   }
 
+  /** Queues one "read" event, at most once per series and chapter in 12 hours. */
+  async function countRead(site: SiteRule, url: string, detection: Detection): Promise<"queued" | "duplicate"> {
+    if (!(await deps.recent.claim(`${site.sourceKey}|${detection.seriesKey}|${detection.chapter}`, now()))) {
+      return "duplicate";
+    }
+    const event = ProgressEvent.parse({
+      id: crypto.randomUUID(),
+      occurredAt: new Date(now()).toISOString(),
+      kind: "read",
+      source: {
+        key: site.sourceKey,
+        externalKey: detection.seriesKey,
+        rawTitle: detection.title ?? detection.seriesKey,
+        url,
+        ...(detection.seriesUrl ? { seriesUrl: detection.seriesUrl } : {}),
+      },
+      position: { unit: "chapter", chapter: detection.chapter },
+    });
+    await deps.outbox.enqueue(event);
+    void deps.outbox.flush();
+    return "queued";
+  }
+
   async function handleContent(message: ContentMessage, tabId: number, senderUrl: string | undefined) {
     const current = await config();
     switch (message.type) {
       case "reader:hello":
         return { ok: true, site: siteFor(current, message.url, senderUrl) ?? null, thresholds: current?.thresholds ?? DEFAULT_THRESHOLDS };
 
-      case "reader:detected":
-        tabs.set(tabId, { url: message.url, detection: message.detection, counted: false });
+      case "reader:detected": {
+        const site = siteFor(current, message.url, senderUrl);
+        const previous = tabs.get(tabId);
+        tabs.set(tabId, { url: message.url, sourceKey: site?.sourceKey ?? null, detection: message.detection, counted: false });
+        // Signal 3 (SPEC §7.4): opening a higher chapter of the same series counts the previous one.
+        if (
+          site &&
+          message.detection &&
+          previous?.detection &&
+          !previous.counted &&
+          previous.sourceKey === site.sourceKey &&
+          previous.detection.seriesKey === message.detection.seriesKey &&
+          message.detection.chapter > previous.detection.chapter
+        ) {
+          await countRead(site, previous.url, previous.detection);
+        }
         return { ok: true };
+      }
 
       case "reader:chapter-read": {
         const site = siteFor(current, message.url, senderUrl);
         if (!site) return { ok: false };
-        const { detection } = message;
-        tabs.set(tabId, { url: message.url, detection, counted: true });
-        if (!(await deps.recent.claim(`${site.sourceKey}|${detection.seriesKey}|${detection.chapter}`, now()))) {
-          return { ok: true, duplicate: true };
-        }
-        const event = ProgressEvent.parse({
-          id: crypto.randomUUID(),
-          occurredAt: new Date(now()).toISOString(),
-          kind: "read",
-          source: {
-            key: site.sourceKey,
-            externalKey: detection.seriesKey,
-            rawTitle: detection.title ?? detection.seriesKey,
-            url: message.url,
-            ...(detection.seriesUrl ? { seriesUrl: detection.seriesUrl } : {}),
-          },
-          position: { unit: "chapter", chapter: detection.chapter },
-        });
-        await deps.outbox.enqueue(event);
-        void deps.outbox.flush();
-        return { ok: true };
+        tabs.set(tabId, { url: message.url, sourceKey: site.sourceKey, detection: message.detection, counted: true });
+        return (await countRead(site, message.url, message.detection)) === "duplicate" ? { ok: true, duplicate: true } : { ok: true };
       }
     }
   }

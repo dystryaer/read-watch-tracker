@@ -110,6 +110,36 @@ describe("router – reader script", () => {
     expect(queued).toHaveLength(0);
   });
 
+  it("counts the previous chapter when the reader moves on to a higher one in the same tab", async () => {
+    const { route, queued } = await setup();
+    const next = { ...detection, chapter: 346 };
+    const nextUrl = "https://asuracomic.net/series/overgeared/chapter/346";
+
+    await route({ type: "reader:detected", url: chapterUrl, detection }, content());
+    await route({ type: "reader:detected", url: nextUrl, detection: next }, content(nextUrl));
+
+    expect(queued.map((e) => e.position)).toEqual([{ unit: "chapter", chapter: 345 }]);
+    expect(queued[0]?.source.url).toBe(chapterUrl);
+  });
+
+  it("does not count on a jump back, to another series or after the chapter was counted", async () => {
+    const { route, queued } = await setup();
+    const at = (chapter: number, seriesKey = "overgeared") => ({
+      url: `https://asuracomic.net/series/${seriesKey}/chapter/${chapter}`,
+      detection: { ...detection, chapter, seriesKey },
+    });
+    const detected = async (step: ReturnType<typeof at>) =>
+      route({ type: "reader:detected", ...step }, content(step.url));
+
+    await detected(at(345));
+    await detected(at(340)); // back
+    await detected(at(1, "solo-leveling")); // other series
+    await route({ type: "reader:chapter-read", ...at(2, "solo-leveling"), signal: "scroll" }, content(at(2, "solo-leveling").url));
+    await detected(at(3, "solo-leveling")); // previous already counted
+
+    expect(queued.map((e) => `${e.source.externalKey}:${(e.position as { chapter: number }).chapter}`)).toEqual(["solo-leveling:2"]);
+  });
+
   it("does not accept popup commands from a content script", async () => {
     const { route, sync } = await setup();
     expect(await route({ type: "options:sync-now" }, content())).toEqual({ ok: false });

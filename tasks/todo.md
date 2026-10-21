@@ -82,7 +82,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T22 Kopplung + Config-Sync in der Extension** · S · Abh. T21, T12
   Akz.: Optionsseite: Code anzeigen, pollen, Token speichern; `/config` mit ETag beim Start, alle 15 min und auf Anforderung; Antwort validiert
 
-- [ ] **T23 Lese-Engine (DOM) + Kapitelende** · M · Abh. T04, T21
+- [x] **T23 Lese-Engine (DOM) + Kapitelende** · M · Abh. T04, T21
   Akz.: SPEC §7.3–7.4: Titel-Selektor/Fallbacks, drei Ende-Signale, 12-h-Dedupe, URL-Wechsel ohne Reload · Prüfung: happy-dom-Tests mit synthetischem Reader-Korpus (Long-Strip, seitenweise, Next-Link)
 
 - [ ] **T24 Popup + Seite freischalten + Umzug** · M · Abh. T22, T23
