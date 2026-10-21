@@ -6,5 +6,8 @@ export default defineProject({
   test: {
     name: "web",
     include: ["test/**/*.test.ts"],
+    // Auth tests start an embedded Postgres, which is slow while all files run in parallel.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 });
