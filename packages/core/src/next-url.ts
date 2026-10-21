@@ -48,6 +48,11 @@ export function nextChapterUrl(input: NextUrlInput): NextUrl | null {
   return last ? { kind: "last", href: last.href } : null;
 }
 
+/** A stored URL on the source's current domain after a domain move (SPEC §4.4 rule 4); null for non-http(s). */
+export function onCurrentDomain(url: string | null, currentDomain: string | null | undefined): string | null {
+  return moveToDomain(parseHttpUrl(url), currentDomain)?.href ?? null;
+}
+
 function moveToDomain(url: URL | null, domain: string | null | undefined): URL | null {
   // Stored domains have no "www."; www.example.org is still the current domain example.org.
   if (url === null || !domain || !isHostname(domain) || normalizeDomain(url.hostname) === domain) return url;

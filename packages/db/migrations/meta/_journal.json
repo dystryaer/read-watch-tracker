@@ -43,6 +43,13 @@
       "when": 1792567970919,
       "tag": "0005_library_sync_at",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792569319109,
+      "tag": "0006_latest_chapter",
+      "breakpoints": true
     }
   ]
 }

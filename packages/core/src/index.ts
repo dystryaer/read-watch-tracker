@@ -9,7 +9,7 @@ export {
   positionUnitFor,
   shouldAdvance,
 } from "./progress";
-export { nextChapterUrl, type NextUrl, type NextUrlInput } from "./next-url";
+export { nextChapterUrl, type NextUrl, type NextUrlInput, onCurrentDomain } from "./next-url";
 export { MAX_URL_LENGTH, parseHttpUrl, safeHref } from "./safe-url";
 export { normalizeSeriesKey } from "./series-key";
 export { isAppBookKey, parseAsin, parseShare, parseWebnovelBookId, sharedTitle, type SharedBook } from "./share";

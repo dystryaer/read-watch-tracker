@@ -83,6 +83,9 @@ export const works = pgTable(
     lastSourceId: uuid("last_source_id").references(() => sources.id, { onDelete: "set null" }),
     lastUrl: text("last_url"),
     lastProgressAt: timestamptz("last_progress_at"),
+    /** Newest chapter on the series page, reported by the extension (SPEC §7.11). */
+    latestChapter: numeric("latest_chapter", { precision: 7, scale: 2, mode: "number" }),
+    latestChapterAt: timestamptz("latest_chapter_at"),
     notes: text("notes"),
     createdAt: createdAt(),
     updatedAt: timestamptz("updated_at").notNull().defaultNow(),

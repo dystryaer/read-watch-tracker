@@ -4,6 +4,7 @@ import {
   EnableSourceRequest,
   IgnoreSeriesRequest,
   type EventResult,
+  LatestChaptersRequest,
   PairingPollRequest,
   PairingStartRequest,
   parseEventBatch,
@@ -16,6 +17,7 @@ import { RateLimiter } from "../http/rate-limit";
 import { bearerToken, clientAddress, errorResponse, jsonResponse, type Parsed, readJsonBody } from "../http/request";
 import { ignoreSeries } from "../ignore";
 import { ingestEvents } from "../ingest";
+import { recordLatestChapters, seriesToWatch } from "../latest";
 import { confirmShare, ShareNotFoundError, ShareUsedError, ShareValueError, startShare } from "../share";
 import { buildDeviceConfig, enableSource, ServiceDomainError, SourceConflictError, SourceNotFoundError } from "../sources";
 
@@ -25,6 +27,8 @@ const MAX_EVENTS_BODY_BYTES = 512 * 1024;
 const MAX_SMALL_BODY_BYTES = 4 * 1024;
 // A shared URL (≤ 2048) plus its text (≤ 2000), with headroom for multibyte characters.
 const MAX_SHARE_BODY_BYTES = 16 * 1024;
+// 100 items with keys of at most ~1 KB each before cleanup.
+const MAX_LATEST_BODY_BYTES = 128 * 1024;
 
 export interface ApiLimiters {
   authFailures: RateLimiter;
@@ -172,6 +176,29 @@ export async function handleIgnoreSeries(request: Request, context: ApiContext):
     throw error;
   }
   return jsonResponse({ ok: true });
+}
+
+/** GET /api/v1/series-watch – M4: the series pages the extension may check for new chapters (SPEC §7.11). */
+export async function handleSeriesWatch(request: Request, context: ApiContext): Promise<Response> {
+  const device = await authenticate(request, context);
+  if (!device.ok) return device.response;
+  if (device.value.kind !== "extension") return errorResponse("forbidden", 403);
+  if (!context.limiters.config.allow(device.value.id)) return tooManyRequests();
+  return jsonResponse({ series: await seriesToWatch(context.db) });
+}
+
+/** POST /api/v1/latest-chapters – M4: the newest chapters the extension found on series pages. */
+export async function handleLatestChapters(request: Request, context: ApiContext): Promise<Response> {
+  const device = await authenticate(request, context);
+  if (!device.ok) return device.response;
+  if (device.value.kind !== "extension") return errorResponse("forbidden", 403);
+  if (!context.limiters.sources.allow(device.value.id)) return tooManyRequests();
+
+  const body = await readJsonBody(request, MAX_LATEST_BODY_BYTES);
+  if (!body.ok) return body.response;
+  const input = LatestChaptersRequest.safeParse(body.value);
+  if (!input.success) return errorResponse("invalid_request", 400);
+  return jsonResponse({ updated: await recordLatestChapters(context.db, input.data.items, context.now?.()) });
 }
 
 // The iOS shortcut shows `message` to the user as it is (SPEC §9.6: understandable errors).

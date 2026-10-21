@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextChapterUrl } from "../src/next-url";
+import { nextChapterUrl, onCurrentDomain } from "../src/next-url";
 
 describe("nextChapterUrl – generic", () => {
   it("increments the chapter number in the last path segment", () => {
@@ -148,5 +148,21 @@ describe("nextChapterUrl – domain move", () => {
     expect(
       nextChapterUrl({ lastUrl: "https://old.example/x/chapter-1", chapter: 1, currentDomain: "bad domain/x" })?.href,
     ).toBe("https://old.example/x/chapter-2");
+  });
+});
+
+describe("onCurrentDomain", () => {
+  it("moves a stored URL to the source's current domain", () => {
+    expect(onCurrentDomain("https://asuracomic.net/series/solo-leveling", "asurascans.com")).toBe("https://asurascans.com/series/solo-leveling");
+  });
+
+  it("keeps a URL already on the current domain, also with www., and without a known domain", () => {
+    expect(onCurrentDomain("https://www.asurascans.com/series/x", "asurascans.com")).toBe("https://www.asurascans.com/series/x");
+    expect(onCurrentDomain("https://asuracomic.net/series/x", null)).toBe("https://asuracomic.net/series/x");
+  });
+
+  it("refuses what is no http(s) URL", () => {
+    expect(onCurrentDomain("javascript:alert(1)", "asurascans.com")).toBeNull();
+    expect(onCurrentDomain(null, "asurascans.com")).toBeNull();
   });
 });

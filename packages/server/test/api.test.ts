@@ -8,13 +8,15 @@ import {
   handleEnableSource,
   handleEvents,
   handleIgnoreSeries,
+  handleLatestChapters,
   handlePairingPoll,
   handlePairingStart,
   handleShare,
+  handleSeriesWatch,
   handleShareConfirm,
 } from "../src/api/handlers";
 import { approvePairing, createDeviceWithToken, revokeDevice } from "../src/devices";
-import { chapterEvent, seedSource } from "./helpers";
+import { chapterEvent, seedLink, seedSource, seedWork } from "./helpers";
 
 let handle: DbHandle;
 let context: ApiContext;
@@ -365,5 +367,62 @@ describe("share endpoints (iOS shortcut)", () => {
     await handleShare(asPhone("/api/v1/share", book), context);
     await handleShare(asPhone("/api/v1/share", book), context);
     expect((await handleShare(asPhone("/api/v1/share", book), context)).status).toBe(429);
+  });
+});
+
+describe("new chapter endpoints (M4, SPEC §7.11)", () => {
+  const get = (authorization = `Bearer ${token}`) => new Request("http://localhost/api/v1/series-watch", { headers: { authorization } });
+
+  async function readingSoloLeveling() {
+    const source = await seedSource(handle.db, { key: "site:asura", trackingEnabled: true }, ["asuracomic.net"]);
+    const work = await seedWork(handle.db, { title: "Solo Leveling", chapter: 200 });
+    await seedLink(handle.db, {
+      workId: work.id,
+      sourceId: source.id,
+      externalKey: "solo-leveling",
+      externalTitle: "Solo Leveling",
+      seriesUrl: "https://asuracomic.net/series/solo-leveling",
+    });
+  }
+
+  it("gives the extension the series pages to check", async () => {
+    await readingSoloLeveling();
+    const response = await handleSeriesWatch(get(), context);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      series: [{ sourceKey: "site:asura", externalKey: "solo-leveling", seriesUrl: "https://asuracomic.net/series/solo-leveling", chapter: 200 }],
+    });
+  });
+
+  it("takes the newest chapters the extension found", async () => {
+    await readingSoloLeveling();
+    const response = await handleLatestChapters(
+      post("/api/v1/latest-chapters", { items: [{ sourceKey: "site:asura", externalKey: "solo-leveling", latestChapter: 203 }] }),
+      context,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ updated: 1 });
+  });
+
+  it.each([
+    ["a chapter with three decimals", { items: [{ sourceKey: "site:asura", externalKey: "x", latestChapter: 1.234 }] }],
+    ["a chapter beyond the position range", { items: [{ sourceKey: "site:asura", externalKey: "x", latestChapter: 100_000 }] }],
+    ["an empty list", { items: [] }],
+    ["more than 100 items", { items: Array.from({ length: 101 }, () => ({ sourceKey: "site:asura", externalKey: "x", latestChapter: 1 })) }],
+    ["a bad source key", { items: [{ sourceKey: "Site Asura", externalKey: "x", latestChapter: 1 }] }],
+  ])("refuses %s", async (_name, body) => {
+    expect((await handleLatestChapters(post("/api/v1/latest-chapters", body), context)).status).toBe(400);
+  });
+
+  it("serves extensions only", async () => {
+    const shield = (await createDeviceWithToken(handle.db, { kind: "shield", name: "Shield" })).token;
+    const phone = (await createDeviceWithToken(handle.db, { kind: "phone", name: "iPhone" })).token;
+    const item = { items: [{ sourceKey: "site:asura", externalKey: "x", latestChapter: 1 }] };
+
+    for (const other of [shield, phone]) {
+      expect((await handleSeriesWatch(get(`Bearer ${other}`), context)).status).toBe(403);
+      expect((await handleLatestChapters(post("/api/v1/latest-chapters", item, { authorization: `Bearer ${other}` }), context)).status).toBe(403);
+    }
+    expect((await handleSeriesWatch(get("Bearer nope"), context)).status).toBe(401);
   });
 });

@@ -26,8 +26,10 @@ export {
   handleEnableSource,
   handleEvents,
   handleIgnoreSeries,
+  handleLatestChapters,
   handlePairingPoll,
   handlePairingStart,
+  handleSeriesWatch,
   handleShare,
   handleShareConfirm,
 } from "./api/handlers";
@@ -49,3 +51,4 @@ export { addSiteDomain, getSite, getSiteId, listRecentSiteUrls, listSites, renam
 export { ignoreSeries } from "./ignore";
 export { confirmShare, ShareNotFoundError, ShareValueError, startShare } from "./share";
 export { progressStats } from "./stats";
+export { type LatestChapter, recordLatestChapters, seriesToWatch, type WatchedSeries } from "./latest";

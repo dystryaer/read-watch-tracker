@@ -125,4 +125,29 @@ export const ShareConfirmResponse = z.object({
 });
 export type ShareConfirmResponse = z.infer<typeof ShareConfirmResponse>;
 
+/** M4 (SPEC §7.11): the series pages the extension may check for new chapters. */
+export const SeriesWatchResponse = z.object({
+  series: z
+    .array(
+      z.object({
+        sourceKey: SourceKey,
+        externalKey: z.string().min(1).max(MAX_TEXT_LENGTH),
+        seriesUrl: HttpUrlSchema,
+        chapter: ChapterNumber,
+      }),
+    )
+    .max(500),
+});
+export type SeriesWatchResponse = z.infer<typeof SeriesWatchResponse>;
+
+/** M4: what the series pages show now; never changes a reading position. */
+export const LatestChaptersRequest = z.object({
+  items: z
+    .array(z.object({ sourceKey: SourceKey, externalKey: cleanText(MAX_TEXT_LENGTH), latestChapter: ChapterNumber }))
+    .min(1)
+    .max(100),
+});
+export type LatestChaptersRequest = z.infer<typeof LatestChaptersRequest>;
+export const LatestChaptersResponse = z.object({ updated: z.number().int().min(0) });
+
 export const ApiError = z.object({ error: z.string().max(100), message: z.string().max(400).optional() });
