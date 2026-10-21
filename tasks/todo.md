@@ -79,7 +79,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T21 Storage + Outbox** · M · Abh. T20
   Akz.: alles aus `chrome.storage` wird validiert (beschädigt → verwerfen + Warnung); Outbox mit UUID, Flush, Backoff bis 30 min, 401 → entkoppelt, Limit 5 000 · Prüfung: Unit-Tests mit Fake-Storage/-Fetch
 
-- [ ] **T22 Kopplung + Config-Sync in der Extension** · S · Abh. T21, T12
+- [x] **T22 Kopplung + Config-Sync in der Extension** · S · Abh. T21, T12
   Akz.: Optionsseite: Code anzeigen, pollen, Token speichern; `/config` mit ETag beim Start, alle 15 min und auf Anforderung; Antwort validiert
 
 - [ ] **T23 Lese-Engine (DOM) + Kapitelende** · M · Abh. T04, T21

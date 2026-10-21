@@ -122,13 +122,21 @@ describe("Outbox", () => {
   });
 
   it("drops the oldest events beyond the limit and counts them", async () => {
-    const { outbox } = setup(acceptAll);
-    for (let i = 0; i < OUTBOX_LIMIT + 3; i++) await outbox.enqueue(event(i % 1000));
+    const full = Array.from({ length: OUTBOX_LIMIT }, (_, i) => event(i % 1000));
+    const area = fakeStorage({
+      outbox: { events: full, attempts: 0, nextAttemptAt: null, lastSyncAt: null, lastError: null, dropped: 0 },
+    });
+    const outbox = new Outbox(createStore(area), { postEvents: acceptAll }, { now: () => 0, onUnauthorized: () => {} });
+    const newest = [event(1), event(2), event(3)];
+
+    for (const e of newest) await outbox.enqueue(e);
 
     const state = await outbox.state();
     expect(state.events).toHaveLength(OUTBOX_LIMIT);
     expect(state.dropped).toBe(3);
-  }, 30_000);
+    expect(state.events.slice(-3).map((e) => e.id)).toEqual(newest.map((e) => e.id));
+    expect(state.events[0]?.id).toBe(full[3]?.id);
+  });
 
   it("does not lose an event queued while a send is in flight", async () => {
     let release: () => void = () => {};

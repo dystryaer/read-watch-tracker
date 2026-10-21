@@ -40,13 +40,8 @@ describe("ExtensionPageMessage", () => {
     expect(ExtensionPageMessage.safeParse({ type: "popup:enable-site", tabId: 3, moveFromSourceKey: "<x>" }).success).toBe(false);
   });
 
-  it("accepts starting a pairing with an http(s) API address", () => {
-    expect(
-      ExtensionPageMessage.safeParse({ type: "options:start-pairing", apiUrl: "https://tracker.example", deviceName: "Brave" }).success,
-    ).toBe(true);
-    expect(ExtensionPageMessage.safeParse({ type: "options:start-pairing", apiUrl: "file:///x", deviceName: "Brave" }).success).toBe(
-      false,
-    );
+  it("accepts a sync request from the options page", () => {
+    expect(ExtensionPageMessage.safeParse({ type: "options:sync-now" }).success).toBe(true);
   });
 });
 

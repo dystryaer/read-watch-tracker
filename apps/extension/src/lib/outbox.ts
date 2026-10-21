@@ -129,3 +129,9 @@ export class Outbox {
     await this.store.write(KEY, state);
   }
 }
+
+/** Read-only summary for the options page; the background's Outbox instance stays the only writer. */
+export async function readOutboxSummary(store: Store): Promise<Pick<OutboxState, "lastSyncAt" | "lastError" | "dropped"> & { queued: number }> {
+  const stored = await store.read(KEY, StoredOutbox, EMPTY);
+  return { queued: stored.events.length, lastSyncAt: stored.lastSyncAt, lastError: stored.lastError, dropped: stored.dropped };
+}

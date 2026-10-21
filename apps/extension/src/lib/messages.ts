@@ -1,4 +1,4 @@
-import { cleanText, DeviceName, HttpUrlSchema, MAX_TEXT_LENGTH, SourceKey } from "@rwt/core";
+import { cleanText, HttpUrlSchema, MAX_TEXT_LENGTH, SourceKey } from "@rwt/core";
 import { z } from "zod";
 
 /**
@@ -26,7 +26,6 @@ export const ContentMessage = z.discriminatedUnion("type", [
 export type ContentMessage = z.infer<typeof ContentMessage>;
 
 const TabId = z.number().int().min(0);
-const ApiOrigin = HttpUrlSchema;
 
 /** Sent by the extension's own popup and options pages – never accepted from content scripts. */
 export const ExtensionPageMessage = z.discriminatedUnion("type", [
@@ -39,10 +38,7 @@ export const ExtensionPageMessage = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("popup:disable-site"), tabId: TabId }),
   z.object({ type: z.literal("popup:ignore-series"), tabId: TabId }),
-  z.object({ type: z.literal("options:start-pairing"), apiUrl: ApiOrigin, deviceName: DeviceName }),
-  z.object({ type: z.literal("options:unpair") }),
   z.object({ type: z.literal("options:sync-now") }),
-  z.object({ type: z.literal("options:backfill") }),
 ]);
 export type ExtensionPageMessage = z.infer<typeof ExtensionPageMessage>;
 
