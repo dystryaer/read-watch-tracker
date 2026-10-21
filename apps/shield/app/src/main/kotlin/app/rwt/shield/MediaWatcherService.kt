@@ -18,6 +18,7 @@ import app.rwt.shield.logic.PlaybackStatus
 import app.rwt.shield.logic.WatchTracker
 import app.rwt.shield.logic.WatchedEpisode
 import java.time.Instant
+import java.util.concurrent.Executors
 
 /**
  * Watches what is playing (SPEC §8.1): the notification-listener grant only unlocks
@@ -26,6 +27,8 @@ import java.time.Instant
  */
 class MediaWatcherService : NotificationListenerService() {
     private val handler = Handler(Looper.getMainLooper())
+    // Outbox and preference writes stay off the main thread; one thread keeps their order.
+    private val writer = Executors.newSingleThreadExecutor()
     private val tracker = WatchTracker(elapsedMs = SystemClock::elapsedRealtime)
     private val events = EventFactory(now = Instant::now)
     private val watched = mutableMapOf<MediaSession.Token, Pair<MediaController, MediaController.Callback>>()
@@ -46,6 +49,7 @@ class MediaWatcherService : NotificationListenerService() {
     }
 
     override fun onListenerConnected() {
+        SpikeLogger.discardOutsideDebug(this)
         val manager = getSystemService(MediaSessionManager::class.java) ?: return
         sessions = manager
         manager.addOnActiveSessionsChangedListener(onSessionsChanged, component, handler)
@@ -60,6 +64,7 @@ class MediaWatcherService : NotificationListenerService() {
 
     override fun onDestroy() {
         stopWatching()
+        writer.shutdown()
         super.onDestroy()
     }
 
@@ -72,7 +77,7 @@ class MediaWatcherService : NotificationListenerService() {
             if (!allowlisted && spike == null) continue
 
             val callback = object : MediaController.Callback() {
-                override fun onMetadataChanged(metadata: MediaMetadata?) = onMetadata(controller.packageName, metadata)
+                override fun onMetadataChanged(metadata: MediaMetadata?) = onMetadata(controller, metadata)
 
                 override fun onPlaybackStateChanged(state: PlaybackState?) = onPlayback(controller.packageName, state)
 
@@ -80,13 +85,16 @@ class MediaWatcherService : NotificationListenerService() {
             }
             controller.registerCallback(callback, handler)
             watched[token] = controller to callback
-            onMetadata(controller.packageName, controller.metadata)
+            onMetadata(controller, controller.metadata)
             onPlayback(controller.packageName, controller.playbackState)
         }
     }
 
+    // A session that is gone must not keep "playing" in the tracker (crash, kill, app closed).
     private fun unwatch(token: MediaSession.Token) {
-        watched.remove(token)?.let { (controller, callback) -> controller.unregisterCallback(callback) }
+        val (controller, callback) = watched.remove(token) ?: return
+        controller.unregisterCallback(callback)
+        record(tracker.onSessionEnded(controller.packageName))
     }
 
     private fun stopWatching() {
@@ -96,10 +104,13 @@ class MediaWatcherService : NotificationListenerService() {
         handler.removeCallbacks(tick)
     }
 
-    private fun onMetadata(packageName: String, metadata: MediaMetadata?) {
+    // The player's current state goes along: on autoplay it can arrive before the new metadata.
+    private fun onMetadata(controller: MediaController, metadata: MediaMetadata?) {
+        val packageName = controller.packageName
         spike?.metadata(packageName, metadata)
         if (metadata == null) return
-        record(tracker.onMetadata(snapshotOf(packageName, metadata)))
+        record(tracker.onMetadata(snapshotOf(packageName, metadata), current = controller.playbackState?.let(::sampleOf)))
+        rearmTick()
         settings.unrecognized = tracker.unrecognized.map { snapshot ->
             listOfNotNull(snapshot.displaySubtitle, snapshot.title, snapshot.displayTitle, snapshot.artist, snapshot.album)
                 .filter { it.isNotBlank() }
@@ -112,18 +123,23 @@ class MediaWatcherService : NotificationListenerService() {
         spike?.playback(packageName, state)
         if (state == null) return
         record(tracker.onPlayback(packageName, sampleOf(state)))
+        rearmTick()
+    }
+
+    private fun rearmTick() {
         handler.removeCallbacks(tick)
         if (tracker.isPlaying()) handler.postDelayed(tick, TICK_MS)
     }
 
     private fun record(episodes: List<WatchedEpisode>) {
-        if (episodes.isEmpty()) return
+        if (episodes.isEmpty() || writer.isShutdown) return
         val now = Instant.now()
-        for (episode in episodes) {
-            outbox.add(events.watched(episode))
-            settings.addRecent(episode, now)
+        val queued = episodes.map { it to events.watched(it) }
+        writer.execute {
+            // Only what the outbox accepted is shown as counted.
+            for ((episode, event) in queued) if (outbox.add(event)) settings.addRecent(episode, now)
+            FlushWorker.schedule(this)
         }
-        FlushWorker.schedule(this)
     }
 
     private fun snapshotOf(packageName: String, metadata: MediaMetadata) = MediaSnapshot(

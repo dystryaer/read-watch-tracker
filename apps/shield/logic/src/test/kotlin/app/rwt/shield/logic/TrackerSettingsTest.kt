@@ -16,7 +16,7 @@ class TrackerSettingsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["http://tracker.example", "http://192.168.1.10:3000", "ftp://tracker.example", "javascript:alert(1)", "https://user:pw@tracker.example", "tracker.example", ""])
+    @ValueSource(strings = ["https://tracker.example:99999", "https://tracker.example:0", "http://tracker.example", "http://192.168.1.10:3000", "ftp://tracker.example", "javascript:alert(1)", "https://user:pw@tracker.example", "tracker.example", ""])
     fun `refuses addresses the token must not travel to`(raw: String) {
         assertNull(TrackerSettings.origin(raw))
     }

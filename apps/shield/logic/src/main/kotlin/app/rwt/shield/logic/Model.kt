@@ -28,6 +28,3 @@ data class WatchedEpisode(
     val season: Int?,
     val episode: Int,
 )
-
-/** What a package mapping reads from the metadata – the same tuple as a watched episode. */
-typealias MappedEpisode = WatchedEpisode

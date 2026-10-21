@@ -13,8 +13,8 @@ object EpisodeParser {
     private const val MAX_EPISODE = 99_999
     private val ignoreCase = setOf(RegexOption.IGNORE_CASE)
 
-    // JavaScript's \s also covers no-break and other Unicode spaces; Java's does not, so they are folded first.
-    private val unicodeSpace = Regex("""[\p{Z}\s]+""")
+    // JavaScript's \s also covers no-break spaces and U+FEFF; Java's does not, so they are folded first.
+    private val unicodeSpace = Regex("""[\p{Z}\s\x{FEFF}]+""")
 
     private val seasonAndEpisode = listOf(
         Regex("""(?<![\p{L}\d])s(\d{1,4})\s*[:.]?\s*e(\d{1,6})(?!\d)""", ignoreCase),

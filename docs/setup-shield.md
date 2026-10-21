@@ -42,9 +42,14 @@ Die App nutzt die Berechtigung nur, um die laufenden Mediensitzungen zu sehen. B
    adb shell am start -n app.rwt.shield/.MainActivity --es apiUrl https://dein-tracker.vercel.app
    ```
 
+   Die Adresse per adb gilt nur, solange die App noch nicht eingerichtet ist; eine andere Adresse verwirft Token und Kopplung (Schutz davor, dass eine andere App auf der Shield die Adresse umbiegt).
 2. Die App zeigt einen sechsstelligen Code und einen QR-Code.
 3. Den QR-Code mit dem Handy scannen (oder im Tracker **Einstellungen → Gerät koppeln** den Code eingeben). Der Tracker zeigt, welches Gerät sich koppeln will („Shield · Nvidia Shield · angefragt gerade eben“); prüfen und **Koppeln bestätigen**.
 4. Nach wenigen Sekunden zeigt die Shield den Statusscreen: **Gekoppelt ✓** und **Medienzugriff ✓**.
+
+## 5. Netzwerk-Debugging wieder ausschalten
+
+Nach der Einrichtung **Einstellungen → Geräteeinstellungen → Entwickleroptionen → Netzwerk-Debugging** wieder ausschalten. Sonst behält jeder einmal erlaubte Rechner im Netz adb-Zugriff auf die Shield. Für ein Update schaltest du es kurz wieder ein.
 
 ## Statusscreen
 

@@ -17,6 +17,7 @@ import androidx.core.app.NotificationManagerCompat
 import app.rwt.shield.logic.ApiResponses
 import app.rwt.shield.logic.PairingPoll
 import app.rwt.shield.logic.PairingStart
+import app.rwt.shield.logic.SetupRules
 import app.rwt.shield.logic.TrackerSettings
 import org.json.JSONObject
 import java.time.Instant
@@ -34,12 +35,15 @@ class MainActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
     private val time = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
     private var polling = false
+    private var resumed = false
     private lateinit var root: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Saves typing on the remote: adb shell am start -n app.rwt.shield/.MainActivity --es apiUrl https://…
-        intent.getStringExtra("apiUrl")?.let(TrackerSettings::origin)?.let { settings.apiUrl = it }
+        // Only for an app that is not set up yet – any app on the device can start this activity.
+        SetupRules.launchAddress(intent.getStringExtra("apiUrl"), settings.setupState)?.let { settings.apiUrl = it }
+        SpikeLogger.discardOutsideDebug(this)
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(48), dp(32), dp(48), dp(32))
@@ -49,18 +53,28 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        resumed = true
         render()
     }
 
     override fun onPause() {
+        resumed = false
         polling = false
         main.removeCallbacksAndMessages(null)
         super.onPause()
     }
 
     override fun onDestroy() {
+        resumed = false
+        polling = false
+        main.removeCallbacksAndMessages(null)
         io.shutdownNow()
         super.onDestroy()
+    }
+
+    // Network and file work runs off the main thread, and never after the screen is gone.
+    private fun background(task: () -> Unit) {
+        if (!io.isShutdown) io.execute(task)
     }
 
     private fun render() {
@@ -106,7 +120,7 @@ class MainActivity : Activity() {
     }
 
     private fun requestCode(apiUrl: String, status: TextView) {
-        io.execute {
+        background {
             val start = runCatching {
                 val body = JSONObject().put("kind", "shield").put("name", settings.deviceName).toString()
                 val result = TrackerHttp(apiUrl).post("/api/v1/pairing", body)
@@ -141,8 +155,8 @@ class MainActivity : Activity() {
         polling = true
         val next = object : Runnable {
             override fun run() {
-                if (!polling) return
-                io.execute {
+                if (!polling || !resumed) return
+                background {
                     val answer = runCatching {
                         val body = JSONObject().put("pollSecret", start.pollSecret).toString()
                         val result = TrackerHttp(apiUrl).post("/api/v1/pairing/poll", body)
@@ -184,21 +198,25 @@ class MainActivity : Activity() {
                 "Medienzugriff ✗ – einmalig per adb freigeben:\nadb shell cmd notification allow_listener app.rwt.shield/app.rwt.shield.MediaWatcherService"
             },
         )
-        text("Outbox: ${ShieldSettings.outbox(this).size()} wartende Ereignisse")
+        val outbox = text("Outbox: …")
+        background {
+            val waiting = ShieldSettings.outbox(this).size()
+            onScreen { outbox.text = "Outbox: $waiting wartende Ereignisse" }
+        }
 
         subheading("Letzte Ereignisse")
         settings.recent.ifEmpty { listOf("Noch keine.") }.forEach { text(it) }
         subheading("Nicht erkannt")
         settings.unrecognized.ifEmpty { listOf("Nichts.") }.forEach { text(it) }
 
-        button("Jetzt senden") { FlushWorker.schedule(this) }
+        button("Jetzt senden") { FlushWorker.schedule(this, now = true) }
         button("Entkoppeln") {
             settings.deviceToken = null
             render()
         }
     }
 
-    private fun onScreen(block: () -> Unit) = main.post { if (!isFinishing && !isDestroyed) block() }
+    private fun onScreen(block: () -> Unit) = main.post { if (resumed && !isFinishing && !isDestroyed) block() }
 
     private fun heading(value: String) = addText(value, 32f)
 

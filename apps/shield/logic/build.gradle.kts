@@ -30,6 +30,10 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-    // Shared with the TypeScript side: the event schema and the episode label fixtures.
-    systemProperty("rwt.coreDir", rootProject.file("../../packages/core").absolutePath)
+    // Shared with the TypeScript side: the event schema and the episode label fixtures. Declared as
+    // inputs, so a changed fixture re-runs the tests instead of reporting an up-to-date green.
+    val coreDir = rootProject.file("../../packages/core")
+    inputs.file(coreDir.resolve("fixtures/episodes.json")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(coreDir.resolve("event.schema.json")).withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("rwt.coreDir", coreDir.absolutePath)
 }

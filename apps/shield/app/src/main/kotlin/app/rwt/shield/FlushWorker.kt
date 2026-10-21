@@ -24,9 +24,14 @@ class FlushWorker(context: Context, params: WorkerParameters) : Worker(context, 
         val transport = EventTransport { payload -> http.post("/api/v1/events", payload, token) }
         val flusher = OutboxFlusher(ShieldSettings.outbox(applicationContext), transport)
 
-        return when (flusher.flush()) {
+        return when (val result = flusher.flush()) {
             is FlushResult.Done -> Result.success()
-            is FlushResult.Retry -> Result.retry()
+            is FlushResult.Retry -> {
+                val wait = result.retryAfterMs ?: return Result.retry()
+                // The server said when: a follow-up run after exactly that wait instead of the backoff.
+                schedule(applicationContext, delayMs = wait)
+                Result.success()
+            }
             FlushResult.Unauthorized -> {
                 // Revoked in the web app: forget the token, keep the events for a new pairing.
                 settings.deviceToken = null
@@ -38,12 +43,18 @@ class FlushWorker(context: Context, params: WorkerParameters) : Worker(context, 
     companion object {
         private const val WORK_NAME = "flush"
 
-        fun schedule(context: Context) {
+        /**
+         * `now` (the "Jetzt senden" button) replaces a run that waits in backoff; otherwise new
+         * events queue up behind the current run.
+         */
+        fun schedule(context: Context, now: Boolean = false, delayMs: Long = 0) {
             val request = OneTimeWorkRequestBuilder<FlushWorker>()
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+            val policy = if (now) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE
+            WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, policy, request)
         }
     }
 }

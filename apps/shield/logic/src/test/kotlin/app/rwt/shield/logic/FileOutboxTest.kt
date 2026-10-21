@@ -71,6 +71,16 @@ class FileOutboxTest {
     }
 
     @Test
+    fun `refuses to queue an event the server would not accept`() {
+        val outbox = FileOutbox(file)
+        val broken = event(1).copy(source = EventSource("netflix", "Da" + Char(7) + "rk", "Dark"))
+
+        assertEquals(false, outbox.add(broken))
+        assertEquals(true, outbox.add(event(2)))
+        assertEquals(listOf(event(2)), outbox.peek(10))
+    }
+
+    @Test
     fun `is empty without a file`() {
         assertEquals(0, FileOutbox(file).size())
     }

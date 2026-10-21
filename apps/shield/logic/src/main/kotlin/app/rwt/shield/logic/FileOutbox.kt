@@ -19,9 +19,12 @@ class FileOutbox(private val file: File, private val limit: Int = 5_000) {
 
     private val lock: Any = locks.getOrPut(file.absoluteFile.normalize().path) { Any() }
 
-    fun add(event: OutboxEvent) = synchronized(lock) {
+    /** False for an event the server would not accept: it is not queued (and must not be shown as counted). */
+    fun add(event: OutboxEvent): Boolean = synchronized(lock) {
+        if (!event.isValid()) return false
         val events = load()
         if (events.none { it.id == event.id }) save((events + event).takeLast(limit))
+        true
     }
 
     fun peek(max: Int): List<OutboxEvent> = synchronized(lock) { load().take(max) }

@@ -28,19 +28,19 @@ class PackageMappingsTest {
     @Test
     fun `reads the episode from one field and the series from the album`() {
         val mapped = PackageMappings.map(snapshot("com.netflix.ninja", title = "Lügen", displaySubtitle = "S2 E5 – Lügen", album = "Dark"))
-        assertEquals(MappedEpisode("netflix", "Dark", 2, 5), mapped)
+        assertEquals(WatchedEpisode("netflix", "Dark", 2, 5), mapped)
     }
 
     @Test
     fun `takes another field for the series when there is no album`() {
         val mapped = PackageMappings.map(snapshot("com.amazon.amazonvideo.livingroom", title = "Staffel 2, Folge 5", artist = "The Boys"))
-        assertEquals(MappedEpisode("primevideo", "The Boys", 2, 5), mapped)
+        assertEquals(WatchedEpisode("primevideo", "The Boys", 2, 5), mapped)
     }
 
     @Test
     fun `takes the text before the label when no field names the series`() {
         val mapped = PackageMappings.map(snapshot("com.crunchyroll.crunchyroid", title = "Frieren Episode 5"))
-        assertEquals(MappedEpisode("crunchyroll", "Frieren", null, 5), mapped)
+        assertEquals(WatchedEpisode("crunchyroll", "Frieren", null, 5), mapped)
     }
 
     @Test
@@ -52,6 +52,14 @@ class PackageMappingsTest {
     @Test
     fun `maps nothing for apps outside the allowlist`() {
         assertNull(PackageMappings.map(snapshot("com.google.android.youtube.tv", title = "S1 E5", album = "Some Show")))
+    }
+
+    @Test
+    fun `cleans control and bidi characters out of titles like the server does`() {
+        val bell = Char(7)
+        val rightToLeftOverride = Char(0x202e)
+        val mapped = PackageMappings.map(snapshot("com.netflix.ninja", displaySubtitle = "S1 E1", album = "Da${bell}rk$rightToLeftOverride"))
+        assertEquals("Da rk", mapped?.seriesTitle)
     }
 
     @Test

@@ -6,7 +6,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class WatchTrackerTest {
-    private var elapsed = 0L
+    // elapsedRealtime is never 0 on a device; 0 marks an unknown update time.
+    private var elapsed = 1_000L
     private val tracker = WatchTracker(elapsedMs = { elapsed })
     private val netflix = "com.netflix.ninja"
 
@@ -129,6 +130,65 @@ class WatchTrackerTest {
 
         assertEquals(listOf(WatchedEpisode("primevideo", "The Boys", 1, 2)), tracker.onPlayback(prime, paused(2_800_000)))
         assertEquals(listOf(dark(5)), tracker.onPlayback(netflix, paused(2_800_000)))
+    }
+
+    @Test
+    fun `keeps the playback when the same episode's metadata is refreshed, for example once the duration is known`() {
+        tracker.onMetadata(episode(5, durationMs = null))
+        tracker.onPlayback(netflix, playing(0))
+        tracker.onMetadata(episode(5))
+        elapsed = 2_600_000
+
+        assertEquals(listOf(dark(5)), tracker.tick())
+    }
+
+    @Test
+    fun `takes the player's current playback for the next episode on autoplay`() {
+        tracker.onMetadata(episode(5))
+        tracker.onPlayback(netflix, playing(2_400_000)) // episode 5 at 80 %
+        elapsed = 200_000 // now at 86.7 %, when autoplay switches
+        // The playback update for episode 6 arrived before its metadata; the service hands it over.
+        assertEquals(listOf(dark(5)), tracker.onMetadata(episode(6), current = playing(0)))
+        assertTrue(tracker.isPlaying())
+
+        elapsed += 2_800_000
+        assertEquals(listOf(dark(6)), tracker.tick())
+    }
+
+    @Test
+    fun `a session that ended counts only what was really played`() {
+        tracker.onMetadata(episode(5))
+        tracker.onPlayback(netflix, playing(300_000)) // 10 %
+        elapsed = 50 * 60_000 // the app was killed long ago
+
+        assertEquals(emptyList<WatchedEpisode>(), tracker.onSessionEnded(netflix))
+        assertEquals(emptyList<WatchedEpisode>(), tracker.tick())
+        assertFalse(tracker.isPlaying())
+    }
+
+    @Test
+    fun `a session that ended is judged once more, for example when the duration came only with the last metadata`() {
+        tracker.onMetadata(episode(5, durationMs = null))
+        tracker.onPlayback(netflix, paused(2_700_000))
+        tracker.onMetadata(episode(5))
+
+        assertEquals(listOf(dark(5)), tracker.onSessionEnded(netflix))
+    }
+
+    @Test
+    fun `does not extrapolate from an impossible update time or far beyond the episode`() {
+        tracker.onMetadata(episode(5))
+        elapsed = 100_000
+        tracker.onPlayback(netflix, PlaybackSample(PlaybackStatus.PLAYING, 0, 1f, updatedAtMs = 0))
+        elapsed = 3_000_000
+        assertEquals(emptyList<WatchedEpisode>(), tracker.tick())
+
+        tracker.onPlayback(netflix, PlaybackSample(PlaybackStatus.PLAYING, 0, 1f, updatedAtMs = elapsed + 60_000))
+        assertEquals(emptyList<WatchedEpisode>(), tracker.tick())
+
+        tracker.onPlayback(netflix, playing(300_000))
+        elapsed += 7_000_000 // more than twice the episode without a single callback: the device slept
+        assertEquals(emptyList<WatchedEpisode>(), tracker.tick())
     }
 
     @Test

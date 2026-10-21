@@ -35,7 +35,7 @@ In jeder App eine Serienfolge starten, ein paar Minuten laufen lassen, einmal pa
 adb shell run-as app.rwt.shield cat files/spike-s1.jsonl > spike-s1.jsonl
 ```
 
-Jede Zeile ist ein JSON-Objekt: `type` (`metadata` oder `playback`), `package`, die Felder (`android.media.metadata.TITLE`, `…DISPLAY_SUBTITLE`, `…DURATION` usw.) und der Zeitpunkt.
+Jede Zeile ist ein JSON-Objekt: `type` (`metadata` oder `playback`), `package`, die Felder (`android.media.metadata.TITLE`, `…DISPLAY_SUBTITLE`, `…DURATION` usw.) und der Zeitpunkt. Felder mit URIs oder IDs (`…ART_URI`, `…MEDIA_ID` …) stehen nur als „(vorhanden)“ im Log, weil sie signierte Links oder Profil-IDs sein können. Ein später installierter Release-Build löscht das Log.
 
 ## 4. Auswerten
 

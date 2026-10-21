@@ -13,12 +13,17 @@ import java.time.Instant
  * `adb shell run-as app.rwt.shield cat files/spike-s1.jsonl > spike-s1.jsonl`.
  */
 class SpikeLogger(context: Context) {
-    private val file = File(context.filesDir, "spike-s1.jsonl")
+    private val file = File(context.filesDir, FILE_NAME)
 
     fun metadata(packageName: String, metadata: MediaMetadata?) {
         val values = JSONObject()
         metadata?.keySet()?.forEach { key ->
-            val value: Any? = metadata.getText(key)?.toString() ?: metadata.getLong(key).takeIf { it != 0L }
+            // URIs and ids can be signed links or profile ids; the spike only needs to know they exist.
+            val value: Any? = if (PRIVATE_KEYS.any { key.endsWith(it) }) {
+                "(vorhanden)"
+            } else {
+                metadata.getText(key)?.toString() ?: metadata.getLong(key).takeIf { it != 0L }
+            }
             values.put(key, value ?: JSONObject.NULL)
         }
         write(JSONObject().put("type", "metadata").put("package", packageName).put("metadata", values))
@@ -36,7 +41,14 @@ class SpikeLogger(context: Context) {
         file.appendText(line.put("at", Instant.now().toString()).toString() + "\n")
     }
 
-    private companion object {
-        const val MAX_BYTES = 5L * 1024 * 1024
+    companion object {
+        private const val MAX_BYTES = 5L * 1024 * 1024
+        private const val FILE_NAME = "spike-s1.jsonl"
+        private val PRIVATE_KEYS = listOf("_URI", "MEDIA_ID")
+
+        /** A release build installed over a debug build drops the debug log of all apps. */
+        fun discardOutsideDebug(context: Context) {
+            if (!BuildConfig.DEBUG) File(context.filesDir, FILE_NAME).delete()
+        }
     }
 }

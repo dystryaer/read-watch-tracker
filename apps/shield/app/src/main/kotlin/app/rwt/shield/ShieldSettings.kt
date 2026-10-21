@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 import app.rwt.shield.logic.FileOutbox
 import app.rwt.shield.logic.PairingStart
+import app.rwt.shield.logic.SetupRules
 import app.rwt.shield.logic.TrackerSettings
 import app.rwt.shield.logic.WatchedEpisode
 import org.json.JSONArray
@@ -18,9 +19,17 @@ import java.time.Instant
 class ShieldSettings(context: Context) {
     private val prefs = context.getSharedPreferences("rwt", Context.MODE_PRIVATE)
 
+    /** Token and pairing belong to the tracker they were made for: another address drops both. */
     var apiUrl: String?
         get() = prefs.getString(KEY_API_URL, null)?.let(TrackerSettings::origin)
-        set(value) = prefs.edit { putString(KEY_API_URL, value?.let(TrackerSettings::origin)) }
+        set(value) = prefs.edit {
+            val origin = value?.let(TrackerSettings::origin)
+            if (!SetupRules.keepsCredentials(apiUrl, origin)) {
+                remove(KEY_TOKEN)
+                remove(KEY_PAIRING)
+            }
+            putString(KEY_API_URL, origin)
+        }
 
     var deviceToken: String?
         get() = prefs.getString(KEY_TOKEN, null)?.takeIf(TrackerSettings::isDeviceToken)
@@ -29,20 +38,31 @@ class ShieldSettings(context: Context) {
     val deviceName: String
         get() = prefs.getString(KEY_NAME, null)?.trim()?.takeIf { it.isNotEmpty() && it.length <= 100 } ?: "Shield"
 
-    /** The running pairing request, until it is approved or expires. */
+    /** The running pairing request, until it is approved or expires; only valid for the tracker it was started with. */
     var pairing: PairingStart?
         get() = runCatching {
             val stored = JSONObject(prefs.getString(KEY_PAIRING, null) ?: return null)
+            if (stored.optString("origin") != apiUrl) return null
             val start = PairingStart(stored.getString("code"), stored.getString("pollSecret"), Instant.parse(stored.getString("expiresAt")))
             start.takeIf { Regex("^[A-Z0-9]{6}$").matches(it.code) && it.pollSecret.length in 20..100 }
         }.getOrNull()
         set(value) = prefs.edit {
-            if (value == null) {
+            val origin = apiUrl
+            if (value == null || origin == null) {
                 remove(KEY_PAIRING)
             } else {
-                putString(KEY_PAIRING, JSONObject().put("code", value.code).put("pollSecret", value.pollSecret).put("expiresAt", value.expiresAt.toString()).toString())
+                val stored = JSONObject()
+                    .put("origin", origin)
+                    .put("code", value.code)
+                    .put("pollSecret", value.pollSecret)
+                    .put("expiresAt", value.expiresAt.toString())
+                putString(KEY_PAIRING, stored.toString())
             }
         }
+
+    /** What SetupRules needs to judge an address handed over at launch. */
+    val setupState: SetupRules.State
+        get() = SetupRules.State(apiUrl = apiUrl, paired = deviceToken != null, pairing = pairing != null)
 
     /** The last ten counted episodes, newest first, for the status screen. */
     val recent: List<String>
