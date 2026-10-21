@@ -1,6 +1,6 @@
 import { HttpUrlSchema, SourceKey } from "@rwt/core";
 import { z } from "zod";
-import { Detection } from "./messages";
+import { Detection, StreamDetection } from "./messages";
 import type { Store } from "./storage";
 
 export const TabState = z.object({
@@ -26,3 +26,21 @@ export function createTabStates(store: Store) {
   };
 }
 export type TabStates = ReturnType<typeof createTabStates>;
+
+export const StreamState = z.object({
+  service: z.enum(["netflix", "primevideo", "disneyplus", "crunchyroll"]),
+  url: HttpUrlSchema,
+  detection: StreamDetection.nullable(),
+});
+export type StreamState = z.infer<typeof StreamState>;
+
+/** What a streaming page last reported per tab; the player frame's "watched" refers to it. */
+export function createStreamStates(store: Store) {
+  const key = (tabId: number) => `stream:${tabId}`;
+  return {
+    get: (tabId: number) => store.read(key(tabId), StreamState.nullable(), null),
+    set: (tabId: number, state: StreamState) => store.write(key(tabId), state),
+    remove: (tabId: number) => store.remove(key(tabId)),
+  };
+}
+export type StreamStates = ReturnType<typeof createStreamStates>;

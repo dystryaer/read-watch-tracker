@@ -4,7 +4,7 @@ import { RecentReads } from "../src/lib/recent";
 import { createRouter } from "../src/lib/router";
 import { saveCachedConfig, saveSettings } from "../src/lib/settings";
 import { createStore, type StorageArea } from "../src/lib/storage";
-import { createTabStates } from "../src/lib/tab-states";
+import { createStreamStates, createTabStates } from "../src/lib/tab-states";
 import { fakeStorage } from "./fakes";
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
@@ -24,6 +24,7 @@ const paired = { apiUrl: "https://tracker.example", deviceToken: "T".repeat(43),
 
 async function setup(options: { paired?: boolean; tabUrl?: string; permission?: boolean; session?: StorageArea } = {}) {
   const store = createStore(fakeStorage());
+  const sessionStore = createStore(options.session ?? fakeStorage());
   await saveCachedConfig(store, { config, etag: null, fetchedAt: 0 });
   if (options.paired !== false) await saveSettings(store, paired);
   const queued: ProgressEvent[] = [];
@@ -52,7 +53,8 @@ async function setup(options: { paired?: boolean; tabUrl?: string; permission?: 
     store,
     outbox,
     recent: new RecentReads(store),
-    tabStates: createTabStates(createStore(options.session ?? fakeStorage())),
+    tabStates: createTabStates(sessionStore),
+    streamStates: createStreamStates(sessionStore),
     api,
     sync,
     browser,
@@ -327,5 +329,110 @@ describe("router – service worker restarts", () => {
     const { route } = await setup({ session });
 
     expect(await route({ type: "popup:status", tabId: 4 }, page)).toMatchObject({ page: { detection: null } });
+  });
+});
+
+describe("router – desktop streaming", () => {
+  const watchUrl = "https://www.netflix.com/watch/81234567";
+  const netflix = (url = watchUrl, frameId = 0) => ({ id: EXT, tab: { id: 7 }, url, frameId });
+  const dark = { kind: "episode" as const, seriesTitle: "Dark (German Dub)", season: 2, episode: 5 };
+
+  it("tells a streaming page the watched threshold", async () => {
+    const { route } = await setup();
+    expect(await route({ type: "stream:hello", url: watchUrl }, netflix())).toEqual({ ok: true, watchedPercent: 85 });
+  });
+
+  it("turns a watched episode into a queued event under the normalized series key", async () => {
+    const { route, queued } = await setup();
+    await route({ type: "stream:detected", url: watchUrl, detection: dark }, netflix());
+
+    expect(await route({ type: "stream:watched", url: watchUrl }, netflix())).toEqual({ ok: true });
+
+    expect(queued).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        occurredAt: "2026-10-21T20:00:00.000Z",
+        kind: "watched",
+        source: { key: "netflix", externalKey: "dark", rawTitle: "Dark (German Dub)", url: watchUrl },
+        position: { unit: "episode", season: 2, episode: 5 },
+      },
+    ]);
+  });
+
+  it("counts an episode only once", async () => {
+    const { route, queued } = await setup();
+    await route({ type: "stream:detected", url: watchUrl, detection: dark }, netflix());
+    await route({ type: "stream:watched", url: watchUrl }, netflix());
+
+    expect(await route({ type: "stream:watched", url: watchUrl }, netflix())).toEqual({ ok: true, duplicate: true });
+    expect(queued).toHaveLength(1);
+  });
+
+  it("takes the progress from the player frame and the title from the page (Crunchyroll)", async () => {
+    const { route, queued } = await setup();
+    const page = "https://www.crunchyroll.com/watch/GXYZ/phantoms";
+    const frame = "https://static.crunchyroll.com/vilos-v2/web/vilos/player.html";
+    const frieren = { kind: "episode" as const, seriesTitle: "Frieren", season: null, episode: 5 };
+    await route({ type: "stream:detected", url: page, detection: frieren }, netflix(page));
+
+    await route({ type: "stream:watched", url: frame }, netflix(frame, 3));
+
+    expect(queued.map((event) => [event.source.key, event.position])).toEqual([["crunchyroll", { unit: "episode", season: null, episode: 5 }]]);
+  });
+
+  it("sends a watched movie without a position, marked as a movie", async () => {
+    const { route, queued } = await setup();
+    const movie = { kind: "movie" as const, seriesTitle: "Glass Onion", season: null, episode: null };
+    await route({ type: "stream:detected", url: watchUrl, detection: movie }, netflix());
+    await route({ type: "stream:watched", url: watchUrl }, netflix());
+
+    expect(queued[0]).toMatchObject({ position: { unit: "none" }, mediaTypeHint: "movie" });
+  });
+
+  it("keeps the detection when the worker is restarted during the episode", async () => {
+    const session = fakeStorage();
+    await (await setup({ session })).route({ type: "stream:detected", url: watchUrl, detection: dark }, netflix());
+
+    const after = await setup({ session });
+    await after.route({ type: "stream:watched", url: watchUrl }, netflix());
+
+    expect(after.queued).toHaveLength(1);
+  });
+
+  it.each([
+    ["a page that is no streaming service", { type: "stream:detected", url: chapterUrl, detection: dark }, content()],
+    ["a sender whose page does not match the reported URL", { type: "stream:detected", url: watchUrl, detection: dark }, netflix("https://www.disneyplus.com/video/1")],
+    ["a frame inside the page", { type: "stream:detected", url: watchUrl, detection: dark }, netflix(watchUrl, 2)],
+  ])("refuses a detection from %s", async (_name, message, sender) => {
+    const { route, queued } = await setup();
+    expect(await route(message, sender)).toEqual({ ok: false });
+    await route({ type: "stream:watched", url: watchUrl }, netflix());
+    expect(queued).toHaveLength(0);
+  });
+
+  it("shows the popup which service the tab is on and what it plays", async () => {
+    const { route } = await setup({ tabUrl: watchUrl });
+    await route({ type: "stream:detected", url: watchUrl, detection: dark }, netflix());
+
+    expect(await route({ type: "popup:status", tabId: 7 }, page)).toMatchObject({
+      page: { site: null, service: { key: "netflix", name: "Netflix" }, stream: dark },
+    });
+  });
+
+  it("tells the popup that a manga page is no streaming service", async () => {
+    const { route } = await setup();
+    expect(await route({ type: "popup:status", tabId: 4 }, page)).toMatchObject({ page: { service: null, stream: null } });
+  });
+
+  it("ignores a watched signal without a detection on that tab", async () => {
+    const { route, queued } = await setup();
+    expect(await route({ type: "stream:watched", url: watchUrl }, netflix())).toEqual({ ok: false });
+    expect(queued).toHaveLength(0);
+  });
+
+  it("drops a detection that does not fit the message contract", async () => {
+    const { route } = await setup();
+    const broken = { ...dark, episode: null };
+    expect(await route({ type: "stream:detected", url: watchUrl, detection: broken }, netflix())).toEqual({ ok: false });
   });
 });

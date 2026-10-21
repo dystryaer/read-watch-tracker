@@ -106,10 +106,10 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 
 ## M2 – Serien & Anime (`feat/m2-streaming`)
 
-- [ ] **T28 core: Folgen-Parser + Streaming-Schlüssel** · S
+- [x] **T28 core: Folgen-Parser + Streaming-Schlüssel** · S
   Akz.: „S2 E5“, „Staffel 2 Folge 5“, „Season 2 Episode 5“, „E5“, „Folge 5“; Streaming-`externalKey` = normalisierter Serientitel ohne Dub/Sub
 
-- [ ] **T29 Extension: Desktop-Streaming** · M · Abh. T28
+- [x] **T29 Extension: Desktop-Streaming** · M · Abh. T28
   Akz.: Media-Session + `<video>`; `watched` bei ≥ 85 % oder `ended`, einmal pro Folge; Parser für Prime, Crunchyroll, Netflix, Disney+ (unverifiziert, A10)
 
 - [ ] **T30 Extension: Verlaufsseiten-Sync** · M · Abh. T29

@@ -17,11 +17,25 @@ export type Detection = z.infer<typeof Detection>;
 export const ReadSignal = z.enum(["scroll", "end-visible", "next-chapter"]);
 export type ReadSignal = z.infer<typeof ReadSignal>;
 
-/** Sent by the reader script running on an enabled manga site. */
+/** What a streaming page plays (SPEC §7.5); a movie is the only detection without an episode. */
+export const StreamDetection = z
+  .object({
+    kind: z.enum(["episode", "movie"]),
+    seriesTitle: cleanText(MAX_TEXT_LENGTH),
+    season: z.number().int().min(1).max(999).nullable(),
+    episode: z.number().int().min(1).max(99999).nullable(),
+  })
+  .refine((detection) => (detection.kind === "movie") === (detection.episode === null), "an episode needs a number, a movie none");
+export type StreamDetection = z.infer<typeof StreamDetection>;
+
+/** Sent by the reader script on an enabled manga site, or the streaming script on a service's pages. */
 export const ContentMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("reader:hello"), url: HttpUrlSchema }),
   z.object({ type: z.literal("reader:detected"), url: HttpUrlSchema, detection: Detection.nullable() }),
   z.object({ type: z.literal("reader:chapter-read"), url: HttpUrlSchema, detection: Detection, signal: ReadSignal }),
+  z.object({ type: z.literal("stream:hello"), url: HttpUrlSchema }),
+  z.object({ type: z.literal("stream:detected"), url: HttpUrlSchema, detection: StreamDetection.nullable() }),
+  z.object({ type: z.literal("stream:watched"), url: HttpUrlSchema }),
 ]);
 export type ContentMessage = z.infer<typeof ContentMessage>;
 
@@ -80,6 +94,8 @@ export const PopupStatus = z.object({
       detection: Detection.nullable(),
       counted: z.boolean(),
       ignored: z.boolean(),
+      service: z.object({ key: SourceKey, name: z.string().max(100) }).nullable(),
+      stream: StreamDetection.nullable(),
     })
     .nullable(),
   sites: z.array(z.object({ sourceKey: SourceKey, domains: z.array(z.string().max(253)) })),

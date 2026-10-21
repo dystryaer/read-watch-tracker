@@ -115,6 +115,67 @@ test("pages of sites that are not enabled send nothing", async () => {
   await page.close();
 });
 
+/** A short WebM clip recorded in the browser itself, so the test needs no media files. */
+async function recordClip(): Promise<Buffer> {
+  const page = await context.newPage();
+  await page.goto(`http://localhost:${site.port}/about`);
+  const base64 = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const paint = canvas.getContext("2d");
+    const recorder = new MediaRecorder(canvas.captureStream(25), { mimeType: "video/webm" });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (event) => chunks.push(event.data);
+    const stopped = new Promise((resolve) => (recorder.onstop = resolve));
+    recorder.start();
+    const timer = setInterval(() => {
+      if (!paint) return;
+      paint.fillStyle = `hsl(${Date.now() % 360} 80% 50%)`;
+      paint.fillRect(0, 0, 64, 64);
+    }, 40);
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    clearInterval(timer);
+    recorder.stop();
+    await stopped;
+    const bytes = new Uint8Array(await new Blob(chunks, { type: "video/webm" }).arrayBuffer());
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  });
+  await page.close();
+  return Buffer.from(base64, "base64");
+}
+
+test("an episode watched to the end on Netflix reaches the tracker as one event", async () => {
+  const clip = await recordClip();
+  // The real site needs a login; a synthetic player page (A10) is served under its address.
+  await context.route("https://www.netflix.com/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/clip.webm") return route.fulfill({ status: 200, contentType: "video/webm", body: clip });
+    return route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><head><title>Netflix</title></head><body>
+<div data-uia="video-title"><h4>Dark</h4><span>S2:E5</span><span>Lügen</span></div>
+<video src="/clip.webm" autoplay muted></video></body></html>`,
+    });
+  });
+
+  const page = await context.newPage();
+  await page.goto("https://www.netflix.com/watch/81234567");
+
+  const watched = () => api.events.filter((event) => event.source.key === "netflix");
+  await expect.poll(() => watched().length, { timeout: 15_000 }).toBe(1);
+  expect(watched()[0]).toMatchObject({
+    kind: "watched",
+    source: { key: "netflix", externalKey: "dark", url: "https://www.netflix.com/watch/81234567" },
+    position: { unit: "episode", season: 2, episode: 5 },
+  });
+  await page.close();
+  await context.unroute("https://www.netflix.com/**");
+});
+
 test("events read while the tracker is unreachable are delivered later, once", async () => {
   api.eventsMode = "unavailable";
   const page = await context.newPage();

@@ -44,6 +44,8 @@ async function show(notice?: HTMLElement) {
   const { page } = status;
   if (!page) {
     sections.push(h("p", { class: "muted" }, "Auf dieser Seite gibt es nichts zu tracken."));
+  } else if (page.service) {
+    sections.push(streamingSection(page.service.name, page.stream));
   } else if (page.site && page.permission) {
     sections.push(...enabledSite(tabId, status, page));
   } else {
@@ -58,6 +60,21 @@ async function show(notice?: HTMLElement) {
   );
   const tracker = status.apiUrl ? h("a", { href: status.apiUrl, target: "_blank", rel: "noopener noreferrer" }, "Tracker öffnen") : null;
   render(root, h("h1", {}, "Read-Watch-Tracker"), notice ?? null, ...sections, h("hr"), footer, tracker);
+}
+
+// Streaming services are built in (SPEC §7.5): nothing to enable, only what is being recognized.
+function streamingSection(serviceName: string, stream: NonNullable<PopupStatus["page"]>["stream"]): HTMLElement {
+  const what = !stream
+    ? "Noch keine Folge erkannt. Erkannt wird im Player."
+    : stream.kind === "movie"
+      ? `${stream.seriesTitle} · Film erkannt`
+      : `${stream.seriesTitle} · ${stream.season === null ? "" : `S${stream.season} · `}F${stream.episode} erkannt`;
+  return h(
+    "div",
+    {},
+    h("p", {}, what),
+    h("p", { class: "muted" }, `${serviceName}: wird automatisch gezählt, sobald 85 % gesehen sind.`),
+  );
 }
 
 function enabledSite(tabId: number, status: PopupStatus, page: NonNullable<PopupStatus["page"]>): HTMLElement[] {

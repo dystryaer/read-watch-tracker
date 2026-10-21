@@ -498,9 +498,11 @@ Pro (Serie, Kapitel) wird höchstens 1 Event in 12 h gesendet.
 
 ### 7.5 Desktop-Streaming (`ext-streaming`)
 
-- Adapter für Prime Video, Crunchyroll, Netflix und Disney+ beobachten das `<video>`-Element.
-- Metadaten kommen bevorzugt aus `navigator.mediaSession.metadata`, sonst aus dem DOM bzw. dem Seitentitel. Daraus entstehen Serientitel, Staffel und Folge.
-- Gesendet wird `watched`, sobald `currentTime / duration ≥ 0.85` oder `ended` eintritt, einmal pro Folge.
+- Adapter für Prime Video, Crunchyroll, Netflix und Disney+ beobachten das `<video>`-Element (Content-Script mit festen Matches auf den Dienst-Domains, `apps/extension/src/streaming/`).
+- Metadaten kommen bevorzugt aus `navigator.mediaSession.metadata`, sonst aus dem DOM bzw. dem Seitentitel. Daraus entstehen Serientitel, Staffel und Folge. Ein Film wird nur erkannt, wo der Dienst für Filme kein Folgen-Label zeigt; ein unlesbares Label heißt „unbekannt“, nicht „Film“.
+- Gesendet wird `watched`, sobald `currentTime / duration ≥ 0.85` oder `ended` eintritt, einmal pro Folge. Videos unter 60 s (Werbung, Trailer, Vorschauen) zählen nie; lädt der Player die nächste Folge ins selbe Element (Autoplay), beginnt die Zählung neu.
+- Spielt der Player in einem Frame (Crunchyroll), meldet der Frame den Fortschritt und die Seite den Titel; der Background führt beides pro Tab zusammen (`chrome.storage.session`). Titel werden nur vom Hauptframe angenommen, und nur von der Dienst-Domain, die der Browser als Absender meldet.
+- Die Adapter sind gegen synthetische Seiten gebaut (A10) und gelten bis zu echten Seitenproben als unverifiziert.
 
 ### 7.6 Sync über Verlaufs- und Bibliotheksseiten (`ext-streaming`, `mobile-sync`)
 

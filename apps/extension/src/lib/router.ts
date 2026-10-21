@@ -1,4 +1,14 @@
-import { DEFAULT_THRESHOLDS, type DeviceConfig, normalizeDomain, parseHttpUrl, ProgressEvent, type SiteRule } from "@rwt/core";
+import {
+  DEFAULT_THRESHOLDS,
+  type DeviceConfig,
+  knownService,
+  normalizeDomain,
+  parseHttpUrl,
+  ProgressEvent,
+  type SiteRule,
+  streamingSeriesKey,
+} from "@rwt/core";
+import { serviceForUrl } from "../streaming/services";
 import type { ApiClient } from "./api-client";
 import { backfillEventId } from "./backfill";
 import { classifySender, ContentMessage, type Detection, ExtensionPageMessage } from "./messages";
@@ -7,7 +17,7 @@ import type { RecentReads } from "./recent";
 import { loadCachedConfig, loadSettings } from "./settings";
 import { findSiteForUrl } from "./sites";
 import type { Store } from "./storage";
-import type { TabStates } from "./tab-states";
+import type { StreamState, StreamStates, TabStates } from "./tab-states";
 
 /** The browser APIs the router needs, so tests can pass fakes. */
 export interface BrowserApis {
@@ -23,6 +33,7 @@ export interface RouterDeps {
   outbox: Pick<Outbox, "enqueue" | "enqueueMany" | "flush" | "state">;
   recent: Pick<RecentReads, "claim">;
   tabStates: TabStates;
+  streamStates: StreamStates;
   api: Pick<ApiClient, "enableSource" | "ignoreSeries">;
   sync: () => Promise<unknown>;
   browser: BrowserApis;
@@ -34,6 +45,7 @@ interface SenderLike {
   id?: string;
   url?: string;
   tab?: { id?: number };
+  frameId?: number;
 }
 
 /**
@@ -78,9 +90,51 @@ export function createRouter(deps: RouterDeps) {
     return "queued";
   }
 
-  async function handleContent(message: ContentMessage, tabId: number, senderUrl: string | undefined) {
+  /** Queues one "watched" event, at most once per series and episode (or movie) in 12 hours. */
+  async function countWatched({ service, url, detection }: StreamState): Promise<"queued" | "duplicate" | "none"> {
+    if (!detection) return "none";
+    const externalKey = streamingSeriesKey(detection.seriesTitle) || detection.seriesTitle;
+    const episode = detection.kind === "episode" && detection.episode !== null ? detection.episode : null;
+    if (!(await deps.recent.claim(`${service}|${externalKey}|${detection.season ?? ""}|${episode ?? "movie"}`, now()))) {
+      return "duplicate";
+    }
+    const event = ProgressEvent.parse({
+      id: crypto.randomUUID(),
+      occurredAt: new Date(now()).toISOString(),
+      kind: "watched",
+      source: { key: service, externalKey, rawTitle: detection.seriesTitle, url },
+      position: episode === null ? { unit: "none" } : { unit: "episode", season: detection.season, episode },
+      ...(episode === null ? { mediaTypeHint: "movie" } : {}),
+    });
+    await deps.outbox.enqueue(event);
+    void deps.outbox.flush();
+    return "queued";
+  }
+
+  async function handleContent(message: ContentMessage, tabId: number, sender: SenderLike) {
+    const senderUrl = sender.url;
     const current = await config();
+    // Streaming messages are accepted from the fixed service domains only, judged by the frame
+    // the browser says sent them – not by what the script reports.
+    const service = senderUrl ? serviceForUrl(senderUrl) : undefined;
     switch (message.type) {
+      case "stream:hello":
+        return service ? { ok: true, watchedPercent: current?.thresholds.watchedPercent ?? DEFAULT_THRESHOLDS.watchedPercent } : { ok: false };
+
+      case "stream:detected": {
+        // Titles come from the page itself; frames (players, ads) only report progress.
+        const topFrame = sender.frameId === undefined || sender.frameId === 0;
+        if (!service || !topFrame || serviceForUrl(message.url)?.key !== service.key) return { ok: false };
+        await deps.streamStates.set(tabId, { service: service.key, url: message.url, detection: message.detection });
+        return { ok: true };
+      }
+
+      case "stream:watched": {
+        const state = await deps.streamStates.get(tabId);
+        if (!service || state?.service !== service.key || !state.detection) return { ok: false };
+        return (await countWatched(state)) === "duplicate" ? { ok: true, duplicate: true } : { ok: true };
+      }
+
       case "reader:hello":
         return { ok: true, site: siteFor(current, message.url, senderUrl) ?? null, thresholds: current?.thresholds ?? DEFAULT_THRESHOLDS };
 
@@ -126,6 +180,8 @@ export function createRouter(deps: RouterDeps) {
     const site = url ? findSiteForUrl(current, url.href) : undefined;
     const state = await tabs.get(tabId);
     const sameTab = state && url && parseHttpUrl(state.url)?.hostname === url.hostname;
+    const service = url ? serviceForUrl(url) : undefined;
+    const stream = service ? await deps.streamStates.get(tabId) : null;
     return {
       ok: true,
       paired: settings.apiUrl !== null && settings.deviceToken !== null,
@@ -140,6 +196,8 @@ export function createRouter(deps: RouterDeps) {
             detection: sameTab ? state.detection : null,
             counted: sameTab ? state.counted : false,
             ignored: sameTab ? (state.ignored ?? false) : false,
+            service: service ? { key: service.key, name: knownService(service.key)?.name ?? service.key } : null,
+            stream: stream && stream.service === service?.key ? stream.detection : null,
           }
         : null,
       sites: (current?.sites ?? []).map(({ sourceKey, domains }) => ({ sourceKey, domains })),
@@ -241,7 +299,7 @@ export function createRouter(deps: RouterDeps) {
     const from = classifySender(sender, deps.extensionId);
     if (from.kind === "content") {
       const message = ContentMessage.safeParse(raw);
-      return message.success ? handleContent(message.data, from.tabId, sender.url) : { ok: false };
+      return message.success ? handleContent(message.data, from.tabId, sender) : { ok: false };
     }
     if (from.kind === "page") {
       const message = ExtensionPageMessage.safeParse(raw);
