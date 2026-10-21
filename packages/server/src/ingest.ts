@@ -5,6 +5,7 @@ import {
   normalizeTitle,
   parseHttpUrl,
   type ProgressEvent,
+  streamingSeriesKey,
 } from "@rwt/core";
 import { type Db, events, pendingMatches, sourceDomains, sources, workLinks, works } from "@rwt/db";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -59,14 +60,14 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
   const occurredAt = clampToNow(new Date(event.occurredAt), now);
   const source = await resolveSource(db, event.source);
   const urls = await urlsOnSource(db, source, event.source);
-  const key = event.source.externalKey;
+  const key = externalKeyFor(source, event.source.externalKey);
 
   // Step 3 (exact link) wins over an earlier "ignore"; step 4 (same title) must not undo one.
   let work = await findExactLink(db, source.id, key);
   let relinked = false;
   const ignored = !work && (await isIgnored(db, source.id, key));
   if (!work && !ignored) {
-    const recognized = await reRecognize(db, source.id, event, urls.seriesUrl);
+    const recognized = await reRecognize(db, source.id, event, key, urls.seriesUrl);
     work = recognized?.work ?? null;
     relinked = recognized?.relinked ?? false;
   }
@@ -92,7 +93,7 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
   } else if (ignored) {
     outcome = "ignored";
   } else {
-    await upsertPendingMatch(db, source.id, event, urls.seriesUrl, now);
+    await upsertPendingMatch(db, source.id, event, key, urls.seriesUrl, now);
     outcome = "pending";
   }
 
@@ -133,6 +134,15 @@ async function urlsOnSource(db: Db, source: Source, input: ProgressEvent["source
     return value && host && domains.has(normalizeDomain(host)) ? value : null;
   };
   return { url: onSource(input.url), seriesUrl: onSource(input.seriesUrl) };
+}
+
+/**
+ * Streaming series are keyed by their normalized title (SPEC §5.2). The server derives it itself,
+ * so the desktop and the Shield cannot disagree and one confirmation covers both.
+ */
+function externalKeyFor(source: Source, sent: string): string {
+  if (source.kind !== "streaming") return sent;
+  return streamingSeriesKey(sent) || sent;
 }
 
 function clampToNow(occurredAt: Date, now: Date): Date {
@@ -189,6 +199,7 @@ async function reRecognize(
   db: Db,
   sourceId: string,
   event: ProgressEvent,
+  externalKey: string,
   seriesUrl: string | null,
 ): Promise<{ work: Work; relinked: boolean } | null> {
   const titleKey = normalizeTitle(event.source.rawTitle);
@@ -214,7 +225,7 @@ async function reRecognize(
     .values({
       workId: match.work.id,
       sourceId,
-      externalKey: event.source.externalKey,
+      externalKey,
       externalTitle: event.source.rawTitle,
       externalTitleNormalized: titleKey,
       seriesUrl,
@@ -243,6 +254,7 @@ async function upsertPendingMatch(
   db: Db,
   sourceId: string,
   event: ProgressEvent,
+  externalKey: string,
   seriesUrl: string | null,
   now: Date,
 ): Promise<void> {
@@ -251,7 +263,7 @@ async function upsertPendingMatch(
     .insert(pendingMatches)
     .values({
       sourceId,
-      externalKey: event.source.externalKey,
+      externalKey,
       rawTitle: event.source.rawTitle,
       mediaTypeHint: event.mediaTypeHint ?? null,
       seriesUrl,
@@ -278,7 +290,7 @@ async function upsertPendingMatch(
     .where(
       and(
         eq(pendingMatches.sourceId, sourceId),
-        eq(pendingMatches.externalKey, event.source.externalKey),
+        eq(pendingMatches.externalKey, externalKey),
         isNull(pendingMatches.resolvedAt),
       ),
     );

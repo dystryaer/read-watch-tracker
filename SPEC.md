@@ -317,7 +317,7 @@ Die Auth-Tabellen kommen von der Auth-Bibliothek (§11).
 | Quelle | `external_key` |
 |---|---|
 | Manga-Seiten | Serien-Slug aus der URL (`rule_series_pattern` bzw. generisch), normalisiert. Angehängte Zufalls- oder Hash-Suffixe (z. B. `-7d3f2a1b`, typisch bei Redesigns) werden entfernt. Fallback: normalisierter Titel. |
-| Streaming (Desktop **und** Shield) | **normalisierter Serientitel**. Die Shield kennt keine Anbieter-IDs, deshalb nutzen beide Clients den Titel. Eine einzige Bestätigung deckt so Desktop und TV ab. |
+| Streaming (Desktop **und** Shield) | **normalisierter Serientitel** ohne Sprach- und Fassungs-Tags wie „(German Dub)“, „[Sub]“, „(OmU)“, „(Uncut)“ (`core/episode.ts`, `streamingSeriesKey`). Die Shield kennt keine Anbieter-IDs, deshalb nutzen beide Clients den Titel. Der Server leitet den Schlüssel für Streaming-Quellen selbst aus dem gesendeten Schlüssel ab, sodass Desktop und Shield nie auseinanderlaufen. Eine einzige Bestätigung deckt so Desktop und TV ab. Staffel und Folge liest `parseEpisode`; die Testfälle in `packages/core/fixtures/episodes.json` gelten auch für die Kotlin-Logik der Shield. |
 | WebNovel | Book-ID aus der URL bzw. der Bibliothek |
 | Kindle | ASIN |
 

@@ -296,6 +296,30 @@ describe("ingestEvents – sources", () => {
     expect(source).toMatchObject({ kind: "streaming", name: "Crunchyroll" });
   });
 
+  it("files a streaming series under one key, whether the desktop or the Shield sent it", async () => {
+    const watched = (externalKey: string, rawTitle: string, episode: number) =>
+      chapterEvent({
+        kind: "watched",
+        source: { key: "crunchyroll", externalKey, rawTitle, url: undefined },
+        position: { unit: "episode", season: 1, episode },
+      });
+
+    await ingestEvents(
+      handle.db,
+      null,
+      [
+        watched("Frieren: Beyond Journey's End (German Dub)", "Frieren: Beyond Journey's End (German Dub)", 4),
+        watched("frieren beyond journeys end", "Frieren: Beyond Journey’s End", 5),
+      ],
+      NOW,
+    );
+
+    const cards = await handle.db.select().from(pendingMatches);
+    expect(cards.map((card) => [card.externalKey, card.eventCount])).toEqual([["frieren beyond journeys end", 2]]);
+    const stored = await handle.db.select({ externalKey: events.externalKey }).from(events);
+    expect(new Set(stored.map((event) => event.externalKey))).toEqual(new Set(["frieren beyond journeys end"]));
+  });
+
   it("creates other unknown keys as websites", async () => {
     await ingestEvents(handle.db, null, [chapterEvent({ source: { key: "site:new", url: undefined } })], NOW);
 
