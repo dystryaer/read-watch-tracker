@@ -32,7 +32,16 @@ const SORTS: { value: SortOrder; label: string }[] = [
 const controlClass =
   "rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900";
 
-export function OverviewScreen({ items, pendingCount }: { items: OverviewItem[]; pendingCount: number }) {
+export function OverviewScreen({
+  items,
+  pendingCount,
+  webnovelHint = null,
+}: {
+  items: OverviewItem[];
+  pendingCount: number;
+  /** "WebNovel zuletzt vor 9 Tagen synchronisiert." – shown quietly with a link to the library (SPEC §9.1). */
+  webnovelHint?: string | null;
+}) {
   const [filter, setFilter] = useState<OverviewFilter>({
     tab: "all",
     status: "reading",
@@ -63,6 +72,15 @@ export function OverviewScreen({ items, pendingCount }: { items: OverviewItem[];
             Prüfen <span aria-hidden="true">→</span>
           </a>
         </div>
+      ) : null}
+
+      {webnovelHint ? (
+        <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+          {webnovelHint}{" "}
+          <a href="https://www.webnovel.com/library" target="_blank" rel="noopener noreferrer" className="underline">
+            WebNovel-Bibliothek öffnen
+          </a>
+        </p>
       ) : null}
 
       <div className="space-y-3">

@@ -1,5 +1,5 @@
-import { type Db, pendingMatches, sourceDomains, sources, workLinks, works } from "@rwt/db";
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { type Db, events, pendingMatches, sourceDomains, sources, workLinks, works } from "@rwt/db";
+import { and, count, desc, eq, isNull, max } from "drizzle-orm";
 
 type WorkColumns = Pick<
   typeof works.$inferSelect,
@@ -81,4 +81,22 @@ export async function listOverview(db: Db): Promise<OverviewRow[]> {
 export async function countOpenPending(db: Db): Promise<number> {
   const [row] = await db.select({ open: count() }).from(pendingMatches).where(isNull(pendingMatches.resolvedAt));
   return row?.open ?? 0;
+}
+
+/**
+ * For the WebNovel reminder on the core screen (SPEC §9.1): when the WebNovel library last came in
+ * through the extension, and whether any light novel is being read at all.
+ */
+export async function webnovelSyncStatus(db: Db): Promise<{ lastSync: Date | null; readingLightNovels: boolean }> {
+  const [synced] = await db
+    .select({ at: max(events.receivedAt) })
+    .from(events)
+    .innerJoin(sources, eq(sources.id, events.sourceId))
+    .where(and(eq(sources.key, "webnovel"), eq(events.kind, "library_sync")));
+  const [reading] = await db
+    .select({ id: works.id })
+    .from(works)
+    .where(and(eq(works.type, "light_novel"), eq(works.status, "reading")))
+    .limit(1);
+  return { lastSync: synced?.at ?? null, readingLightNovels: reading !== undefined };
 }

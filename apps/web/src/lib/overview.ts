@@ -169,3 +169,13 @@ export function quickUpdateItems(items: OverviewItem[]): OverviewItem[] {
     .sort((a, b) => (b.lastProgressAt ?? -1) - (a.lastProgressAt ?? -1) || byTitle(a, b))
     .slice(0, QUICK_LIMIT);
 }
+
+const REMIND_AFTER_DAYS = 7;
+const DAY_MS = 86_400_000;
+
+/** The WebNovel hint on the core screen (SPEC §9.1), or null when no reminder is due. */
+export function webnovelReminder(status: { lastSync: Date | null; readingLightNovels: boolean }, now: Date): string | null {
+  if (status.lastSync === null) return status.readingLightNovels ? "WebNovel wurde noch nie synchronisiert." : null;
+  const days = Math.floor((now.getTime() - status.lastSync.getTime()) / DAY_MS);
+  return days > REMIND_AFTER_DAYS ? `WebNovel zuletzt vor ${days} Tagen synchronisiert.` : null;
+}

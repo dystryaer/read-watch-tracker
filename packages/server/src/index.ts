@@ -34,7 +34,7 @@ export {
 export { RateLimiter } from "./http/rate-limit";
 export { clientAddress } from "./http/request";
 export { buildDeviceConfig, enableSource, ServiceDomainError, SourceConflictError, SourceNotFoundError } from "./sources";
-export { countOpenPending, listOverview, type OverviewRow } from "./overview";
+export { countOpenPending, listOverview, type OverviewRow, webnovelSyncStatus } from "./overview";
 export { setManualPosition, setWorkStatus, WorkNotFoundError, WorkPositionMismatchError, type WorkStatus } from "./manual";
 export { getWorkDetail, listMergeCandidates, MergeIncompatibleError, mergeWorks, unlinkWork, updateWorkMeta, type WorkDetail } from "./work-detail";
 export { listOpenMatches, type OpenMatch } from "./inbox";

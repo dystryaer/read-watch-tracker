@@ -1,8 +1,8 @@
-import { type DbHandle, pendingMatches, workLinks, works } from "@rwt/db";
+import { type DbHandle, events, pendingMatches, workLinks, works } from "@rwt/db";
 import { createTestDb, resetDb } from "@rwt/db/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { countOpenPending, listOverview } from "../src/overview";
+import { countOpenPending, listOverview, webnovelSyncStatus } from "../src/overview";
 import { seedLink, seedSource, seedWork } from "./helpers";
 
 let handle: DbHandle;
@@ -116,5 +116,39 @@ describe("listOverview – series URL", () => {
     const [row] = await listOverview(handle.db);
 
     expect(row?.seriesUrl).toBe("https://asuracomic.net/series/overgeared-new");
+  });
+});
+
+describe("webnovelSyncStatus", () => {
+  it("knows when the WebNovel library was last synced and whether light novels are being read", async () => {
+    const source = await seedSource(handle.db, { key: "webnovel", kind: "app" });
+    await seedWork(handle.db, { title: "Shadow Slave", type: "light_novel" });
+    const synced = new Date("2026-10-10T12:00:00.000Z");
+    for (const receivedAt of [new Date("2026-10-01T12:00:00.000Z"), synced]) {
+      await handle.db.insert(events).values({
+        id: crypto.randomUUID(),
+        kind: "library_sync",
+        sourceId: source.id,
+        chapter: 1,
+        occurredAt: receivedAt,
+        receivedAt,
+        outcome: "applied",
+      });
+    }
+    await handle.db.insert(events).values({
+      id: crypto.randomUUID(),
+      kind: "read",
+      sourceId: source.id,
+      chapter: 2,
+      occurredAt: new Date("2026-10-20T12:00:00.000Z"),
+      receivedAt: new Date("2026-10-20T12:00:00.000Z"),
+      outcome: "applied",
+    });
+
+    expect(await webnovelSyncStatus(handle.db)).toEqual({ lastSync: synced, readingLightNovels: true });
+  });
+
+  it("reports no sync and no light novels on an empty tracker", async () => {
+    expect(await webnovelSyncStatus(handle.db)).toEqual({ lastSync: null, readingLightNovels: false });
   });
 });

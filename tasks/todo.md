@@ -151,7 +151,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T39 Extension: WebNovel- und Kindle-Bibliothek** · M · Abh. T36
   Akz.: `library_sync` aus Bibliotheksseiten (unverifiziert, A10)
 
-- [ ] **T40 WebNovel-Erinnerung** · XS
+- [x] **T40 WebNovel-Erinnerung** · XS
   Akz.: Hinweis auf dem Core-Screen, wenn der letzte WebNovel-Sync älter als 7 Tage ist
 
 - [ ] **T41 Doku iPhone + Spikes S2/S3** · S

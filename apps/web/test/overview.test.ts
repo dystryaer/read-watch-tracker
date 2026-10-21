@@ -1,6 +1,6 @@
 import type { OverviewRow } from "@rwt/server";
 import { describe, expect, it } from "vitest";
-import { filterAndSort, formatRelative, type OverviewItem, quickUpdateItems, toOverviewItem } from "../src/lib/overview";
+import { filterAndSort, formatRelative, type OverviewItem, quickUpdateItems, toOverviewItem, webnovelReminder } from "../src/lib/overview";
 
 const NOW = new Date("2026-10-21T20:00:00.000Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
@@ -250,5 +250,22 @@ describe("quickUpdateItems (SPEC §9.3)", () => {
     const [item] = quickUpdateItems([toOverviewItem(row({ type: "ebook", title: "Hail Mary", chapter: null, percent: 43.5 }), NOW)]);
     expect(item?.percent).toBe(43.5);
     expect(item?.stepper).toBeNull();
+  });
+});
+
+describe("webnovelReminder (SPEC §9.1)", () => {
+  const days = (n: number) => new Date(NOW.getTime() - n * 86_400_000);
+
+  it("reminds when the last WebNovel sync is older than 7 days", () => {
+    expect(webnovelReminder({ lastSync: days(9), readingLightNovels: true }, NOW)).toBe("WebNovel zuletzt vor 9 Tagen synchronisiert.");
+  });
+
+  it("stays quiet within 7 days", () => {
+    expect(webnovelReminder({ lastSync: days(6), readingLightNovels: true }, NOW)).toBeNull();
+  });
+
+  it("reminds once light novels are read but WebNovel was never synced", () => {
+    expect(webnovelReminder({ lastSync: null, readingLightNovels: true }, NOW)).toBe("WebNovel wurde noch nie synchronisiert.");
+    expect(webnovelReminder({ lastSync: null, readingLightNovels: false }, NOW)).toBeNull();
   });
 });
