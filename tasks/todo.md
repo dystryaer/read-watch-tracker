@@ -73,7 +73,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 
 ### Phase D – Extension
 
-- [ ] **T20 WXT-Gerüst + Nachrichtenverträge** · S · Abh. T02
+- [x] **T20 WXT-Gerüst + Nachrichtenverträge** · S · Abh. T02
   Akz.: MV3-Manifest (optional host permissions, storage, alarms, scripting, optional history); typisierte, zod-validierte Messages; Build grün
 
 - [ ] **T21 Storage + Outbox** · M · Abh. T20

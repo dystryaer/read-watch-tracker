@@ -8,3 +8,5 @@ dist/
 .data/
 next-env.d.ts
 *.tsbuildinfo
+.output/
+.wxt/
