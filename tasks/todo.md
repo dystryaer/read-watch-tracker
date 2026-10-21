@@ -39,7 +39,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T09 Geräte, Kopplung, Tokens** · S · Abh. T06
   Akz.: Pairing start/approve/poll (Token genau einmal, Ablauf 10 min, Hash-only); `authenticateDevice` (widerrufen → null); `revokeDevice` · Prüfung: Integrationstests
 
-- [ ] **T10 Next.js-Gerüst** · M · Abh. T06
+- [x] **T10 Next.js-Gerüst** · M · Abh. T06
   Akz.: `apps/web` mit App Router + Tailwind; DB-Singleton aus `DATABASE_URL`; `pnpm db:migrate`; Security-Header (CSP, nosniff, frame-ancestors, Referrer-Policy); `pnpm --filter @rwt/web build` grün
 
 - [ ] **T11 Auth (Better Auth, Single-User)** · M · Abh. T10
