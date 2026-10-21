@@ -250,6 +250,19 @@ test("the quick update saves the next chapter of a light novel and an e-book's p
   await expect(page.getByRole("listitem").filter({ hasText: "Project Hail Mary" }).getByText("40,5 %")).toBeVisible();
 });
 
+test("the statistics count this week's chapters as text, with decorative bars", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: "Statistik" }).click();
+  await expect(page.getByRole("heading", { name: "Statistik" })).toBeVisible();
+
+  const weeks = page.getByRole("table", { name: "Pro Woche (letzte 12 Wochen)" });
+  await expect(weeks.getByRole("row")).toHaveCount(13);
+  // The stepper and quick-update tests above saved chapters this week.
+  const thisWeek = weeks.getByRole("row").nth(1);
+  await expect(thisWeek.getByRole("cell").first()).not.toHaveText("0");
+  await expect(page.getByRole("table", { name: "Pro Monat (letzte 12 Monate)" }).getByRole("row")).toHaveCount(13);
+});
+
 test("app pages reveal nothing without a session, even to crafted RSC requests", async ({ page, playwright, baseURL }) => {
   await login(page);
   await page.goto("/");

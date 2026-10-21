@@ -48,3 +48,4 @@ export { listOpenMatches, type OpenMatch } from "./inbox";
 export { addSiteDomain, getSite, getSiteId, listRecentSiteUrls, listSites, renameSite, type RuleUpdateResult, setSiteTracking, SiteDomainError, type SiteRuleFields, type SiteSummary, updateSiteRule } from "./site-admin";
 export { ignoreSeries } from "./ignore";
 export { confirmShare, ShareNotFoundError, ShareValueError, startShare } from "./share";
+export { progressStats } from "./stats";

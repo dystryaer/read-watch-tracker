@@ -8,13 +8,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   await requireSession();
   return (
     <div className="mx-auto max-w-5xl px-4 pb-12">
-      <header className="flex items-center justify-between gap-4 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
         <Link href="/" className="text-lg font-semibold">
           Read-Watch-Tracker
         </Link>
-        <nav aria-label="Hauptnavigation" className="flex items-center gap-4 text-sm">
+        <nav aria-label="Hauptnavigation" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <Link href="/quick" className="hover:underline">
             Schnell-Update
+          </Link>
+          <Link href="/stats" className="hover:underline">
+            Statistik
           </Link>
           <Link href="/settings" className="hover:underline">
             Einstellungen
