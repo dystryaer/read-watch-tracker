@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import type { OverviewItem } from "@/lib/overview";
+import { PositionStepper } from "./position-stepper";
 
 /** One work in the core screen list (SPEC §4.1): title, position, source, activity, continue link. */
 export function WorkRow({ item, actions }: { item: OverviewItem; actions?: ReactNode }) {
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-zinc-200 py-3 sm:grid-cols-[minmax(0,1fr)_7rem_11rem_7rem_auto] dark:border-zinc-800">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-zinc-200 py-3 sm:grid-cols-[minmax(0,1fr)_10rem_11rem_7rem_auto] dark:border-zinc-800">
       <div className="min-w-0">
         <a href={`/works/${item.id}`} className="block truncate font-medium hover:underline">
           {item.title}
@@ -13,7 +14,10 @@ export function WorkRow({ item, actions }: { item: OverviewItem; actions?: React
       </div>
 
       <div className="text-right sm:text-left">
-        {item.positionUnknown ? (
+        {item.stepper ? (
+          // Remounts when the server's value changes, e.g. after an event from a device.
+          <PositionStepper key={`${item.id}:${item.stepper.value}`} workId={item.id} initial={item.stepper} />
+        ) : item.positionUnknown ? (
           <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-sm font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
             {item.positionLabel}
             <span className="sr-only">(Stand unbekannt)</span>

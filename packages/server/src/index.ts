@@ -30,3 +30,4 @@ export { RateLimiter } from "./http/rate-limit";
 export { clientAddress } from "./http/request";
 export { buildDeviceConfig, enableSource, SourceConflictError, SourceNotFoundError } from "./sources";
 export { countOpenPending, listOverview, type OverviewRow } from "./overview";
+export { setManualPosition, setWorkStatus, WorkNotFoundError, WorkPositionMismatchError, type WorkStatus } from "./manual";

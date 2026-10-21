@@ -1,5 +1,6 @@
 import { type MediaType, nextChapterUrl, normalizeTitle, positionUnitFor, safeHref } from "@rwt/core";
 import type { OverviewRow } from "@rwt/server";
+import type { StepperState } from "./stepper";
 
 export type Tab = "all" | "comics" | "novels" | "ebooks" | "video";
 export type StatusFilter = "reading" | "completed" | "dropped" | "all";
@@ -22,6 +23,8 @@ export interface OverviewItem {
   positionLabel: string;
   positionUnknown: boolean;
   chapter: number | null;
+  /** −/+ control for chapter and episode types; null for e-books and movies. */
+  stepper: StepperState | null;
   source: { label: string; initial: string } | null;
   lastActivity: { iso: string; label: string } | null;
   continueLink: { href: string; label: string } | null;
@@ -82,6 +85,13 @@ function continueLink(row: OverviewRow): OverviewItem["continueLink"] {
   return { href: next.href, label: next.kind === "next" ? "Weiterlesen" : "Zuletzt gelesen" };
 }
 
+function stepperFor(row: OverviewRow): StepperState | null {
+  const unit = positionUnitFor(row.type);
+  if (unit === "chapter") return { unit, value: row.chapter, season: null };
+  if (unit === "episode") return { unit, value: row.episode, season: row.season };
+  return null;
+}
+
 /** "vor 2 Std.", "gestern", "vor 3 Tagen" (SPEC §4.1). */
 export function formatRelative(date: Date, now: Date): string {
   // ICU mixes in (narrow) no-break spaces for some units only; plain spaces keep output stable.
@@ -112,6 +122,7 @@ export function toOverviewItem(row: OverviewRow, now: Date): OverviewItem {
     positionLabel: label,
     positionUnknown: unknown,
     chapter: row.chapter,
+    stepper: stepperFor(row),
     source:
       row.source && sourceName
         ? { label: sourceName, initial: /\p{L}/u.exec(row.source.name)?.[0]?.toUpperCase() ?? "?" }

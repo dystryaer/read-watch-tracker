@@ -51,6 +51,16 @@ describe("toOverviewItem – position", () => {
     expect(item.positionUnknown).toBe(unknown);
   });
 
+  it("offers a stepper for chapters and episodes only", () => {
+    expect(toOverviewItem(row({ chapter: 7 }), NOW).stepper).toEqual({ unit: "chapter", value: 7, season: null });
+    expect(toOverviewItem(row({ type: "anime", chapter: null, season: 2, episode: 3 }), NOW).stepper).toEqual({
+      unit: "episode",
+      value: 3,
+      season: 2,
+    });
+    expect(toOverviewItem(row({ type: "ebook", chapter: null, percent: 3 }), NOW).stepper).toBeNull();
+  });
+
   it("labels the media type in German", () => {
     expect(toOverviewItem(row({ type: "light_novel" }), NOW).typeLabel).toBe("Novel");
     expect(toOverviewItem(row({ type: "series", chapter: null }), NOW).typeLabel).toBe("Serie");

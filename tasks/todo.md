@@ -53,7 +53,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T13 Core-Screen: Liste** · M · Abh. T05, T11
   Akz.: SPEC §4.1–4.2: Tabs, Status-Filter (Standard „Lese“), Sortierung, Suche (normalisiert), `Kap. ?`-Hervorhebung + Filter „Stand unbekannt“, Quelle als Buchstaben-Badge, „Weiterlesen“ (§4.4) über `safeHref`; mobil Karten · Prüfung: Unit-Tests der View-Model-Funktionen
 
-- [ ] **T14 Stepper + Status** · S · Abh. T13
+- [x] **T14 Stepper + Status** · S · Abh. T13
   Akz.: −/+ entprellt 500 ms als `manual`-Event; Status setzen; Validierung serverseitig · Prüfung: Integrationstest der Actions
 
 - [ ] **T15 Detailansicht + Zusammenführen** · M · Abh. T14
