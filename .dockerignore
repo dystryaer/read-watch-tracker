@@ -1,0 +1,12 @@
+**/node_modules
+**/.next
+**/.data
+**/.output
+**/.output-e2e
+**/.wxt
+**/.env
+**/.env.*
+test-results
+playwright-report
+.claude
+.git

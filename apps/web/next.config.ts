@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 const securityHeaders = [
@@ -11,6 +12,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Docker image (own server): a self-contained server bundle. Vercel and local runs stay unchanged.
+  ...(process.env.NEXT_OUTPUT === "standalone"
+    ? { output: "standalone" as const, outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)) }
+    : {}),
   transpilePackages: ["@rwt/core", "@rwt/db", "@rwt/server"],
   serverExternalPackages: ["@electric-sql/pglite", "pg"],
   async headers() {

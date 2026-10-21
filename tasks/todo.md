@@ -94,7 +94,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T26 E2E: Web** · M · Abh. T13–T18
   Akz.: Ersteinrichtung, Login, Kopplung, Ingest per API → Inbox → bestätigen → Liste; Weiterlesen-Link; Stepper; **XSS-Payload-Titel als Text dargestellt**; 375 px ohne horizontales Scrollen
 
-- [ ] **T27 E2E: Extension + Doku** · M · Abh. T24, T25
+- [x] **T27 E2E: Extension + Doku** · M · Abh. T24, T25
   Akz.: Fixture-Manga-Seite + Fake-API: Event erst am Kapitelende; nicht freigeschaltete Seite → 0 Requests; Offline-Queue ohne Duplikate; `docs/setup-extension.md`, `docs/deploy.md`, `docs/server-umzug.md`, `docker-compose.yml`, `Dockerfile`
 
 ### Abnahme M1

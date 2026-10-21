@@ -1,0 +1,38 @@
+# Own server: Postgres + web app. Secrets come from a .env file next to this one (see docs/server-umzug.md).
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tracker
+      POSTGRES_USER: tracker
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracker -d tracker"]
+      interval: 5s
+      retries: 10
+
+  migrate:
+    build: { context: ., target: build }
+    command: pnpm db:migrate
+    environment:
+      DATABASE_URL: postgres://tracker:${POSTGRES_PASSWORD}@db:5432/tracker
+    depends_on:
+      db: { condition: service_healthy }
+
+  web:
+    build: { context: ., target: run }
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://tracker:${POSTGRES_PASSWORD}@db:5432/tracker
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?set BETTER_AUTH_URL in .env}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  db-data:
