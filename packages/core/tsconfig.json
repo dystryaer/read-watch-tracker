@@ -2,7 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     // URL is a WHATWG global available in browsers and Node; core runs in both.
-    "lib": ["ES2023", "DOM"]
+    "lib": ["ES2023", "DOM"],
+    // Test fixtures shared with the Shield's Kotlin module are plain JSON files.
+    "resolveJsonModule": true
   },
   "include": ["src", "test"]
 }

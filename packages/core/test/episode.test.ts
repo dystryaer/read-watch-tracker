@@ -1,15 +1,7 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parseEpisode, streamingSeriesKey } from "../src/episode";
-
-interface Fixtures {
-  parse: { label: string; season: number | null; episode: number }[];
-  reject: string[];
-  streamingKey: { title: string; key: string }[];
-}
-
 // Shared with the Shield's Kotlin module, so desktop and TV read labels the same way.
-const fixtures = JSON.parse(readFileSync(new URL("../fixtures/episodes.json", import.meta.url), "utf8")) as Fixtures;
+import fixtures from "../fixtures/episodes.json" with { type: "json" };
+import { parseEpisode, streamingSeriesKey } from "../src/episode";
 
 describe("parseEpisode", () => {
   it.each(fixtures.parse.map((entry) => [entry.label, entry]))("reads %j", (label, { season, episode }) => {
