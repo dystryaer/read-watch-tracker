@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { cleanText, EventOutcome, HttpUrlSchema, MAX_TEXT_LENGTH, SourceKey } from "./event";
-import { parseHttpUrl } from "./safe-url";
+import { MAX_URL_LENGTH, parseHttpUrl } from "./safe-url";
 import { SiteRule } from "./site-rule";
 
 /**
@@ -77,4 +77,45 @@ export const IgnoreSeriesRequest = z.object({
   rawTitle: cleanText(MAX_TEXT_LENGTH),
 });
 
-export const ApiError = z.object({ error: z.string().max(100) });
+/** What the iOS shortcut gets from the share sheet (SPEC §9.4); the server finds the book in it. */
+export const ShareRequest = z
+  .object({
+    url: z.string().max(MAX_URL_LENGTH).optional(),
+    text: z.string().max(2000).optional(),
+  })
+  .refine((share) => Boolean(share.url || share.text), "url or text is required");
+
+export const ShareResponse = z.object({
+  shareId: z.uuid(),
+  /** The work's title, or the shared book's title while it is not assigned yet. */
+  title: z.string().max(MAX_TEXT_LENGTH),
+  unit: z.enum(["chapter", "percent"]),
+  current: z.number().nullable(),
+  /** Pre-filled in the shortcut: chapter n+1, or the last percentage. */
+  suggested: z.number().nullable(),
+  needsMatch: z.boolean(),
+});
+export type ShareResponse = z.infer<typeof ShareResponse>;
+
+// Shortcuts may send a number as text, and a German keyboard types a decimal comma.
+const typedNumber = (schema: z.ZodNumber) =>
+  z.preprocess((value) => (typeof value === "string" ? Number(value.trim().replace(",", ".")) : value), schema);
+
+export const ShareConfirmRequest = z
+  .object({
+    shareId: z.uuid(),
+    chapter: typedNumber(z.number().min(0).max(99999.99)).optional(),
+    percent: typedNumber(z.number().min(0).max(100)).optional(),
+  })
+  .refine((confirm) => (confirm.chapter === undefined) !== (confirm.percent === undefined), "exactly one of chapter and percent");
+export type ShareConfirmRequest = z.infer<typeof ShareConfirmRequest>;
+
+export const ShareConfirmResponse = z.object({
+  outcome: EventOutcome,
+  title: z.string().max(MAX_TEXT_LENGTH),
+  /** Ready for the shortcut's notification, e.g. "Shadow Slave → Kap. 1205 gespeichert". */
+  message: z.string().max(400),
+});
+export type ShareConfirmResponse = z.infer<typeof ShareConfirmResponse>;
+
+export const ApiError = z.object({ error: z.string().max(100), message: z.string().max(400).optional() });

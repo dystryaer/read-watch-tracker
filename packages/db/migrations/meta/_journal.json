@@ -29,6 +29,13 @@
       "when": 1792551332116,
       "tag": "0003_event_relinked",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792564945276,
+      "tag": "0004_shares",
+      "breakpoints": true
     }
   ]
 }

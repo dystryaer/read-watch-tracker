@@ -4,7 +4,8 @@ import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
 import { getAuthorizedDb } from "@/lib/dal";
 import { formatAge, formatDateTime } from "@/lib/format";
-import { approveDeviceAction, revokeDeviceAction } from "./actions";
+import { PhoneTokenForm } from "@/components/phone-token";
+import { addPhoneAction, approveDeviceAction, revokeDeviceAction } from "./actions";
 
 const inputClass =
   "rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900";
@@ -88,6 +89,14 @@ export default async function SettingsPage({
             ) : null}
           </>
         )}
+      </section>
+
+      <section className="border-t border-zinc-200 py-5 dark:border-zinc-800">
+        <h2 className="mb-1 text-base font-semibold">iPhone-Kurzbefehl</h2>
+        <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+          Für Light Novels und E-Books: „Teilen“ in der WebNovel- oder Kindle-App, Kapitel bzw. Prozent bestätigen.
+        </p>
+        <PhoneTokenForm action={addPhoneAction} />
       </section>
 
       <section className="border-t border-zinc-200 py-5 dark:border-zinc-800">

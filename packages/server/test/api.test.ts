@@ -10,6 +10,8 @@ import {
   handleIgnoreSeries,
   handlePairingPoll,
   handlePairingStart,
+  handleShare,
+  handleShareConfirm,
 } from "../src/api/handlers";
 import { approvePairing, createDeviceWithToken, revokeDevice } from "../src/devices";
 import { chapterEvent, seedSource } from "./helpers";
@@ -251,5 +253,62 @@ describe("POST /api/v1/ignore", () => {
       context,
     );
     expect(response.status).toBe(403);
+  });
+});
+
+describe("share endpoints (iOS shortcut)", () => {
+  const book = { url: "https://m.webnovel.com/book/22196546206090805", text: "Shadow Slave" };
+  let phone: string;
+
+  beforeEach(async () => {
+    ({ token: phone } = await createDeviceWithToken(handle.db, { kind: "phone", name: "iPhone" }));
+  });
+
+  const asPhone = (path: string, body: unknown) => post(path, body, { authorization: `Bearer ${phone}` });
+
+  it("walks a share from the book to the saved chapter", async () => {
+    const started = await handleShare(asPhone("/api/v1/share", book), context);
+    expect(started.status).toBe(200);
+    const share = await started.json();
+    expect(share).toMatchObject({ title: "Shadow Slave", unit: "chapter", needsMatch: true });
+
+    const confirmed = await handleShareConfirm(asPhone("/api/v1/share/confirm", { shareId: share.shareId, chapter: "12" }), context);
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.json()).toEqual({ outcome: "pending", title: "Shadow Slave", message: "Neuer Titel – bitte im Tracker zuordnen" });
+  });
+
+  it("explains a link it does not know", async () => {
+    const response = await handleShare(asPhone("/api/v1/share", { url: "https://www.example.com/x" }), context);
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ error: "unknown_link", message: expect.stringContaining("WebNovel") });
+  });
+
+  it("explains an expired or used share", async () => {
+    const response = await handleShareConfirm(asPhone("/api/v1/share/confirm", { shareId: crypto.randomUUID(), chapter: 1 }), context);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: "share_not_found", message: expect.any(String) });
+  });
+
+  it("refuses a number that does not fit the book", async () => {
+    const share = await (await handleShare(asPhone("/api/v1/share", book), context)).json();
+    const response = await handleShareConfirm(asPhone("/api/v1/share/confirm", { shareId: share.shareId, percent: 40 }), context);
+    expect(response.status).toBe(400);
+  });
+
+  it("explains a revoked token in words the shortcut can show", async () => {
+    const response = await handleShare(post("/api/v1/share", book, { authorization: `Bearer ${"Z".repeat(43)}` }), context);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: "unauthorized", message: expect.stringContaining("Kurzbefehl") });
+  });
+
+  it("accepts phone tokens only", async () => {
+    expect((await handleShare(post("/api/v1/share", book), context)).status).toBe(403);
+  });
+
+  it("limits shares per device", async () => {
+    context = { db: handle.db, limiters: createApiLimiters({ sharesPerMinute: 2 }) };
+    await handleShare(asPhone("/api/v1/share", book), context);
+    await handleShare(asPhone("/api/v1/share", book), context);
+    expect((await handleShare(asPhone("/api/v1/share", book), context)).status).toBe(429);
   });
 });

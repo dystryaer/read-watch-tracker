@@ -162,6 +162,30 @@ test("the stepper saves the chapter after quick clicks", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("an iPhone shortcut token is shown once and lets the shortcut save a shared book", async ({ page, request }) => {
+  await login(page);
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "iPhone-Kurzbefehl hinzufügen" }).click();
+  const tokenField = page.getByLabel("Token");
+  await expect(tokenField).toHaveValue(/^[A-Za-z0-9_-]{43}$/);
+  const phone = { authorization: `Bearer ${await tokenField.inputValue()}` };
+
+  const shared = await request.post("/api/v1/share", {
+    data: { url: "https://m.webnovel.com/book/22196546206090805", text: "Shadow Slave" },
+    headers: phone,
+  });
+  expect(shared.status()).toBe(200);
+  const share = await shared.json();
+  expect(share).toMatchObject({ title: "Shadow Slave", unit: "chapter", needsMatch: true });
+
+  const confirmed = await request.post("/api/v1/share/confirm", { data: { shareId: share.shareId, chapter: 12 }, headers: phone });
+  expect(await confirmed.json()).toMatchObject({ outcome: "pending", message: "Neuer Titel – bitte im Tracker zuordnen" });
+
+  await page.reload();
+  await expect(page.getByLabel("Token")).toHaveCount(0);
+  await expect(page.getByRole("listitem").filter({ hasText: "iPhone-Kurzbefehl" })).toBeVisible();
+});
+
 test("app pages reveal nothing without a session, even to crafted RSC requests", async ({ page, playwright, baseURL }) => {
   await login(page);
   await page.goto("/");

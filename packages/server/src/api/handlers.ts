@@ -6,6 +6,8 @@ import {
   PairingPollRequest,
   PairingStartRequest,
   parseEventBatch,
+  ShareConfirmRequest,
+  ShareRequest,
 } from "@rwt/core";
 import type { Db } from "@rwt/db";
 import { authenticateDevice, type DeviceSummary, pollPairing, startPairing } from "../devices";
@@ -13,12 +15,15 @@ import { RateLimiter } from "../http/rate-limit";
 import { bearerToken, clientAddress, errorResponse, jsonResponse, type Parsed, readJsonBody } from "../http/request";
 import { ignoreSeries } from "../ignore";
 import { ingestEvents } from "../ingest";
+import { confirmShare, ShareNotFoundError, ShareValueError, startShare } from "../share";
 import { buildDeviceConfig, enableSource, ServiceDomainError, SourceConflictError, SourceNotFoundError } from "../sources";
 
 const MINUTE = 60_000;
 // 100 events of at most ~3 KB each, with headroom.
 const MAX_EVENTS_BODY_BYTES = 512 * 1024;
 const MAX_SMALL_BODY_BYTES = 4 * 1024;
+// A shared URL (≤ 2048) plus its text (≤ 2000), with headroom for multibyte characters.
+const MAX_SHARE_BODY_BYTES = 16 * 1024;
 
 export interface ApiLimiters {
   authFailures: RateLimiter;
@@ -27,10 +32,11 @@ export interface ApiLimiters {
   sources: RateLimiter;
   pairingStart: RateLimiter;
   pairingPoll: RateLimiter;
+  shares: RateLimiter;
 }
 
 export function createApiLimiters(
-  overrides: { eventsPerMinute?: number; pairingStartsPerMinute?: number; authFailuresPerMinute?: number } = {},
+  overrides: { eventsPerMinute?: number; pairingStartsPerMinute?: number; authFailuresPerMinute?: number; sharesPerMinute?: number } = {},
 ): ApiLimiters {
   return {
     // Wrong tokens per client address: guessing is hopeless (256 bit), but each try costs a query.
@@ -41,6 +47,7 @@ export function createApiLimiters(
     pairingStart: new RateLimiter({ limit: overrides.pairingStartsPerMinute ?? 10, windowMs: MINUTE }),
     // Devices poll every 3 s while a code is shown.
     pairingPoll: new RateLimiter({ limit: 40, windowMs: MINUTE }),
+    shares: new RateLimiter({ limit: overrides.sharesPerMinute ?? 30, windowMs: MINUTE }),
   };
 }
 
@@ -161,4 +168,54 @@ export async function handleIgnoreSeries(request: Request, context: ApiContext):
     throw error;
   }
   return jsonResponse({ ok: true });
+}
+
+// The iOS shortcut shows `message` to the user as it is (SPEC §9.6: understandable errors).
+const shareError = (error: string, status: number, message: string) => jsonResponse({ error, message }, status);
+
+async function authenticatePhone(request: Request, context: ApiContext): Promise<Parsed<DeviceSummary>> {
+  const device = await authenticate(request, context);
+  if (!device.ok) {
+    if (device.response.status !== 401) return device;
+    const message = "Dieser Kurzbefehl ist nicht mehr mit dem Tracker verbunden. Bitte in den Tracker-Einstellungen einen neuen iPhone-Kurzbefehl hinzufügen.";
+    return { ok: false, response: jsonResponse({ error: "unauthorized", message }, 401, { "www-authenticate": "Bearer" }) };
+  }
+  if (device.value.kind !== "phone") return { ok: false, response: errorResponse("forbidden", 403) };
+  return device;
+}
+
+/** POST /api/v1/share: which book was shared, where it stands and what to suggest (SPEC §9.4). */
+export async function handleShare(request: Request, context: ApiContext): Promise<Response> {
+  const device = await authenticatePhone(request, context);
+  if (!device.ok) return device.response;
+  if (!context.limiters.shares.allow(device.value.id)) return tooManyRequests();
+
+  const body = await readJsonBody(request, MAX_SHARE_BODY_BYTES);
+  if (!body.ok) return body.response;
+  const input = ShareRequest.safeParse(body.value);
+  if (!input.success) return errorResponse("invalid_request", 400);
+
+  const share = await startShare(context.db, device.value.id, input.data, context.now?.());
+  if (!share) return shareError("unknown_link", 422, "Dieser Link gehört zu keinem Buch aus WebNovel oder Kindle.");
+  return jsonResponse(share);
+}
+
+/** POST /api/v1/share/confirm: the confirmed chapter or percentage becomes an event. */
+export async function handleShareConfirm(request: Request, context: ApiContext): Promise<Response> {
+  const device = await authenticatePhone(request, context);
+  if (!device.ok) return device.response;
+  if (!context.limiters.shares.allow(device.value.id)) return tooManyRequests();
+
+  const body = await readJsonBody(request, MAX_SMALL_BODY_BYTES);
+  if (!body.ok) return body.response;
+  const input = ShareConfirmRequest.safeParse(body.value);
+  if (!input.success) return shareError("invalid_request", 400, "Bitte eine Zahl eingeben.");
+
+  try {
+    return jsonResponse(await confirmShare(context.db, device.value.id, input.data, context.now?.()));
+  } catch (error) {
+    if (error instanceof ShareNotFoundError) return shareError("share_not_found", 404, "Das ist abgelaufen. Bitte das Buch noch einmal teilen.");
+    if (error instanceof ShareValueError) return shareError("invalid_value", 400, "Diese Zahl passt nicht zu dem Buch.");
+    throw error;
+  }
 }

@@ -30,6 +30,16 @@ describe("RateLimiter", () => {
     expect(limiter.allow("k", 1000)).toBe(true);
   });
 
+  it("tells whether a key is blocked without counting the question", () => {
+    const limiter = new RateLimiter({ limit: 2, windowMs: 1000 });
+    expect(limiter.isBlocked("a", 0)).toBe(false);
+    limiter.allow("a", 0);
+    limiter.allow("a", 0);
+    expect(limiter.isBlocked("a", 10)).toBe(true);
+    expect(limiter.isBlocked("a", 1000)).toBe(false);
+    expect(limiter.isBlocked("b", 10)).toBe(false);
+  });
+
   it("forgets idle keys so memory stays bounded", () => {
     const limiter = new RateLimiter({ limit: 1, windowMs: 1000, maxKeys: 2 });
     limiter.allow("a", 0);

@@ -142,7 +142,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T36 core: WebNovel- und Amazon-Parser** · S
   Akz.: Book-ID aus WebNovel-URLs, ASIN aus Amazon-/Kindle-Links; ungültige Eingaben → null
 
-- [ ] **T37 Share-API + iPhone-Token** · M · Abh. T36
+- [x] **T37 Share-API + iPhone-Token** · M · Abh. T36
   Akz.: `POST /share`, `/share/confirm` (Server erzeugt UUID); unbekannter Titel → Pending; Einstellungen: „iPhone-Kurzbefehl hinzufügen“ zeigt Token einmalig
 
 - [ ] **T38 Schnell-Update-PWA** · M

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DeviceConfig, EnableSourceRequest, PairingPollResponse, PairingStartRequest } from "../src/api";
+import { DeviceConfig, EnableSourceRequest, PairingPollResponse, PairingStartRequest, ShareConfirmRequest, ShareRequest } from "../src/api";
 
 describe("PairingStartRequest", () => {
   it("accepts an extension or shield with a name", () => {
@@ -57,5 +57,41 @@ describe("DeviceConfig", () => {
 
   it("rejects thresholds outside the sane range", () => {
     expect(DeviceConfig.safeParse({ sites: [], thresholds: { scrollDepthPercent: 0, watchedPercent: 85 } }).success).toBe(false);
+  });
+});
+
+describe("ShareRequest", () => {
+  it("takes what the share sheet hands over: a URL, a text or both", () => {
+    expect(ShareRequest.safeParse({ url: "https://m.webnovel.com/book/22196546206090805" }).success).toBe(true);
+    expect(ShareRequest.safeParse({ text: "Shadow Slave https://m.webnovel.com/book/22196546206090805" }).success).toBe(true);
+  });
+
+  it.each([[{}], [{ url: "" }], [{ url: "x".repeat(2049) }], [{ text: "x".repeat(2001) }], [{ url: 42 }]])("refuses %j", (body) => {
+    expect(ShareRequest.safeParse(body).success).toBe(false);
+  });
+});
+
+describe("ShareConfirmRequest", () => {
+  const shareId = "6f1c0a52-8d4b-4a8e-9a7c-2f6b5d1e0c11";
+
+  it("takes exactly one of chapter and percent", () => {
+    expect(ShareConfirmRequest.parse({ shareId, chapter: 1205 })).toEqual({ shareId, chapter: 1205 });
+    expect(ShareConfirmRequest.parse({ shareId, percent: 43.5 })).toEqual({ shareId, percent: 43.5 });
+  });
+
+  it("accepts numbers typed with a decimal comma, as a German keyboard sends them", () => {
+    expect(ShareConfirmRequest.parse({ shareId, percent: "43,5" })).toEqual({ shareId, percent: 43.5 });
+  });
+
+  it.each([
+    [{ shareId }],
+    [{ shareId, chapter: 1, percent: 1 }],
+    [{ shareId, chapter: -1 }],
+    [{ shareId, chapter: 100000 }],
+    [{ shareId, percent: 101 }],
+    [{ shareId, chapter: "zwölf" }],
+    [{ shareId: "x", chapter: 1 }],
+  ])("refuses %j", (body) => {
+    expect(ShareConfirmRequest.safeParse(body).success).toBe(false);
   });
 });

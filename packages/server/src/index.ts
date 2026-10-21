@@ -28,6 +28,8 @@ export {
   handleIgnoreSeries,
   handlePairingPoll,
   handlePairingStart,
+  handleShare,
+  handleShareConfirm,
 } from "./api/handlers";
 export { RateLimiter } from "./http/rate-limit";
 export { clientAddress } from "./http/request";
@@ -38,3 +40,4 @@ export { getWorkDetail, listMergeCandidates, MergeIncompatibleError, mergeWorks,
 export { listOpenMatches, type OpenMatch } from "./inbox";
 export { addSiteDomain, getSite, getSiteId, listRecentSiteUrls, listSites, renameSite, type RuleUpdateResult, setSiteTracking, SiteDomainError, type SiteRuleFields, type SiteSummary, updateSiteRule } from "./site-admin";
 export { ignoreSeries } from "./ignore";
+export { confirmShare, ShareNotFoundError, ShareValueError, startShare } from "./share";

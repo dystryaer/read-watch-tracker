@@ -142,6 +142,23 @@ export const devices = pgTable("devices", {
   revokedAt: timestamptz("revoked_at"),
 });
 
+/**
+ * A share from the iOS shortcut (SPEC §9.4) between "which book is this?" and "this chapter":
+ * shortcuts cannot keep state, so the server does, for one device and a few minutes.
+ */
+export const shares = pgTable("shares", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  deviceId: uuid("device_id")
+    .notNull()
+    .references(() => devices.id, { onDelete: "cascade" }),
+  sourceKey: text("source_key").notNull(),
+  externalKey: text("external_key").notNull(),
+  rawTitle: text("raw_title").notNull(),
+  createdAt: createdAt(),
+  expiresAt: timestamptz("expires_at").notNull(),
+  usedAt: timestamptz("used_at"),
+});
+
 export const pairingCodes = pgTable("pairing_codes", {
   code: text("code").primaryKey(),
   pollSecretHash: text("poll_secret_hash").notNull().unique(),

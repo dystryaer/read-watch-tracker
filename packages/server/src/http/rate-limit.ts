@@ -18,6 +18,11 @@ export class RateLimiter {
     return this.hits.size;
   }
 
+  /** True when the key used up its limit in the window; asking records nothing. */
+  isBlocked(key: string, now = Date.now()): boolean {
+    return (this.hits.get(key) ?? []).filter((time) => now - time < this.windowMs).length >= this.limit;
+  }
+
   /** Records the attempt and returns true when it is within the limit; refused attempts are not counted. */
   allow(key: string, now = Date.now()): boolean {
     const recent = (this.hits.get(key) ?? []).filter((time) => now - time < this.windowMs);

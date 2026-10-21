@@ -365,7 +365,7 @@ Basis-Pfad `/api/v1`. Alle Bodies sind JSON und werden mit zod validiert (Schema
 | `POST /pairing` | – | `{ kind, name }` → `{ code, pollSecret, expiresAt }` |
 | `POST /pairing/poll` | – (`pollSecret`) | `{ status: pending \| approved \| expired, deviceToken? }`. Das Token wird genau einmal ausgeliefert. |
 | `POST /share` | Geräte-Token (`phone`) | Für den iOS-Kurzbefehl: `{ url?, text? }` → Server erkennt Quelle und Werk → `{ shareId, title?, unit?, current?, suggested?, needsMatch }` |
-| `POST /share/confirm` | Geräte-Token (`phone`) | `{ shareId, chapter? \| percent? }` → der Server erzeugt das Event (inkl. UUID, weil Kurzbefehle keine erzeugen können) → `{ outcome, title }` |
+| `POST /share/confirm` | Geräte-Token (`phone`) | `{ shareId, chapter? \| percent? }` (Zahl auch als Text mit Dezimalkomma) → der Server erzeugt das Event (inkl. UUID, weil Kurzbefehle keine erzeugen können) → `{ outcome, title, message }`. `message` ist die fertige Mitteilung für den Kurzbefehl. Ein Teilen gilt 15 min, einmal und nur für das Gerät, das es gestartet hat. Fehler der beiden Share-Endpunkte tragen ebenfalls ein `message` (z. B. bei widerrufenem Token). |
 
 Interne Aktionen der Web-UI (Kopplung bestätigen, Zuordnung auflösen, Stand ändern, Werk zusammenführen, Gerät widerrufen, Seitenregeln bearbeiten, Domain-Umzug) laufen als Server Actions mit Session-Auth.
 

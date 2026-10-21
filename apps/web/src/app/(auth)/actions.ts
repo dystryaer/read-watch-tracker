@@ -25,7 +25,9 @@ const SetupInput = z.object({
 
 export async function signInAction(_previous: FormState, formData: FormData): Promise<FormState> {
   const requestHeaders = await headers();
-  if (!loginLimiterPerClient.allow(clientAddress(requestHeaders))) {
+  const client = clientAddress(requestHeaders);
+  // Only failed attempts count: guessing fails, signing in does not use up the owner's budget.
+  if (loginLimiterPerClient.isBlocked(client)) {
     return { error: "Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen." };
   }
   const input = LoginInput.safeParse({ email: formData.get("email"), password: formData.get("password") });
@@ -34,8 +36,9 @@ export async function signInAction(_previous: FormState, formData: FormData): Pr
   try {
     await (await getAuth()).api.signInEmail({ body: input.data, headers: requestHeaders });
   } catch (error) {
-    if (isAPIError(error)) return { error: "E-Mail-Adresse oder Passwort ist falsch." };
-    throw error;
+    if (!isAPIError(error)) throw error;
+    loginLimiterPerClient.allow(client);
+    return { error: "E-Mail-Adresse oder Passwort ist falsch." };
   }
   redirect(safeNextPath(formData.get("next")));
 }
@@ -46,10 +49,10 @@ export async function setupAction(_previous: FormState, formData: FormData): Pro
   const gate = setupGate(process.env);
   if (gate === "disabled") return { error: "Die Einrichtung ist gesperrt, solange SETUP_TOKEN nicht gesetzt ist." };
   if (gate === "token") {
-    if (!loginLimiterPerClient.allow(clientAddress(requestHeaders))) {
-      return { error: "Zu viele Versuche. Bitte in 15 Minuten erneut versuchen." };
-    }
+    const client = clientAddress(requestHeaders);
+    if (loginLimiterPerClient.isBlocked(client)) return { error: "Zu viele Versuche. Bitte in 15 Minuten erneut versuchen." };
     if (!setupTokenMatches(formData.get("setupToken"), process.env.SETUP_TOKEN ?? "")) {
+      loginLimiterPerClient.allow(client);
       return { error: "Der Einrichtungs-Code stimmt nicht." };
     }
   }
