@@ -27,7 +27,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 
 ### Phase B – DB + Server
 
-- [ ] **T06 `packages/db`: Schema, Migrationen, Factory** · M · Abh. T02
+- [x] **T06 `packages/db`: Schema, Migrationen, Factory** · M · Abh. T02
   Akz.: alle Tabellen aus SPEC §5.1 inkl. `source_domains`, Seitenregel-Spalten, `pairing_codes` (ohne Chiffretext, A4); `pg_trgm` + GIN-Index; Check-Constraint Positionsspalten ↔ Typ; `createDb(url)` für `pglite:`/`postgres:`; `createTestDb()` · Prüfung: Migrationstest auf PGlite, Constraint-Test
 
 - [ ] **T07 Ingest-Pipeline** · M · Abh. T03, T06
