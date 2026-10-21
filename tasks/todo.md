@@ -30,7 +30,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T06 `packages/db`: Schema, Migrationen, Factory** · M · Abh. T02
   Akz.: alle Tabellen aus SPEC §5.1 inkl. `source_domains`, Seitenregel-Spalten, `pairing_codes` (ohne Chiffretext, A4); `pg_trgm` + GIN-Index; Check-Constraint Positionsspalten ↔ Typ; `createDb(url)` für `pglite:`/`postgres:`; `createTestDb()` · Prüfung: Migrationstest auf PGlite, Constraint-Test
 
-- [ ] **T07 Ingest-Pipeline** · M · Abh. T03, T06
+- [x] **T07 Ingest-Pipeline** · M · Abh. T03, T06
   Akz.: SPEC §5.3 Schritte 1–7 (Idempotenz, Quelle über Key/Domain, Link, Wiedererkennung, ignoriert, Pending mit Trigram-Kandidaten, Fortschritt); Ergebnis pro Event · Dateien: `apps/web/src/server/ingest.ts` + Integrationstests (PGlite)
 
 - [ ] **T08 Zuordnungen auflösen + Replay** · S · Abh. T07

@@ -19,7 +19,7 @@ Jeder Meilenstein liegt auf einem eigenen Branch. Die Branches bauen aufeinander
 
 | # | Entscheidung | Begründung |
 |---|---|---|
-| A1 | Die **Serverlogik ist framework-frei** (`apps/web/src/server/*`) und bekommt die DB als Parameter. Next.js-Route-Handler und Server Actions sind dünne Adapter. | testbar ohne Next.js; die Spec verlangt „möglichst framework-frei“ |
+| A1 | Die **Serverlogik ist framework-frei** in einem eigenen Paket `packages/server` und bekommt die DB als Parameter. Next.js-Route-Handler, Server Actions und der Excel-Import sind dünne Adapter darauf. | testbar ohne Next.js; Web-App und Import-Skript teilen dieselbe Logik |
 | A2 | **DB-Factory:** `DATABASE_URL=pglite:<pfad>` → PGlite (lokal, Tests, E2E), `postgres://…` → node-postgres (Neon, später eigener Server). Gleiches Drizzle-Schema, gleiche Migrationen. | lokale Entwicklung ohne Docker (nicht installiert), echtes Postgres inkl. `pg_trgm` in Tests |
 | A3 | `works.title_normalized` wird **in der Anwendung** per `normalizeTitle` gesetzt, nicht als SQL-generierte Spalte. | Die Normalisierung (Unicode, Tags) ist TypeScript; eine SQL-Kopie würde auseinanderlaufen |
 | A4 | **Kopplung ohne gespeicherten Token-Chiffretext:** Das Token wird beim ersten erfolgreichen Poll nach der Freigabe erzeugt; gespeichert wird nur sein SHA-256-Hash. | einfacher und sicherer als `token_ciphertext` (SPEC §5.1 wird angepasst) |

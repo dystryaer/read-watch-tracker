@@ -162,6 +162,22 @@ importers:
         specifier: ^0.31.11
         version: 0.31.11
 
+  packages/server:
+    dependencies:
+      '@rwt/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rwt/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@electric-sql/pglite@0.5.10)(@types/pg@8.23.1)(pg@8.23.1)
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+
 packages:
 
   '@babel/helper-string-parser@7.29.7':
