@@ -68,7 +68,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [ ] **T18 Einstellungen: Seiten, Regeln, Umzug** · M · Abh. T04, T11
   Akz.: Quellen-Liste, Tracking an/aus, Regel-Editor mit Live-Test (gleicher core-Code), Regex-Prüfung beim Speichern, Domain hinzufügen/umziehen
 
-- [ ] **T19 Excel-Import** · S · Abh. T07
+- [x] **T19 Excel-Import** · S · Abh. T07
   Akz.: SPEC §10.1; idempotent; `--dry-run`-Bericht; ungültige Zeilen werden gemeldet, nicht importiert · Prüfung: Test mit synthetischer xlsx; Dry-Run gegen deine Liste ergibt 136/73/63/2
 
 ### Phase D – Extension

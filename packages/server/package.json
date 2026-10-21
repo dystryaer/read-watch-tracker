@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./excel-import": "./src/excel-import.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -12,7 +13,8 @@
   "dependencies": {
     "@rwt/core": "workspace:*",
     "@rwt/db": "workspace:*",
-    "drizzle-orm": "^0.45.4"
+    "drizzle-orm": "^0.45.4",
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.5"
