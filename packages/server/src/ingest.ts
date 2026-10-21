@@ -1,5 +1,6 @@
 import {
   type EventOutcome,
+  isServiceUrl,
   knownService,
   normalizeDomain,
   normalizeTitle,
@@ -122,11 +123,15 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
 }
 
 /**
- * For websites only URLs on the source's own domains are kept: a stolen device token must not be
- * able to plant links to other hosts behind "Weiterlesen". Services and apps keep theirs.
+ * Only URLs on the source's own domains are kept – a website's registered domains, a service's
+ * fixed ones: a stolen device token must not be able to plant links to other hosts behind
+ * "Weiterlesen" or "Öffnen".
  */
 async function urlsOnSource(db: Db, source: Source, input: ProgressEvent["source"]): Promise<SourceUrls> {
-  if (source.kind !== "website") return { url: input.url ?? null, seriesUrl: input.seriesUrl ?? null };
+  if (source.kind !== "website") {
+    const onService = (value: string | undefined) => (value && isServiceUrl(source.key, value) ? value : null);
+    return { url: onService(input.url), seriesUrl: onService(input.seriesUrl) };
+  }
   const rows = await db.select({ domain: sourceDomains.domain }).from(sourceDomains).where(eq(sourceDomains.sourceId, source.id));
   const domains = new Set(rows.map((row) => row.domain));
   const onSource = (value: string | undefined) => {

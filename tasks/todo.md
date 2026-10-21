@@ -127,7 +127,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [ ] **T34 Shield-Doku + Spike-S1-Anleitung** · S
   Akz.: `docs/setup-shield.md`, `docs/spikes/s1-shield-metadata.md`, `docs/testing/shield-checkliste.md`
 
-- [ ] **T35 Web: Streaming-Darstellung** · S
+- [x] **T35 Web: Streaming-Darstellung** · S
   Akz.: `S1 · F14`, Öffnen-Link zur Serienseite, Film = gesehen; URLs von Streaming-Quellen nur auf den bekannten Domains des Dienstes übernehmen (wie bei Websites, Security-Review M1)
 
 ### Abnahme M2

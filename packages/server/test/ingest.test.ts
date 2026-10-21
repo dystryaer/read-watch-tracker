@@ -296,6 +296,23 @@ describe("ingestEvents – sources", () => {
     expect(source).toMatchObject({ kind: "streaming", name: "Crunchyroll" });
   });
 
+  it("keeps URLs of a streaming service only on the service's own domains", async () => {
+    const watched = (url: string) =>
+      chapterEvent({
+        kind: "watched",
+        source: { key: "crunchyroll", externalKey: "frieren", rawTitle: "Frieren", url, seriesUrl: url },
+        position: { unit: "episode", season: 1, episode: 5 },
+      });
+    const own = watched("https://www.crunchyroll.com/watch/GXYZ/phantoms");
+    const foreign = watched("https://crunchyroll.com.evil.example/watch/GXYZ");
+
+    await ingestEvents(handle.db, null, [own, foreign], NOW);
+
+    const stored = await handle.db.select({ id: events.id, url: events.url }).from(events);
+    expect(stored.find((event) => event.id === own.id)?.url).toBe("https://www.crunchyroll.com/watch/GXYZ/phantoms");
+    expect(stored.find((event) => event.id === foreign.id)?.url).toBeNull();
+  });
+
   it("files a streaming series under one key, whether the desktop or the Shield sent it", async () => {
     const watched = (externalKey: string, rawTitle: string, episode: number) =>
       chapterEvent({

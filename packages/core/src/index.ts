@@ -22,5 +22,5 @@ export {
   type RuleFields,
   SiteRule,
 } from "./site-rule";
-export { type KnownService, knownService, normalizeDomain } from "./services";
+export { isServiceUrl, type KnownService, knownService, normalizeDomain } from "./services";
 export * from "./api";
