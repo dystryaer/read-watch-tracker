@@ -251,10 +251,17 @@ test("the quick update saves the next chapter of a light novel and an e-book's p
 });
 
 test("new chapters reported by the extension show as a badge and through a filter", async ({ page, request }) => {
-  // Overgeared was read up to chapter 347 above; its series page now lists 350.
+  const auth = { authorization: `Bearer ${token}` };
+  // The site is enabled in the extension (its source already exists from the events above), and
+  // reading chapter 348 stores the series page – only such works may get a newest chapter.
+  const enabled = await request.post("/api/v1/sources/enable", { data: { origin: "https://asuracomic.net", moveFromSourceKey: "site:asuracomic-net" }, headers: auth });
+  expect(enabled.status()).toBe(200);
+  const read = chapterEvent("overgeared", "Overgeared", 348);
+  await postEvents(request, [{ ...read, source: { ...read.source, seriesUrl: "https://asuracomic.net/series/overgeared" } }]);
+
   const reported = await request.post("/api/v1/latest-chapters", {
-    data: { items: [{ sourceKey: "site:asuracomic-net", externalKey: "overgeared", latestChapter: 350 }] },
-    headers: { authorization: `Bearer ${token}` },
+    data: { items: [{ sourceKey: "site:asuracomic-net", externalKey: "overgeared", latestChapter: 351 }] },
+    headers: auth,
   });
   expect(await reported.json()).toEqual({ updated: 1 });
 
@@ -267,7 +274,7 @@ test("new chapters reported by the extension show as a badge and through a filte
   await expect(page.getByRole("link", { name: "Shadow Slave", exact: true })).toHaveCount(0);
 
   await page.getByRole("link", { name: "Overgeared", exact: true }).click();
-  await expect(page.getByText("Neuestes Kapitel laut Serienseite: Kap. 350")).toBeVisible();
+  await expect(page.getByText("Neuestes Kapitel laut Serienseite: Kap. 351")).toBeVisible();
 });
 
 test("the statistics count this week's chapters as text, with decorative bars", async ({ page }) => {
