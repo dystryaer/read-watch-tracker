@@ -25,9 +25,15 @@ export async function createDb(url: string): Promise<DbHandle> {
       import("@electric-sql/pglite/contrib/pg_trgm"),
       import("drizzle-orm/pglite"),
     ]);
+    const inMemory = location === "" || location === "memory";
+    if (!inMemory) {
+      // PGlite creates the data directory itself, but not missing parents such as `.data/`.
+      const [{ mkdir }, path] = await Promise.all([import("node:fs/promises"), import("node:path")]);
+      await mkdir(path.dirname(path.resolve(location)), { recursive: true });
+    }
     // Options-object form: with `undefined` as first argument PGlite would drop the extensions.
     const client = await PGlite.create({
-      dataDir: location === "" || location === "memory" ? "memory://" : location,
+      dataDir: inMemory ? "memory://" : location,
       extensions: { pg_trgm },
     });
     return { db: drizzle({ client, schema }), driver: "pglite", close: () => client.close() };
