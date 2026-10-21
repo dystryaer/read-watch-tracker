@@ -42,7 +42,7 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
       <p className="mt-1 mb-4 text-sm text-zinc-600 dark:text-zinc-400">
         {MEDIA_TYPE_LABELS[work.type]} · {STATUS_LABELS[work.status]} · {positionText(work)}
       </p>
-      {unit === "chapter" && work.latestChapter !== null && work.latestChapterAt !== null ? (
+      {unit === "chapter" && work.latestChapter !== null && work.latestChapterAt !== null && work.latestChapter >= Math.floor(work.chapter ?? 0) ? (
         <p className="-mt-2 mb-4 text-sm text-zinc-600 dark:text-zinc-400">
           Neuestes Kapitel laut Serienseite: Kap. {work.latestChapter} (geprüft {formatRelative(work.latestChapterAt, new Date())})
         </p>

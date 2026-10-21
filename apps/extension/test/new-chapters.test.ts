@@ -1,5 +1,6 @@
 import type { DeviceConfig, SeriesWatchResponse } from "@rwt/core";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import type { ApiResult } from "../src/lib/api-client";
 import { checkNewChapters, loadNewChapterChecks, saveNewChapterChecks } from "../src/lib/new-chapters";
 import { saveCachedConfig, saveSettings } from "../src/lib/settings";
@@ -11,7 +12,7 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const paired = { apiUrl: "https://tracker.example", deviceToken: "T".repeat(43), deviceName: "Brave", pairing: null };
 const config: DeviceConfig = {
-  sites: [{ sourceKey: "site:asura", domains: ["asuracomic.net"] }],
+  sites: [{ sourceKey: "site:asura", domains: ["asuracomic.net", "asurascans.com"] }],
   thresholds: { scrollDepthPercent: 60, watchedPercent: 85 },
 };
 type Series = SeriesWatchResponse["series"][number];
@@ -24,8 +25,9 @@ const watched = (key: string, chapter = 200, host = "asuracomic.net"): Series =>
 });
 const listing = (key: string, latest: number) =>
   `<ul><li><a href="/series/${key}/chapter-${latest}">Chapter ${latest}</a></li><li><a href="/series/${key}/chapter-${latest - 1}">Chapter ${latest - 1}</a></li></ul>`;
+const listingFor = (url: string) => html(listing(url.split("/").pop() ?? "", 203));
 
-function html(body: string, init: { status?: number; type?: string; length?: number; redirectedTo?: string } = {}): Response {
+function html(body: string | ReadableStream<Uint8Array>, init: { status?: number; type?: string; length?: number; redirectedTo?: string } = {}): Response {
   const headers: Record<string, string> = { "content-type": init.type ?? "text/html; charset=utf-8" };
   if (init.length !== undefined) headers["content-length"] = String(init.length);
   const response = new Response(body, { status: init.status ?? 200, headers });
@@ -36,11 +38,12 @@ function html(body: string, init: { status?: number; type?: string; length?: num
   return response;
 }
 
-async function setup(series: Series[], pages: Record<string, () => Response> = {}, options: { granted?: boolean } = {}) {
+async function setup(series: Series[], pages: Record<string, () => Response | Promise<Response>> = {}, options: { granted?: boolean } = {}) {
   const store = createStore(fakeStorage());
   await saveSettings(store, paired);
   await saveCachedConfig(store, { config, etag: null, fetchedAt: 0 });
   let now = 1_000_000_000;
+  let online = true;
   const deps = {
     store,
     api: {
@@ -52,11 +55,16 @@ async function setup(series: Series[], pages: Record<string, () => Response> = {
     },
     fetchPage: vi.fn(async (url: string) => (pages[url] ?? (() => html("", { status: 404 })))()),
     permissions: { contains: vi.fn<(request: { origins: string[] }) => Promise<boolean>>(async () => options.granted ?? true) },
+    isOnline: () => online,
     now: () => now,
     sleep: vi.fn<(ms: number) => Promise<void>>(async () => {}),
     onUnauthorized: vi.fn(),
   };
-  return { deps, advance: (ms: number) => (now += ms) };
+  return {
+    deps,
+    advance: (ms: number) => (now += ms),
+    setOnline: (value: boolean) => (online = value),
+  };
 }
 
 const fetched = (deps: Awaited<ReturnType<typeof setup>>["deps"]) => deps.fetchPage.mock.calls.map(([url]) => url);
@@ -75,6 +83,14 @@ describe("checkNewChapters (SPEC §7.11)", () => {
       { sourceKey: "site:asura", externalKey: "solo-leveling", latestChapter: 203 },
       { sourceKey: "site:asura", externalKey: "omniscient-reader", latestChapter: 100 },
     ]);
+  });
+
+  it("does not report a page that lists less than I have read: only part of the list", async () => {
+    const solo = watched("solo-leveling", 200);
+    const { deps } = await setup([solo], { [solo.seriesUrl]: () => html(listing("solo-leveling", 50)) });
+
+    expect(await checkNewChapters(deps)).toEqual({ checked: 1, reported: 0 });
+    expect(deps.api.postLatestChapters).not.toHaveBeenCalled();
   });
 
   it("checks each series at most once a day", async () => {
@@ -102,12 +118,53 @@ describe("checkNewChapters (SPEC §7.11)", () => {
     expect(deps.sleep).toHaveBeenCalledWith(3000);
   });
 
+  it("checks never-checked series first, so the end of a long list is not starved", async () => {
+    const many = Array.from({ length: 12 }, (_, index) => watched(`series-${index}`));
+    const { deps, advance } = await setup(many);
+
+    await checkNewChapters(deps);
+    advance(HOUR);
+    await checkNewChapters(deps);
+
+    expect(fetched(deps).slice(10)).toEqual([many[10]?.seriesUrl, many[11]?.seriesUrl]);
+  });
+
+  it("claims a series before fetching it: a run that dies in the middle does not repeat it within the day", async () => {
+    const solo = watched("solo-leveling");
+    const omni = watched("omniscient-reader");
+    const { deps, advance } = await setup([solo, omni]);
+    deps.fetchPage.mockImplementationOnce(async (url: string) => listingFor(url));
+    // The service worker is stopped while this request hangs.
+    deps.fetchPage.mockImplementationOnce(() => new Promise<Response>(() => {}));
+
+    void checkNewChapters(deps);
+    await vi.waitFor(() => expect(deps.fetchPage).toHaveBeenCalledTimes(2));
+    advance(HOUR);
+    deps.fetchPage.mockImplementation(async (url: string) => listingFor(url));
+    await checkNewChapters(deps);
+
+    expect(deps.fetchPage).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     ["a bot check", () => html(`<html><head><title>Just a moment...</title></head></html>`)],
     ["a redirect to another site", () => html(listing("solo-leveling", 203), { redirectedTo: "https://parked.example/" })],
     ["an error status", () => html("", { status: 503 })],
     ["something else than HTML", () => html("{}", { type: "application/json" })],
-    ["an oversized page", () => html(listing("solo-leveling", 203), { length: 3 * 1024 * 1024 })],
+    ["an oversized page by its header", () => html(listing("solo-leveling", 203), { length: 3 * 1024 * 1024 })],
+    [
+      "an oversized page without a header",
+      () =>
+        html(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              const chunk = new Uint8Array(512 * 1024).fill(32);
+              for (let index = 0; index < 5; index++) controller.enqueue(chunk);
+              controller.close();
+            },
+          }),
+        ),
+    ],
   ])("skips %s, reports nothing and waits 7 days", async (_name, response) => {
     const solo = watched("solo-leveling");
     const { deps, advance } = await setup([solo], { [solo.seriesUrl]: response });
@@ -120,6 +177,84 @@ describe("checkNewChapters (SPEC §7.11)", () => {
     advance(DAY + HOUR);
     await checkNewChapters(deps);
     expect(deps.fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("follows a redirect within the same site and reads links against the final page", async () => {
+    const solo = watched("solo-leveling");
+    const { deps } = await setup([solo], {
+      [solo.seriesUrl]: () => html(`<a href="chapter-204">Chapter 204</a>`, { redirectedTo: "https://www.asuracomic.net/series/solo-leveling/" }),
+    });
+
+    expect(await checkNewChapters(deps)).toEqual({ checked: 1, reported: 1 });
+    expect(deps.api.postLatestChapters).toHaveBeenCalledWith(expect.any(String), expect.any(String), [
+      { sourceKey: "site:asura", externalKey: "solo-leveling", latestChapter: 204 },
+    ]);
+  });
+
+  it("tries again the next day when a site does not answer, not after 7 days", async () => {
+    const solo = watched("solo-leveling");
+    const { deps, advance } = await setup([solo], { [solo.seriesUrl]: () => Promise.reject(new DOMException("timed out", "TimeoutError")) });
+
+    await checkNewChapters(deps);
+    advance(DAY + HOUR);
+    await checkNewChapters(deps);
+
+    expect(deps.fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops without penalty when the browser went offline: no back-off, checked again within the hour", async () => {
+    const { deps, advance, setOnline } = await setup([watched("solo-leveling"), watched("omniscient-reader")]);
+    deps.fetchPage.mockImplementation(async () => {
+      setOnline(false);
+      throw new TypeError("Failed to fetch");
+    });
+
+    await checkNewChapters(deps);
+    expect(deps.fetchPage).toHaveBeenCalledTimes(1);
+
+    setOnline(true);
+    deps.fetchPage.mockImplementation(async (url: string) => listingFor(url));
+    advance(HOUR);
+    expect(await checkNewChapters(deps)).toEqual({ checked: 2, reported: 2 });
+  });
+
+  it("does not start a run while offline", async () => {
+    const { deps, setOnline } = await setup([watched("solo-leveling")]);
+    setOnline(false);
+    expect(await checkNewChapters(deps)).toEqual({ checked: 0, reported: 0 });
+    expect(deps.api.getSeriesWatch).not.toHaveBeenCalled();
+  });
+
+  it("keeps results the tracker did not take and sends them next time, without fetching the page again", async () => {
+    const solo = watched("solo-leveling");
+    const { deps, advance } = await setup([solo], { [solo.seriesUrl]: () => html(listing("solo-leveling", 203)) });
+    deps.api.postLatestChapters.mockResolvedValueOnce({ ok: false, kind: "retry", message: "offline" });
+
+    expect(await checkNewChapters(deps)).toEqual({ checked: 1, reported: 0 });
+    advance(HOUR);
+    await checkNewChapters(deps);
+
+    expect(deps.fetchPage).toHaveBeenCalledTimes(1);
+    expect(deps.api.postLatestChapters).toHaveBeenCalledTimes(2);
+    expect(deps.api.postLatestChapters).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), [
+      { sourceKey: "site:asura", externalKey: "solo-leveling", latestChapter: 203 },
+    ]);
+  });
+
+  it("checks a series again right away when its page moved to the current domain, despite a back-off", async () => {
+    const old = watched("solo-leveling");
+    const moved = watched("solo-leveling", 200, "asurascans.com");
+    const { deps, advance } = await setup([old], {
+      [old.seriesUrl]: () => html("", { status: 404 }),
+      [moved.seriesUrl]: () => html(listing("solo-leveling", 205)),
+    });
+
+    await checkNewChapters(deps);
+    deps.api.getSeriesWatch.mockResolvedValue({ ok: true, value: { series: [moved] } });
+    advance(7 * HOUR);
+    await checkNewChapters(deps);
+
+    expect(fetched(deps)).toEqual([old.seriesUrl, moved.seriesUrl]);
   });
 
   it("never fetches a page without host permission or on a site that is not enabled", async () => {
@@ -135,16 +270,31 @@ describe("checkNewChapters (SPEC §7.11)", () => {
     expect(fetched(notEnabled)).toEqual([]);
   });
 
-  it("asks the tracker for the list at most every 6 hours", async () => {
-    const { deps, advance } = await setup([]);
+  it("asks the tracker for the list at most every 6 hours and keeps using the last one when it is down", async () => {
+    const solo = watched("solo-leveling");
+    const { deps, advance } = await setup([solo], { [solo.seriesUrl]: () => html(listing("solo-leveling", 203)) });
     await checkNewChapters(deps);
     advance(HOUR);
     await checkNewChapters(deps);
     expect(deps.api.getSeriesWatch).toHaveBeenCalledTimes(1);
 
-    advance(6 * HOUR);
+    deps.api.getSeriesWatch.mockResolvedValue({ ok: false, kind: "retry", message: "down" });
+    advance(DAY);
     await checkNewChapters(deps);
     expect(deps.api.getSeriesWatch).toHaveBeenCalledTimes(2);
+    expect(deps.fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("forgets the schedule of series that left the list", async () => {
+    const solo = watched("solo-leveling");
+    const { deps, advance } = await setup([solo], { [solo.seriesUrl]: () => html(listing("solo-leveling", 203)) });
+    await checkNewChapters(deps);
+
+    deps.api.getSeriesWatch.mockResolvedValue({ ok: true, value: { series: [] } });
+    advance(7 * HOUR);
+    await checkNewChapters(deps);
+
+    expect(await deps.store.read("newChapterSchedule", z.record(z.string(), z.unknown()), {})).toEqual({});
   });
 
   it("does nothing when switched off or not paired", async () => {
@@ -169,23 +319,11 @@ describe("checkNewChapters (SPEC §7.11)", () => {
     expect(deps.onUnauthorized).toHaveBeenCalled();
   });
 
-  it("checks again within the hour when the results could not be delivered", async () => {
-    const solo = watched("solo-leveling");
-    const { deps, advance } = await setup([solo], { [solo.seriesUrl]: () => html(listing("solo-leveling", 203)) });
-    deps.api.postLatestChapters.mockResolvedValueOnce({ ok: false, kind: "retry", message: "offline" });
-
-    await checkNewChapters(deps);
-    advance(HOUR + 1);
-    await checkNewChapters(deps);
-
-    expect(deps.fetchPage).toHaveBeenCalledTimes(2);
-    expect(deps.api.postLatestChapters).toHaveBeenCalledTimes(2);
-  });
-
-  it("survives a corrupted schedule in storage", async () => {
+  it("survives a corrupted schedule and pending list in storage", async () => {
     const solo = watched("solo-leveling");
     const { deps } = await setup([solo], { [solo.seriesUrl]: () => html(listing("solo-leveling", 203)) });
     await deps.store.write("newChapterSchedule", { "site:asura|solo-leveling": "tomorrow" });
+    await deps.store.write("newChapterPending", [{ sourceKey: "<script>", latestChapter: "many" }]);
 
     expect(await checkNewChapters(deps)).toEqual({ checked: 1, reported: 1 });
   });

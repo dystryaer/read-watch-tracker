@@ -1,5 +1,6 @@
 import { browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
+import { ensureAlarm } from "@/lib/alarms";
 import { createApiClient } from "@/lib/api-client";
 import { checkNewChapters } from "@/lib/new-chapters";
 import { syncConfig } from "@/lib/config-sync";
@@ -10,6 +11,8 @@ import { loadSettings, saveCachedConfig, updateSettings } from "@/lib/settings";
 import { syncReaderScripts } from "@/lib/sites";
 import { createStore } from "@/lib/storage";
 import { createStreamStates, createTabStates } from "@/lib/tab-states";
+
+const PAGE_TIMEOUT_MS = 20_000;
 
 export default defineBackground(() => {
   const store = createStore(browser.storage.local);
@@ -77,9 +80,12 @@ export default defineBackground(() => {
       await checkNewChapters({
         store,
         api,
-        // A plain GET without cookies or extra headers; nothing that would get past a bot check.
-        fetchPage: (url) => fetch(url, { credentials: "omit", cache: "no-store", referrerPolicy: "no-referrer" }),
+        // A plain GET without cookies or extra headers; nothing that would get past a bot check. The
+        // timeout ends a hanging site before Chrome stops the worker (after 30 s).
+        fetchPage: (url) =>
+          fetch(url, { credentials: "omit", cache: "no-store", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(PAGE_TIMEOUT_MS) }),
         permissions: { contains: (request) => browser.permissions.contains(request) },
+        isOnline: () => navigator.onLine,
         now: Date.now,
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         onUnauthorized: () => void onUnauthorized(),
@@ -89,9 +95,10 @@ export default defineBackground(() => {
     }
   };
 
-  void browser.alarms.create("flush", { periodInMinutes: 1 });
-  void browser.alarms.create("config", { periodInMinutes: 15 });
-  void browser.alarms.create("new-chapters", { delayInMinutes: 5, periodInMinutes: 60 });
+  // Created only when missing: the worker starts on every wake-up, and re-creating would push them back.
+  void ensureAlarm(browser.alarms, "flush", { periodInMinutes: 1 });
+  void ensureAlarm(browser.alarms, "config", { periodInMinutes: 15 });
+  void ensureAlarm(browser.alarms, "new-chapters", { delayInMinutes: 5, periodInMinutes: 60 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "flush") void outbox.flush();
     if (alarm.name === "config") void sync();

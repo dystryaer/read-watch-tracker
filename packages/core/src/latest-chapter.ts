@@ -5,7 +5,8 @@ import type { SiteRule } from "./site-rule";
 
 /** Pages beyond this are not read (SPEC §7.11). */
 export const MAX_SERIES_PAGE_LENGTH = 2 * 1024 * 1024;
-const MAX_LINKS = 5000;
+// Bounds the URL parsing; long chapter lists (2000 chapters × several links each) still fit.
+const MAX_LINKS = 50_000;
 const HREF = /\bhref\s*=\s*(?:"([^"<>]{1,2048})"|'([^'<>]{1,2048})')/gi;
 // Markers of interstitial bot checks; such a page is skipped, never worked around.
 const CHALLENGE_MARKERS = [
