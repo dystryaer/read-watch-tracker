@@ -22,7 +22,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T04 Serienschlüssel + URL-Erkennung + Seitenregeln** · M · Abh. T01
   Akz.: `normalizeSeriesKey` (Hash-Suffix weg); `SiteRule`-Schema (Pattern ≤ 200, Regex muss kompilieren); `detectChapterFromUrl(url, title, rule?)` generisch + mit Regel; Titelbereinigung („Chapter N“, Seitenname); URL > 2048 → keine Erkennung · Dateien: `series-key.ts`, `site-rule.ts`, `detect-url.ts` + Tests
 
-- [ ] **T05 „Weiterlesen“-URL + `safeHref`** · S · Abh. T04
+- [x] **T05 „Weiterlesen“-URL + `safeHref`** · S · Abh. T04
   Akz.: Template → generisch (Kapitelnummer genau einmal im letzten Segment) → `last_url`; aktuelle Domain bei Umzug; `safeHref` lässt nur http/https durch · Dateien: `next-url.ts`, `safe-url.ts` + Tests
 
 ### Phase B – DB + Server

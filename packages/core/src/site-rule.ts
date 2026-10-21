@@ -12,6 +12,10 @@ const NESTED_QUANTIFIER = /\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)\s*[+*{]/;
 
 const HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
 
+export function isHostname(value: string): boolean {
+  return HOSTNAME.test(value);
+}
+
 /** Rule patterns run case-insensitively on the URL path; invalid patterns yield null. */
 export function compileRulePattern(pattern: string, flags = "i"): RegExp | null {
   if (pattern.length > MAX_PATTERN_LENGTH) return null;
