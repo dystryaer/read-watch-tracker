@@ -1,3 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Dependency install scripts stay disabled; esbuild works from its prebuilt optional package.
+allowBuilds:
+  esbuild: false
