@@ -104,7 +104,13 @@ describe("recordLatestChapters", () => {
   it("stores the newest chapter at the linked work and ignores unknown series", async () => {
     const source = await asura();
     const work = await seedWork(handle.db, { title: "Solo Leveling", chapter: 200 });
-    await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: "solo-leveling", externalTitle: "Solo Leveling" });
+    await seedLink(handle.db, {
+      workId: work.id,
+      sourceId: source.id,
+      externalKey: "solo-leveling",
+      externalTitle: "Solo Leveling",
+      seriesUrl: "https://asuracomic.net/series/solo-leveling",
+    });
 
     const updated = await recordLatestChapters(
       handle.db,
@@ -121,10 +127,37 @@ describe("recordLatestChapters", () => {
     expect(stored).toMatchObject({ latestChapter: 203, latestChapterAt: NOW, chapter: 200 });
   });
 
+  it("only writes to works being read through an enabled website, whatever a stolen token sends", async () => {
+    const source = await asura();
+    const kindle = await seedSource(handle.db, { key: "kindle", kind: "app" });
+    const done = await seedWork(handle.db, { title: "Done", chapter: 200, status: "completed" });
+    const book = await seedWork(handle.db, { title: "Book", type: "ebook", percent: 40 });
+    await seedLink(handle.db, { workId: done.id, sourceId: source.id, externalKey: "done", externalTitle: "Done", seriesUrl: "https://asuracomic.net/series/done" });
+    await seedLink(handle.db, { workId: book.id, sourceId: kindle.id, externalKey: "B08FHBV4ZX", externalTitle: "Book" });
+
+    const updated = await recordLatestChapters(
+      handle.db,
+      [
+        { sourceKey: "site:asura", externalKey: "done", latestChapter: 99999 },
+        { sourceKey: "kindle", externalKey: "B08FHBV4ZX", latestChapter: 99999 },
+      ],
+      NOW,
+    );
+
+    expect(updated).toBe(0);
+    expect((await handle.db.select().from(works)).map((work) => work.latestChapter)).toEqual([null, null]);
+  });
+
   it("takes the value the page shows now, also when it is lower", async () => {
     const source = await asura();
     const work = await seedWork(handle.db, { title: "Solo Leveling", chapter: 200, latestChapter: 210 });
-    await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: "solo-leveling", externalTitle: "Solo Leveling" });
+    await seedLink(handle.db, {
+      workId: work.id,
+      sourceId: source.id,
+      externalKey: "solo-leveling",
+      externalTitle: "Solo Leveling",
+      seriesUrl: "https://asuracomic.net/series/solo-leveling",
+    });
 
     await recordLatestChapters(handle.db, [{ sourceKey: "site:asura", externalKey: "solo-leveling", latestChapter: 205 }], NOW);
 

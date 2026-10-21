@@ -19,6 +19,9 @@ const LIST_MAX_AGE_MS = 6 * HOUR;
 const CHECK_EVERY_MS = DAY;
 const BACK_OFF_MS = 7 * DAY;
 const MAX_PER_RUN = 10;
+// Several series on one site are spread over the hours: fewer requests in a row than a bot check reacts to.
+const MAX_PER_HOST_PER_RUN = 3;
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const MAX_PENDING = 100;
 const PAUSE_MS = 3000;
 
@@ -75,14 +78,22 @@ export async function checkNewChapters(deps: NewChapterDeps): Promise<{ checked:
   const sites = (await loadCachedConfig(deps.store))?.config.sites ?? [];
   const schedule = await deps.store.read(SCHEDULE_KEY, Schedule, {});
   const now = deps.now();
-  // An entry for another URL (after a domain move) does not hold the series back.
+  // An entry for another URL (after a domain move) does not hold the series back, and neither does
+  // one further ahead than any back-off (a clock that once jumped forward).
   const entryOf = (series: Series) => {
     const entry = schedule[keyOf(series)];
-    return entry?.url === series.seriesUrl ? entry : undefined;
+    return entry?.url === series.seriesUrl && entry.next <= now + BACK_OFF_MS ? entry : undefined;
   };
+  const perHost = new Map<string, number>();
   const due = list
     .filter((series) => (entryOf(series)?.next ?? 0) <= now)
     .sort((a, b) => (entryOf(a)?.next ?? 0) - (entryOf(b)?.next ?? 0))
+    .filter((series) => {
+      const host = normalizeDomain(parseHttpUrl(series.seriesUrl)?.hostname ?? "");
+      const count = perHost.get(host) ?? 0;
+      perHost.set(host, count + 1);
+      return count < MAX_PER_HOST_PER_RUN;
+    })
     .slice(0, MAX_PER_RUN);
 
   const found: LatestChapterItem[] = [];
@@ -95,7 +106,7 @@ export async function checkNewChapters(deps: NewChapterDeps): Promise<{ checked:
     await deps.store.write(SCHEDULE_KEY, schedule);
 
     checked++;
-    const result = await checkSeries(deps, series, sites);
+    const result = await checkSeries(deps, series, sites).catch((): CheckResult => AGAIN_TOMORROW);
     if (result === "offline") {
       // Due again as before: being offline is no reason to wait.
       schedule[key] = before ?? { url: series.seriesUrl, next: 0 };
@@ -127,7 +138,8 @@ async function deliver(deps: NewChapterDeps, apiUrl: string, token: string, foun
     return items.length;
   }
   if (sent.kind === "unauthorized") deps.onUnauthorized();
-  await deps.store.write(PENDING_KEY, items);
+  // Refused for good (4xx): sending them again would not help.
+  await deps.store.write(PENDING_KEY, sent.kind === "rejected" ? [] : items);
   return 0;
 }
 
@@ -153,7 +165,8 @@ const BACK_OFF: CheckResult = { latest: null, nextIn: BACK_OFF_MS };
 
 async function checkSeries(deps: NewChapterDeps, series: Series, sites: readonly SiteRule[]): Promise<CheckResult> {
   const url = parseHttpUrl(series.seriesUrl);
-  if (!url) return AGAIN_TOMORROW;
+  // https only, plain http only on this machine: an http page could be rewritten on the way.
+  if (!url || (url.protocol !== "https:" && !LOCAL_HOSTS.has(url.hostname))) return AGAIN_TOMORROW;
   const host = normalizeDomain(url.hostname);
   // Only sites I enabled, and only with the host permission the extension already holds.
   const rule = sites.find((site) => site.sourceKey === series.sourceKey && site.domains.includes(host));
@@ -167,11 +180,20 @@ async function checkSeries(deps: NewChapterDeps, series: Series, sites: readonly
     return deps.isOnline() ? AGAIN_TOMORROW : "offline";
   }
   const finalUrl = parseHttpUrl(response.url) ?? url;
-  if (response.status !== 200 || (response.redirected && normalizeDomain(finalUrl.hostname) !== host)) return BACK_OFF;
+  // Redirects are not followed (fetchPage asks for "manual"); one arrives as an opaque redirect
+  // with status 0. The check after it covers a fetch that followed one anyway.
+  if (response.status !== 200 || response.type === "opaqueredirect") return BACK_OFF;
+  if (response.redirected && normalizeDomain(finalUrl.hostname) !== host) return BACK_OFF;
   if (!(response.headers.get("content-type") ?? "").toLowerCase().includes("text/html")) return BACK_OFF;
   if (Number(response.headers.get("content-length") ?? 0) > MAX_SERIES_PAGE_LENGTH) return BACK_OFF;
 
-  const html = await readText(response, MAX_SERIES_PAGE_LENGTH).catch(() => null);
+  let html: string | null;
+  try {
+    html = await readText(response, MAX_SERIES_PAGE_LENGTH);
+  } catch {
+    // The connection broke (or the timeout hit) while the page loaded.
+    return deps.isOnline() ? AGAIN_TOMORROW : "offline";
+  }
   // A bot check is skipped, never worked around (SPEC §16).
   if (html === null || looksLikeChallenge(html)) return BACK_OFF;
   return { latest: latestChapterIn(html, finalUrl.href, series.externalKey, rule), nextIn: CHECK_EVERY_MS };

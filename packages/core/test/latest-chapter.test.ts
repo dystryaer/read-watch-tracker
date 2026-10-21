@@ -63,6 +63,19 @@ describe("latestChapterIn (SPEC §7.11)", () => {
     expect(latestChapterIn(`<a href="chapter-204">204</a>`, `${SERIES}/`, "solo-leveling")).toBe(204);
   });
 
+  it("stops after its time budget and keeps what it found, so a slow site rule cannot stall the extension", () => {
+    const html = Array.from({ length: 50 }, (_, index) => `<a href="/series/solo-leveling/chapter-${index + 1}">x</a>`).join("");
+    let time = 0;
+    expect(latestChapterIn(html, SERIES, "solo-leveling", undefined, { budgetMs: 5, now: () => time++ })).toBe(5);
+  });
+
+  it("checks each link only once and skips links without a number", () => {
+    let calls = 0;
+    const html = `${`<a href="/series/solo-leveling/chapter-7">x</a>`.repeat(100)}${`<a href="/about">a</a>`.repeat(100)}`;
+    expect(latestChapterIn(html, SERIES, "solo-leveling", undefined, { budgetMs: 1000, now: () => (calls++, 0) })).toBe(7);
+    expect(calls).toBeLessThan(5);
+  });
+
   it("does not read oversized pages", () => {
     const html = `<a href="/series/solo-leveling/chapter-200">200</a>${" ".repeat(2 * 1024 * 1024)}`;
     expect(latestChapterIn(html, SERIES, "solo-leveling")).toBeNull();

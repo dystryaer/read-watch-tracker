@@ -140,13 +140,11 @@ export const SeriesWatchResponse = z.object({
 });
 export type SeriesWatchResponse = z.infer<typeof SeriesWatchResponse>;
 
-/** M4: what the series pages show now; never changes a reading position. */
-export const LatestChaptersRequest = z.object({
-  items: z
-    .array(z.object({ sourceKey: SourceKey, externalKey: cleanText(MAX_TEXT_LENGTH), latestChapter: ChapterNumber }))
-    .min(1)
-    .max(100),
-});
+/** M4: what one series page shows now; never changes a reading position. */
+export const LatestChapterItem = z.object({ sourceKey: SourceKey, externalKey: cleanText(MAX_TEXT_LENGTH), latestChapter: ChapterNumber });
+export const LatestChaptersRequest = z.object({ items: z.array(LatestChapterItem).min(1).max(100) });
+/** The envelope alone: the server checks each item on its own and skips broken ones (like `/events`). */
+export const LatestChaptersEnvelope = z.object({ items: z.array(z.unknown()).min(1).max(100) });
 export type LatestChaptersRequest = z.infer<typeof LatestChaptersRequest>;
 export const LatestChaptersResponse = z.object({ updated: z.number().int().min(0) });
 

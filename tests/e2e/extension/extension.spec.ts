@@ -272,7 +272,7 @@ test("new chapters: an enabled series page is checked without cookies and its ne
   await worker.evaluate(() => chrome.alarms.create("new-chapters", { when: Date.now() + 100 }));
 
   await expect.poll(() => api.latestChapters, { timeout: 15_000 }).toContainEqual({ sourceKey: "site:fixture", externalKey: "solo-leveling", latestChapter: 205 });
-  expect(site.seriesRequests).toEqual([{ path: "/manga/solo-leveling", cookie: undefined }]);
+  expect(site.seriesRequests).toEqual([{ path: "/manga/solo-leveling", cookie: undefined, referer: undefined, origin: undefined }]);
 });
 
 test("events read while the tracker is unreachable are delivered later, once", async () => {

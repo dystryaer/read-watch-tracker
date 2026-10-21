@@ -101,8 +101,8 @@ function seriesPage(series: string, latest: number): string {
 
 export interface FixtureSite {
   port: number;
-  /** Requests for series pages (M4), with the cookie header they carried. */
-  seriesRequests: { path: string; cookie: string | undefined }[];
+  /** Requests for series pages (M4), with the headers that could identify me. */
+  seriesRequests: { path: string; cookie: string | undefined; referer: string | undefined; origin: string | undefined }[];
   close(): Promise<void>;
 }
 
@@ -116,7 +116,7 @@ export async function startFixtureSite(): Promise<FixtureSite> {
     if (request.url === "/about") return response.writeHead(200, { "content-type": "text/html" }).end("<p>About</p>");
     const seriesOnly = /^\/manga\/([a-z-]+)$/.exec(request.url ?? "");
     if (seriesOnly?.[1]) {
-      seriesRequests.push({ path: request.url ?? "", cookie: request.headers.cookie });
+      seriesRequests.push({ path: request.url ?? "", cookie: request.headers.cookie, referer: request.headers.referer, origin: request.headers.origin });
       return response.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(seriesPage(seriesOnly[1], 205));
     }
     const paged = /^\/paged\/([a-z-]+)\/chapter-(\d+)$/.exec(request.url ?? "");

@@ -83,7 +83,14 @@ export default defineBackground(() => {
         // A plain GET without cookies or extra headers; nothing that would get past a bot check. The
         // timeout ends a hanging site before Chrome stops the worker (after 30 s).
         fetchPage: (url) =>
-          fetch(url, { credentials: "omit", cache: "no-store", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(PAGE_TIMEOUT_MS) }),
+          fetch(url, {
+            credentials: "omit",
+            cache: "no-store",
+            referrerPolicy: "no-referrer",
+            // A redirect could lead to any host, even into the home network: it is not followed.
+            redirect: "manual",
+            signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
+          }),
         permissions: { contains: (request) => browser.permissions.contains(request) },
         isOnline: () => navigator.onLine,
         now: Date.now,

@@ -7,7 +7,11 @@ const WINDOW_MS = 400 * 86_400_000;
 // (season, episode) as one sortable number, so the highest episode so far is a plain max().
 const SEASON_FACTOR = 100_000;
 
-const toNumber = (value: unknown): number | null => (value === null || value === undefined ? null : Number(value));
+// Raw window values; a tampered numeric 'NaN' must not end up in the counts.
+const toNumber = (value: unknown): number | null => {
+  const number = value === null || value === undefined ? Number.NaN : Number(value);
+  return Number.isFinite(number) ? number : null;
+};
 
 /**
  * The statistics page (SPEC §4.8): chapters and episodes per week and month, each applied event

@@ -404,12 +404,35 @@ describe("new chapter endpoints (M4, SPEC §7.11)", () => {
     expect(await response.json()).toEqual({ updated: 1 });
   });
 
+  it("skips a broken item instead of refusing the whole report", async () => {
+    await readingSoloLeveling();
+    const response = await handleLatestChapters(
+      post("/api/v1/latest-chapters", {
+        items: [
+          { sourceKey: "site:asura", externalKey: "   ", latestChapter: 5 },
+          { sourceKey: "site:asura", externalKey: "solo-leveling", latestChapter: 203 },
+        ],
+      }),
+      context,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ updated: 1 });
+  });
+
   it.each([
-    ["a chapter with three decimals", { items: [{ sourceKey: "site:asura", externalKey: "x", latestChapter: 1.234 }] }],
-    ["a chapter beyond the position range", { items: [{ sourceKey: "site:asura", externalKey: "x", latestChapter: 100_000 }] }],
+    ["a chapter with three decimals", { sourceKey: "site:asura", externalKey: "x", latestChapter: 1.234 }],
+    ["a chapter beyond the position range", { sourceKey: "site:asura", externalKey: "x", latestChapter: 100_000 }],
+    ["a bad source key", { sourceKey: "Site Asura", externalKey: "x", latestChapter: 1 }],
+  ])("takes nothing from an item with %s", async (_name, item) => {
+    const response = await handleLatestChapters(post("/api/v1/latest-chapters", { items: [item] }), context);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ updated: 0 });
+  });
+
+  it.each([
     ["an empty list", { items: [] }],
     ["more than 100 items", { items: Array.from({ length: 101 }, () => ({ sourceKey: "site:asura", externalKey: "x", latestChapter: 1 })) }],
-    ["a bad source key", { items: [{ sourceKey: "Site Asura", externalKey: "x", latestChapter: 1 }] }],
+    ["no list", { latestChapter: 1 }],
   ])("refuses %s", async (_name, body) => {
     expect((await handleLatestChapters(post("/api/v1/latest-chapters", body), context)).status).toBe(400);
   });

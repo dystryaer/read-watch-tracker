@@ -47,7 +47,11 @@ export async function seriesToWatch(db: Db): Promise<WatchedSeries[]> {
   });
 }
 
-/** Stores what the series pages show now at the linked works; returns how many works it updated. */
+/**
+ * Stores what the series pages show now at the linked works; returns how many works it updated.
+ * Only works that series-watch could have listed are written: a stolen extension token cannot put
+ * badges on finished works or app books.
+ */
 export async function recordLatestChapters(db: Db, items: readonly LatestChapter[], now = new Date()): Promise<number> {
   return db.transaction(async (tx) => {
     let updated = 0;
@@ -56,7 +60,18 @@ export async function recordLatestChapters(db: Db, items: readonly LatestChapter
         .select({ workId: workLinks.workId })
         .from(workLinks)
         .innerJoin(sources, eq(sources.id, workLinks.sourceId))
-        .where(and(eq(sources.key, item.sourceKey), eq(workLinks.externalKey, item.externalKey)));
+        .innerJoin(works, eq(works.id, workLinks.workId))
+        .where(
+          and(
+            eq(sources.key, item.sourceKey),
+            eq(workLinks.externalKey, item.externalKey),
+            eq(sources.kind, "website"),
+            eq(sources.trackingEnabled, true),
+            isNotNull(workLinks.seriesUrl),
+            eq(works.status, "reading"),
+            isNotNull(works.chapter),
+          ),
+        );
       if (!link) continue;
       await tx.update(works).set({ latestChapter: item.latestChapter, latestChapterAt: now }).where(eq(works.id, link.workId));
       updated++;

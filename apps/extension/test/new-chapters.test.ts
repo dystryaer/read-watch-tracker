@@ -12,7 +12,7 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const paired = { apiUrl: "https://tracker.example", deviceToken: "T".repeat(43), deviceName: "Brave", pairing: null };
 const config: DeviceConfig = {
-  sites: [{ sourceKey: "site:asura", domains: ["asuracomic.net", "asurascans.com"] }],
+  sites: [{ sourceKey: "site:asura", domains: ["asuracomic.net", "asurascans.com", "host0.example", "host1.example", "host2.example", "host3.example"] }],
   thresholds: { scrollDepthPercent: 60, watchedPercent: 85 },
 };
 type Series = SeriesWatchResponse["series"][number];
@@ -108,7 +108,7 @@ describe("checkNewChapters (SPEC §7.11)", () => {
   });
 
   it("checks at most 10 series per run, one after another with 3 s pause", async () => {
-    const many = Array.from({ length: 12 }, (_, index) => watched(`series-${index}`));
+    const many = Array.from({ length: 12 }, (_, index) => watched(`series-${index}`, 200, `host${index % 4}.example`));
     const { deps } = await setup(many);
 
     await checkNewChapters(deps);
@@ -119,7 +119,7 @@ describe("checkNewChapters (SPEC §7.11)", () => {
   });
 
   it("checks never-checked series first, so the end of a long list is not starved", async () => {
-    const many = Array.from({ length: 12 }, (_, index) => watched(`series-${index}`));
+    const many = Array.from({ length: 12 }, (_, index) => watched(`series-${index}`, 200, `host${index % 4}.example`));
     const { deps, advance } = await setup(many);
 
     await checkNewChapters(deps);
@@ -179,16 +179,74 @@ describe("checkNewChapters (SPEC §7.11)", () => {
     expect(deps.fetchPage).toHaveBeenCalledTimes(2);
   });
 
-  it("follows a redirect within the same site and reads links against the final page", async () => {
+  it("asks the browser not to follow redirects, and skips one: it could lead anywhere, even into my home network", async () => {
     const solo = watched("solo-leveling");
-    const { deps } = await setup([solo], {
-      [solo.seriesUrl]: () => html(`<a href="chapter-204">Chapter 204</a>`, { redirectedTo: "https://www.asuracomic.net/series/solo-leveling/" }),
-    });
+    const opaque = html("");
+    Object.defineProperty(opaque, "status", { value: 0 });
+    Object.defineProperty(opaque, "type", { value: "opaqueredirect" });
+    const { deps } = await setup([solo], { [solo.seriesUrl]: () => opaque });
+
+    expect(await checkNewChapters(deps)).toEqual({ checked: 1, reported: 0 });
+    expect(deps.fetchPage).toHaveBeenCalledWith(solo.seriesUrl);
+  });
+
+  it("checks only https pages (plain http only on this machine)", async () => {
+    const insecure: Series = { ...watched("solo-leveling"), seriesUrl: "http://asuracomic.net/series/solo-leveling" };
+    const { deps } = await setup([insecure]);
+
+    await checkNewChapters(deps);
+
+    expect(deps.fetchPage).not.toHaveBeenCalled();
+  });
+
+  it("sends at most 3 requests to one site per run", async () => {
+    const asura = Array.from({ length: 5 }, (_, index) => watched(`asura-${index}`));
+    const scans = Array.from({ length: 2 }, (_, index) => watched(`scans-${index}`, 200, "asurascans.com"));
+    const { deps } = await setup([...asura, ...scans]);
+
+    await checkNewChapters(deps);
+
+    const hosts = fetched(deps).map((url) => new URL(url).hostname);
+    expect(hosts.filter((host) => host === "asuracomic.net")).toHaveLength(3);
+    expect(hosts.filter((host) => host === "asurascans.com")).toHaveLength(2);
+  });
+
+  it("treats a schedule entry far in the future as due: a clock that once jumped ahead does not stop the checks", async () => {
+    const solo = watched("solo-leveling");
+    const { deps } = await setup([solo], { [solo.seriesUrl]: () => html(listing("solo-leveling", 203)) });
+    await deps.store.write("newChapterSchedule", { "site:asura|solo-leveling": { url: solo.seriesUrl, next: 1_000_000_000 + 365 * DAY } });
 
     expect(await checkNewChapters(deps)).toEqual({ checked: 1, reported: 1 });
-    expect(deps.api.postLatestChapters).toHaveBeenCalledWith(expect.any(String), expect.any(String), [
-      { sourceKey: "site:asura", externalKey: "solo-leveling", latestChapter: 204 },
-    ]);
+  });
+
+  it("tries again tomorrow when the connection breaks while the page loads", async () => {
+    const solo = watched("solo-leveling");
+    const broken = () =>
+      html(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.error(new TypeError("network error"));
+          },
+        }),
+      );
+    const { deps, advance } = await setup([solo], { [solo.seriesUrl]: broken });
+
+    expect(await checkNewChapters(deps)).toEqual({ checked: 1, reported: 0 });
+    advance(DAY + HOUR);
+    await checkNewChapters(deps);
+    expect(deps.fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops results the tracker refuses for good instead of sending them forever", async () => {
+    const solo = watched("solo-leveling");
+    const { deps, advance } = await setup([solo], { [solo.seriesUrl]: () => html(listing("solo-leveling", 203)) });
+    deps.api.postLatestChapters.mockResolvedValueOnce({ ok: false, kind: "rejected", message: "Server lehnt ab (400)", status: 400 });
+
+    await checkNewChapters(deps);
+    advance(HOUR);
+    await checkNewChapters(deps);
+
+    expect(deps.api.postLatestChapters).toHaveBeenCalledTimes(1);
   });
 
   it("tries again the next day when a site does not answer, not after 7 days", async () => {

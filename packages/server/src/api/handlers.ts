@@ -4,7 +4,8 @@ import {
   EnableSourceRequest,
   IgnoreSeriesRequest,
   type EventResult,
-  LatestChaptersRequest,
+  LatestChapterItem,
+  LatestChaptersEnvelope,
   type SeriesWatchResponse,
   PairingPollRequest,
   PairingStartRequest,
@@ -206,9 +207,14 @@ export async function handleLatestChapters(request: Request, context: ApiContext
 
   const body = await readJsonBody(request, MAX_LATEST_BODY_BYTES);
   if (!body.ok) return body.response;
-  const input = LatestChaptersRequest.safeParse(body.value);
+  const input = LatestChaptersEnvelope.safeParse(body.value);
   if (!input.success) return errorResponse("invalid_request", 400);
-  return jsonResponse({ updated: await recordLatestChapters(context.db, input.data.items, context.now?.()) });
+  // One broken item must not make the extension resend the whole batch forever.
+  const items = input.data.items.flatMap((raw) => {
+    const item = LatestChapterItem.safeParse(raw);
+    return item.success ? [item.data] : [];
+  });
+  return jsonResponse({ updated: await recordLatestChapters(context.db, items, context.now?.()) });
 }
 
 // The iOS shortcut shows `message` to the user as it is (SPEC §9.6: understandable errors).

@@ -21,28 +21,48 @@ const CHALLENGE_MARKERS = [
 ];
 const CHALLENGE_SCAN_LENGTH = 32 * 1024;
 
+/** Detection runs at most this long per page: a slow site rule must not stall the extension. */
+const DEFAULT_BUDGET_MS = 1000;
+const MAX_CANDIDATE_PATH_LENGTH = 512;
+const HAS_DIGIT = /\d/;
+
 /**
  * The newest chapter a series page links to (SPEC §7.11), read without a DOM: every `href` on the
  * same site is checked with the chapter detection (and the site rule) of the reader, and the
  * highest chapter of this series wins. Null when the page lists none, e.g. it loads them by script.
+ * Each link is checked once, links without a number are skipped, and after the time budget the
+ * highest chapter found so far is returned.
  */
-export function latestChapterIn(html: string, pageUrl: string, externalKey: string, rule?: SiteRule): number | null {
+export function latestChapterIn(
+  html: string,
+  pageUrl: string,
+  externalKey: string,
+  rule?: SiteRule,
+  { budgetMs = DEFAULT_BUDGET_MS, now = Date.now }: { budgetMs?: number; now?: () => number } = {},
+): number | null {
   const page = parseHttpUrl(pageUrl);
   if (!page || html.length > MAX_SERIES_PAGE_LENGTH) return null;
   const site = normalizeDomain(page.hostname);
+  const deadline = now() + budgetMs;
 
   let latest: number | null = null;
   let links = 0;
+  const seen = new Set<string>();
   for (const match of html.matchAll(HREF)) {
     if (++links > MAX_LINKS) break;
     const href = (match[1] ?? match[2] ?? "").replaceAll("&amp;", "&");
+    if (!HAS_DIGIT.test(href)) continue;
     let url: URL;
     try {
       url = new URL(href, page);
     } catch {
       continue;
     }
+    const path = url.pathname + url.search;
+    if (path.length > MAX_CANDIDATE_PATH_LENGTH || seen.has(path)) continue;
+    seen.add(path);
     if (!parseHttpUrl(url.href) || normalizeDomain(url.hostname) !== site) continue;
+    if (now() > deadline) break;
     const detection = detectChapterFromUrl(url, "", rule);
     if (detection?.seriesKey !== externalKey) continue;
     latest = latest === null ? detection.chapter : Math.max(latest, detection.chapter);
