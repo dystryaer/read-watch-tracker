@@ -33,7 +33,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T07 Ingest-Pipeline** · M · Abh. T03, T06
   Akz.: SPEC §5.3 Schritte 1–7 (Idempotenz, Quelle über Key/Domain, Link, Wiedererkennung, ignoriert, Pending mit Trigram-Kandidaten, Fortschritt); Ergebnis pro Event · Dateien: `apps/web/src/server/ingest.ts` + Integrationstests (PGlite)
 
-- [ ] **T08 Zuordnungen auflösen + Replay** · S · Abh. T07
+- [x] **T08 Zuordnungen auflösen + Replay** · S · Abh. T07
   Akz.: `linked` / `new_work` / `ignored`; wartende Events in Zeitreihenfolge anwenden; Sammelbestätigung ≥ 0.9 · Prüfung: Integrationstests
 
 - [ ] **T09 Geräte, Kopplung, Tokens** · S · Abh. T06

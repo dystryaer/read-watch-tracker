@@ -6,7 +6,8 @@ export type Work = typeof works.$inferSelect;
 
 export interface ProgressUpdate {
   position: Position;
-  kind: EventKind;
+  // "manual" comes from the web UI (SPEC §5.3) and is stored, but never sent by devices.
+  kind: EventKind | "manual";
   sourceId: string;
   url: string | null;
   occurredAt: Date;
