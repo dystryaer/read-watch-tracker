@@ -58,6 +58,12 @@ describe("classifySender", () => {
     });
   });
 
+  it("recognizes the options page opened in a tab as an extension page", () => {
+    expect(
+      classifySender({ id: EXTENSION_ID, tab: { id: 9 }, url: `chrome-extension://${EXTENSION_ID}/options.html` }, EXTENSION_ID),
+    ).toEqual({ kind: "page" });
+  });
+
   it("rejects messages from other extensions", () => {
     expect(classifySender({ id: "otherextensionidotherextensionid", tab: { id: 7 } }, EXTENSION_ID)).toEqual({ kind: "foreign" });
   });

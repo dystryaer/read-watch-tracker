@@ -12,3 +12,4 @@ next-env.d.ts
 .wxt/
 test-results/
 playwright-report/
+.output-e2e/

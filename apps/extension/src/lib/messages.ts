@@ -54,13 +54,14 @@ interface SenderLike {
 export type SenderKind = { kind: "content"; tabId: number } | { kind: "page" } | { kind: "foreign" };
 
 /**
- * Who sent a runtime message. Content scripts come with a tab; the popup and options pages have no
- * tab and an extension URL. Anything else, including other extensions, is foreign and ignored.
+ * Who sent a runtime message. The browser sets `sender.url` to the sending frame, so a page cannot
+ * fake it: our own popup and options pages (also when opened in a tab) have an extension URL,
+ * content scripts the URL of the web page and a tab. Anything else is foreign and ignored.
  */
 export function classifySender(sender: SenderLike, extensionId: string): SenderKind {
   if (sender.id !== extensionId) return { kind: "foreign" };
-  if (sender.tab?.id !== undefined) return { kind: "content", tabId: sender.tab.id };
   if (sender.url?.startsWith(`chrome-extension://${extensionId}/`)) return { kind: "page" };
+  if (sender.tab?.id !== undefined) return { kind: "content", tabId: sender.tab.id };
   return { kind: "foreign" };
 }
 

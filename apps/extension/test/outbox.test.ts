@@ -88,6 +88,19 @@ describe("Outbox", () => {
     expect(last.events).toHaveLength(1);
   });
 
+  it("sends at once on a manual sync, even while backing off", async () => {
+    let fail = true;
+    const post = vi.fn(async (events: { id: string }[]) => (fail ? { ok: false as const, kind: "retry" as const, message: "x" } : acceptAll(events)));
+    const { outbox } = setup(post);
+    await outbox.enqueue(event(1));
+    await outbox.flush();
+    fail = false;
+
+    const result = await outbox.flush({ force: true });
+
+    expect(result).toEqual({ sent: 1, remaining: 0 });
+  });
+
   it("honours a Retry-After from the server", async () => {
     const { outbox } = setup(async () => ({ ok: false, kind: "retry", message: "rate limited", retryAfterMs: 60_000 }));
     await outbox.enqueue(event(1));

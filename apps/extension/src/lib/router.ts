@@ -162,8 +162,11 @@ export function createRouter(deps: RouterDeps) {
 
   async function handlePage(message: ExtensionPageMessage) {
     switch (message.type) {
-      case "options:sync-now":
-        return { ok: true, result: await deps.sync() };
+      case "options:sync-now": {
+        const result = await deps.sync();
+        await deps.outbox.flush({ force: true });
+        return { ok: true, result };
+      }
 
       case "options:backfill": {
         const current = await config();

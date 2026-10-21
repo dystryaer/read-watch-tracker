@@ -65,6 +65,6 @@ export default defineBackground(() => {
   });
   // New or removed credentials (pairing in the options page, revocation): resync and send.
   browser.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && "settings" in changes) void sync().then(() => outbox.flush());
+    if (area === "local" && "settings" in changes) void sync().then(() => outbox.flush({ force: true }));
   });
 });

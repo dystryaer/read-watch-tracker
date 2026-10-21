@@ -64,11 +64,13 @@ export class Outbox {
     });
   }
 
-  flush(): Promise<{ sent: number; remaining: number }> {
+  /** `force` (a manual "sync now", new credentials) skips the backoff wait. */
+  flush({ force = false }: { force?: boolean } = {}): Promise<{ sent: number; remaining: number }> {
     return this.exclusive(async () => {
       const state = await this.load();
       const now = this.options.now();
-      if (state.events.length === 0 || (state.nextAttemptAt !== null && state.nextAttemptAt > now)) {
+      const waiting = !force && state.nextAttemptAt !== null && state.nextAttemptAt > now;
+      if (state.events.length === 0 || waiting) {
         return { sent: 0, remaining: state.events.length };
       }
 
