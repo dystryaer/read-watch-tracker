@@ -158,7 +158,10 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
   Akz.: `docs/setup-iphone.md` (Kurzbefehl Schritt für Schritt), `docs/spikes/s2-webnovel.md`, `s3-kindle.md`, `docs/testing/iphone-checkliste.md`
 
 ### Abnahme M3
-- [ ] volle Testsuite · [ ] Code-Review · [ ] Security-Review · [ ] Befunde behoben
+- [x] volle Testsuite inkl. Gradle · [x] Code-Review · [x] Security-Review · [x] Befunde behoben
+  Stand 2026-10-21: typecheck + lint sauber, 1108 Unit/Integration-Tests (Coverage 92,9 %, core 98,6 %), 26 E2E, 110 JUnit-Tests, Debug-/Release-APK, Android-Lint.
+  Behoben: Login-Limiter reserviert vor der Passwortprüfung; Share-Zahlen streng geprüft, Prüfung vor dem Verbrauchen; Phone-Token nur für `/share…`; jede Share-Antwort mit Meldung; Titel aus Anführungszeichen/Slug, wartende Karte behält ihren Titel; Einheit des verknüpften Werks; `409 share_used`; WebNovel-Hinweis über `sources.last_library_sync_at` und nur für WebNovel-Leser; Listen springen nicht mehr unter dem Finger, ausstehende Speicherungen werden beim Verlassen gesendet, Schritte von veralteten Bildschirmen abgelehnt; Bibliotheks-Karten enthalten genau ein Buch, Einträge einzeln geprüft.
+  Hingenommen: Bibliotheks- und Share-Adapter gegen synthetische Seiten (A10, Spikes S2/S3 offen, inkl. „Latest: Chapter N“-Frage); Telefon-Token im Klartext im Kurzbefehl (Doku warnt, Token nur fürs Teilen); erneutes Bestätigen nennt nicht das erste Ergebnis (nur „Schon gespeichert“); `ShareResponse`/`ShareConfirmResponse` nur als Vertragsdoku.
 
 ---
 
