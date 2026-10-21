@@ -31,10 +31,16 @@ pnpm typecheck
 pnpm lint
 pnpm test --coverage
 pnpm test:e2e
+# Shield-App (in apps/shield, Windows: gradlew.bat)
+./gradlew test assembleDebug
 ```
 
 ## Anleitungen
 
 - [Deployment (Neon + Vercel)](docs/deploy.md)
 - [Browser-Extension einrichten](docs/setup-extension.md)
+- [Nvidia Shield einrichten](docs/setup-shield.md)
+- [iPhone: Schnell-Update und Kurzbefehl „Lesestand“](docs/setup-iphone.md)
 - [Umzug auf einen eigenen Server](docs/server-umzug.md)
+- Spikes auf deinen Geräten: [S1 Shield](docs/spikes/s1-shield-metadata.md), [S2 WebNovel](docs/spikes/s2-webnovel.md), [S3 Kindle](docs/spikes/s3-kindle.md)
+- Manuelle Abnahme: [Shield](docs/testing/shield-checkliste.md), [iPhone](docs/testing/iphone-checkliste.md)
