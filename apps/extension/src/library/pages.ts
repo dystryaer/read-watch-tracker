@@ -12,7 +12,7 @@ const LIBRARY_PAGES: Record<LibraryService, (url: URL) => boolean> = {
   kindle: (url) => url.pathname.startsWith("/kindle-library"),
 };
 
-const CHAPTER = /(?<![\p{L}\d])(?:chapter|chap|ch\.?|kapitel|kap\.?)\s*(\d{1,6})(?!\d)/iu;
+const CHAPTER = /(?<![\p{L}\d])(?:chapter|chap|ch\.?|kapitel|kap\.?)\s*(\d{1,5})(?!\d)/iu;
 const PERCENT = /(?<![\d.,])(\d{1,3}(?:[.,]\d)?)\s*%/u;
 const ASIN = /^[A-Z0-9]{10}$/;
 

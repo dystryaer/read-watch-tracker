@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { cleanText, EventOutcome, HttpUrlSchema, MAX_TEXT_LENGTH, SourceKey } from "./event";
+import { ChapterNumber, cleanText, EventOutcome, HttpUrlSchema, MAX_TEXT_LENGTH, PercentNumber, SourceKey } from "./event";
 import { MAX_URL_LENGTH, parseHttpUrl } from "./safe-url";
 import { SiteRule } from "./site-rule";
 
@@ -98,14 +98,21 @@ export const ShareResponse = z.object({
 export type ShareResponse = z.infer<typeof ShareResponse>;
 
 // Shortcuts may send a number as text, and a German keyboard types a decimal comma.
-const typedNumber = (schema: z.ZodNumber) =>
-  z.preprocess((value) => (typeof value === "string" ? Number(value.trim().replace(",", ".")) : value), schema);
+// Only plain decimals: Number() would also take "", "0x10" or "1e3".
+const TYPED_DECIMAL = /^\d+(?:[.,]\d+)?$/;
+const typedNumber = (schema: z.ZodType<number>) =>
+  z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    const typed = value.trim();
+    return TYPED_DECIMAL.test(typed) ? Number(typed.replace(",", ".")) : Number.NaN;
+  }, schema);
 
+// The same number rules as the positions they become, so a confirmed value always fits an event.
 export const ShareConfirmRequest = z
   .object({
     shareId: z.uuid(),
-    chapter: typedNumber(z.number().min(0).max(99999.99)).optional(),
-    percent: typedNumber(z.number().min(0).max(100)).optional(),
+    chapter: typedNumber(ChapterNumber).optional(),
+    percent: typedNumber(PercentNumber).optional(),
   })
   .refine((confirm) => (confirm.chapter === undefined) !== (confirm.percent === undefined), "exactly one of chapter and percent");
 export type ShareConfirmRequest = z.infer<typeof ShareConfirmRequest>;

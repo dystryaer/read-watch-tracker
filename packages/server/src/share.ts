@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  cleanTextValue,
   knownService,
   MAX_TEXT_LENGTH,
   parseShare,
@@ -49,10 +50,13 @@ async function appSource(db: Db, key: "webnovel" | "kindle"): Promise<Source> {
 
 const unitOf = (key: "webnovel" | "kindle"): Unit => (key === "kindle" ? "percent" : "chapter");
 
-/** A title from the shared text: the link and quotation marks removed ("„Project Hail Mary“ von Andy Weir"). */
+/**
+ * A title from the shared text: cleaned like every other title (no control or bidi characters),
+ * the link and quotation marks removed ("„Project Hail Mary“ von Andy Weir").
+ */
 function titleFromText(text: string | undefined): string | null {
-  const title = (text ?? "").replace(URLS, " ").replace(QUOTES, "").replace(/\s+/g, " ").trim().replace(/[\s:–—-]+$/u, "");
-  return title === "" ? null : title.slice(0, MAX_TEXT_LENGTH);
+  const title = cleanTextValue(cleanTextValue(text ?? "").replace(URLS, " ").replace(QUOTES, "")).replace(/[\s:–—-]+$/u, "");
+  return title === "" ? null : title.slice(0, MAX_TEXT_LENGTH).trim();
 }
 
 async function linkedWork(db: Db, sourceId: string, externalKey: string) {
@@ -104,6 +108,16 @@ export async function confirmShare(db: Db, deviceId: string, input: ShareConfirm
   const value = unit === "chapter" ? input.chapter : input.percent;
   if (value === undefined) throw new ShareValueError();
 
+  // Built before the claim: a value the event schema refuses must not use up the share.
+  const event = ProgressEvent.safeParse({
+    id: randomUUID(),
+    occurredAt: now.toISOString(),
+    kind: "read",
+    source: { key: share.sourceKey, externalKey: share.externalKey, rawTitle: share.rawTitle },
+    position: unit === "chapter" ? { unit: "chapter", chapter: value } : { unit: "percent", percent: value },
+  });
+  if (!event.success) throw new ShareValueError();
+
   // Claimed atomically: a shortcut that sends twice saves once.
   const claimed = await db
     .update(shares)
@@ -112,14 +126,11 @@ export async function confirmShare(db: Db, deviceId: string, input: ShareConfirm
     .returning({ id: shares.id });
   if (claimed.length === 0) throw new ShareNotFoundError();
 
-  const event = ProgressEvent.parse({
-    id: randomUUID(),
-    occurredAt: now.toISOString(),
-    kind: "read",
-    source: { key: share.sourceKey, externalKey: share.externalKey, rawTitle: share.rawTitle },
-    position: unit === "chapter" ? { unit: "chapter", chapter: value } : { unit: "percent", percent: value },
+  const [result] = await ingestEvents(db, deviceId, [event.data], now).catch(async (error: unknown) => {
+    // Nothing was saved, so the shortcut may try again.
+    await db.update(shares).set({ usedAt: null }).where(eq(shares.id, share.id));
+    throw error;
   });
-  const [result] = await ingestEvents(db, deviceId, [event], now);
   const outcome = result?.outcome ?? "rejected";
 
   const source = await appSource(db, share.sourceKey);

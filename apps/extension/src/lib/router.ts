@@ -1,6 +1,7 @@
 import {
   DEFAULT_THRESHOLDS,
   type DeviceConfig,
+  isAppBookKey,
   isServiceUrl,
   knownService,
   normalizeDomain,
@@ -10,12 +11,12 @@ import {
   streamingSeriesKey,
 } from "@rwt/core";
 import { isLibraryPage, type LibraryService, libraryServiceForUrl } from "../library/pages";
-import { type HistoryEntry, isHistoryPage, latestPerSeries } from "../streaming/history";
+import { isHistoryPage, latestPerSeries } from "../streaming/history";
 import { serviceForUrl, type StreamingServiceKey } from "../streaming/services";
 import { deterministicEventId } from "./event-id";
 import type { ApiClient } from "./api-client";
 import { backfillEventId } from "./backfill";
-import { classifySender, ContentMessage, type Detection, ExtensionPageMessage, type LibraryEntry } from "./messages";
+import { classifySender, ContentMessage, type Detection, ExtensionPageMessage, HistoryEntry, LibraryEntry } from "./messages";
 import type { Outbox } from "./outbox";
 import type { RecentReads } from "./recent";
 import { loadCachedConfig, loadSettings } from "./settings";
@@ -122,7 +123,11 @@ export function createRouter(deps: RouterDeps) {
   }
 
   /** library_sync events for a history page: the furthest episode per series, never sent twice in 12 hours. */
-  async function syncLibrary(service: StreamingServiceKey, entries: HistoryEntry[]): Promise<number> {
+  async function syncLibrary(service: StreamingServiceKey, rawEntries: unknown[]): Promise<number> {
+    const entries = rawEntries.flatMap((raw) => {
+      const entry = HistoryEntry.safeParse(raw);
+      return entry.success ? [entry.data] : [];
+    });
     const events: ProgressEvent[] = [];
     for (const { seriesTitle, season, episode, seriesUrl } of latestPerSeries(entries)) {
       const externalKey = streamingSeriesKey(seriesTitle);
@@ -145,18 +150,20 @@ export function createRouter(deps: RouterDeps) {
   }
 
   /** library_sync events for a WebNovel (chapters) or Kindle (percent) library page; other units are skipped. */
-  async function syncAppLibrary(app: LibraryService, entries: LibraryEntry[]): Promise<number> {
+  async function syncAppLibrary(app: LibraryService, rawEntries: unknown[]): Promise<number> {
     const events: ProgressEvent[] = [];
-    for (const { externalKey, title, chapter, percent, seriesUrl } of entries) {
-      const position =
-        app === "webnovel" ? (chapter === undefined ? null : { unit: "chapter", chapter }) : percent === undefined ? null : { unit: "percent", percent };
-      if (!position) continue;
+    for (const raw of rawEntries) {
+      const entry = LibraryEntry.safeParse(raw);
+      if (!entry.success || !isAppBookKey(app, entry.data.externalKey)) continue;
+      const { externalKey, title, chapter, percent, seriesUrl } = entry.data;
+      const value = app === "webnovel" ? chapter : percent;
+      if (value === undefined) continue;
       const event = ProgressEvent.safeParse({
-        id: await deterministicEventId(["library", app, externalKey, chapter ?? percent ?? ""]),
+        id: await deterministicEventId(["library", app, externalKey, value]),
         occurredAt: new Date(now()).toISOString(),
         kind: "library_sync",
         source: { key: app, externalKey, rawTitle: title, ...(seriesUrl && isServiceUrl(app, seriesUrl) ? { seriesUrl } : {}) },
-        position,
+        position: app === "webnovel" ? { unit: "chapter", chapter: value } : { unit: "percent", percent: value },
       });
       if (event.success) events.push(event.data);
     }

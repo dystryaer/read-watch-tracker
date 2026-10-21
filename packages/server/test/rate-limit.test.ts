@@ -40,6 +40,16 @@ describe("RateLimiter", () => {
     expect(limiter.isBlocked("b", 10)).toBe(false);
   });
 
+  it("gives a reserved slot back, so only failed attempts use up the budget", () => {
+    const limiter = new RateLimiter({ limit: 2, windowMs: 1000 });
+    expect(limiter.allow("a", 0)).toBe(true);
+    limiter.release("a");
+    expect(limiter.allow("a", 1)).toBe(true);
+    expect(limiter.allow("a", 2)).toBe(true);
+    expect(limiter.allow("a", 3)).toBe(false);
+    limiter.release("unknown");
+  });
+
   it("forgets idle keys so memory stays bounded", () => {
     const limiter = new RateLimiter({ limit: 1, windowMs: 1000, maxKeys: 2 });
     limiter.allow("a", 0);

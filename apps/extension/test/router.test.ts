@@ -537,6 +537,14 @@ describe("router – history sync", () => {
     expect(queued).toHaveLength(2);
   });
 
+  it("keeps the other series when one history entry is broken", async () => {
+    const { route, queued } = await setup();
+    const broken = { seriesTitle: "", season: 1, episode: 0, seriesUrl: "javascript:alert(1)" };
+
+    expect(await route({ type: "stream:library", url: historyUrl, entries: [broken, ...entries] }, crunchyroll())).toEqual({ ok: true, queued: 2 });
+    expect(queued).toHaveLength(2);
+  });
+
   it.each([
     ["a page that is no streaming service", content()],
     ["a frame inside the page", crunchyroll(historyUrl, 4)],
@@ -590,6 +598,24 @@ describe("router – app libraries (WebNovel, Kindle)", () => {
     await route({ type: "library:sync", url: webnovelLibrary, entries: [shadowSlave] }, sender(webnovelLibrary));
 
     expect(await route({ type: "library:sync", url: webnovelLibrary, entries: [shadowSlave] }, sender(webnovelLibrary))).toEqual({ ok: true, queued: 0 });
+  });
+
+  it("keeps the other books when one entry is broken, so one odd card does not stop the sync", async () => {
+    const { route, queued } = await setup();
+    const broken = { externalKey: "x y", title: "", chapter: 1.234, seriesUrl: "javascript:alert(1)" };
+    const lordOfMysteries = { externalKey: "11022733006234505", title: "Lord of Mysteries", chapter: 1432, seriesUrl: null };
+
+    const result = await route({ type: "library:sync", url: webnovelLibrary, entries: [shadowSlave, broken, lordOfMysteries] }, sender(webnovelLibrary));
+
+    expect(result).toEqual({ ok: true, queued: 2 });
+    expect(queued.map((event) => event.source.externalKey)).toEqual(["22196546206090805", "11022733006234505"]);
+  });
+
+  it("skips keys that are no book id of that app", async () => {
+    const { route, queued } = await setup();
+    await route({ type: "library:sync", url: webnovelLibrary, entries: [{ ...shadowSlave, externalKey: "B08FHBV4ZX" }] }, sender(webnovelLibrary));
+    await route({ type: "library:sync", url: kindleLibrary, entries: [{ ...hailMary, externalKey: "22196546206090805" }] }, sender(kindleLibrary));
+    expect(queued).toHaveLength(0);
   });
 
   it("skips entries in the other app's unit", async () => {

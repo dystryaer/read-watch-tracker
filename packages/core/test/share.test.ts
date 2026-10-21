@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAsin, parseShare, parseWebnovelBookId } from "../src/share";
+import { isAppBookKey, parseAsin, parseShare, parseWebnovelBookId } from "../src/share";
 
 describe("parseWebnovelBookId", () => {
   it.each([
@@ -81,5 +81,25 @@ describe("parseShare", () => {
 
   it("does not search unbounded input", () => {
     expect(parseShare({ text: `${"x".repeat(10_000)} https://www.amazon.de/dp/B08FHBV4ZX` })).toBeNull();
+  });
+});
+
+describe("isAppBookKey", () => {
+  it("accepts WebNovel book ids and Kindle ASINs in their own app only", () => {
+    expect(isAppBookKey("webnovel", "22196546206090805")).toBe(true);
+    expect(isAppBookKey("kindle", "B08FHBV4ZX")).toBe(true);
+    expect(isAppBookKey("webnovel", "B08FHBV4ZX")).toBe(false);
+    expect(isAppBookKey("kindle", "22196546206090805")).toBe(false);
+  });
+
+  it.each(["", "1234567", "123456789012345678901", "b08fhbv4zx", "B08FHBV4Z", "B08FHBV4ZX1", "2219654620609080 "])("refuses %j", (key) => {
+    expect(isAppBookKey("webnovel", key) || isAppBookKey("kindle", key)).toBe(false);
+  });
+});
+
+describe("trailing punctuation after a shared link", () => {
+  it("is cut off however long it is", () => {
+    expect(parseShare({ text: `Lies das: https://www.amazon.de/dp/B08FHBV4ZX${".".repeat(1500)}` })).toEqual({ source: "kindle", externalKey: "B08FHBV4ZX" });
+    expect(parseWebnovelBookId(`(https://www.webnovel.com/book/22196546206090805).`)).toBe("22196546206090805");
   });
 });

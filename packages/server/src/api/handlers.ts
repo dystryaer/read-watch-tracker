@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  ApiError,
   EnableSourceRequest,
   IgnoreSeriesRequest,
   type EventResult,
@@ -71,6 +72,8 @@ async function authenticate(request: Request, context: ApiContext): Promise<Pars
 export async function handleEvents(request: Request, context: ApiContext): Promise<Response> {
   const device = await authenticate(request, context);
   if (!device.ok) return device.response;
+  // Phone tokens live in a shortcut on the phone; they only reach the share endpoints.
+  if (device.value.kind === "phone") return errorResponse("forbidden", 403);
   if (!context.limiters.events.allow(device.value.id)) return tooManyRequests();
 
   const body = await readJsonBody(request, MAX_EVENTS_BODY_BYTES);
@@ -95,6 +98,7 @@ export async function handleEvents(request: Request, context: ApiContext): Promi
 export async function handleConfig(request: Request, context: ApiContext): Promise<Response> {
   const device = await authenticate(request, context);
   if (!device.ok) return device.response;
+  if (device.value.kind === "phone") return errorResponse("forbidden", 403);
   if (!context.limiters.config.allow(device.value.id)) return tooManyRequests();
 
   const body = JSON.stringify(await buildDeviceConfig(context.db));
@@ -173,19 +177,42 @@ export async function handleIgnoreSeries(request: Request, context: ApiContext):
 // The iOS shortcut shows `message` to the user as it is (SPEC §9.6: understandable errors).
 const shareError = (error: string, status: number, message: string) => jsonResponse({ error, message }, status);
 
+const INVALID_SHORTCUT = "Der Kurzbefehl hat etwas Unerwartetes geschickt. Bitte den Kurzbefehl aus den Tracker-Einstellungen neu einrichten.";
+const SHARE_MESSAGES: Record<string, string> = {
+  unauthorized: "Dieser Kurzbefehl ist nicht mehr mit dem Tracker verbunden. Bitte in den Tracker-Einstellungen einen neuen iPhone-Kurzbefehl hinzufügen.",
+  forbidden: "Dieser Schlüssel gehört zu keinem iPhone-Kurzbefehl. Bitte in den Tracker-Einstellungen einen iPhone-Kurzbefehl hinzufügen.",
+  rate_limited: "Zu viele Anfragen – bitte eine Minute warten.",
+  payload_too_large: "Der geteilte Text ist zu lang.",
+  unsupported_media_type: INVALID_SHORTCUT,
+  invalid_json: INVALID_SHORTCUT,
+  invalid_request: INVALID_SHORTCUT,
+};
+
+/** Adds the shortcut's message to the generic errors of the shared helpers; keeps status and headers. */
+async function explained(response: Response): Promise<Response> {
+  if (response.ok) return response;
+  const body = ApiError.safeParse(await response.clone().json().catch(() => null));
+  const message = body.success && body.data.message === undefined ? SHARE_MESSAGES[body.data.error] : undefined;
+  if (!body.success || message === undefined) return response;
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+  return jsonResponse({ error: body.data.error, message }, response.status, headers);
+}
+
 async function authenticatePhone(request: Request, context: ApiContext): Promise<Parsed<DeviceSummary>> {
   const device = await authenticate(request, context);
-  if (!device.ok) {
-    if (device.response.status !== 401) return device;
-    const message = "Dieser Kurzbefehl ist nicht mehr mit dem Tracker verbunden. Bitte in den Tracker-Einstellungen einen neuen iPhone-Kurzbefehl hinzufügen.";
-    return { ok: false, response: jsonResponse({ error: "unauthorized", message }, 401, { "www-authenticate": "Bearer" }) };
-  }
-  if (device.value.kind !== "phone") return { ok: false, response: errorResponse("forbidden", 403) };
+  if (device.ok && device.value.kind !== "phone") return { ok: false, response: errorResponse("forbidden", 403) };
   return device;
 }
 
 /** POST /api/v1/share: which book was shared, where it stands and what to suggest (SPEC §9.4). */
 export async function handleShare(request: Request, context: ApiContext): Promise<Response> {
+  return explained(await share(request, context));
+}
+
+async function share(request: Request, context: ApiContext): Promise<Response> {
   const device = await authenticatePhone(request, context);
   if (!device.ok) return device.response;
   if (!context.limiters.shares.allow(device.value.id)) return tooManyRequests();
@@ -195,13 +222,17 @@ export async function handleShare(request: Request, context: ApiContext): Promis
   const input = ShareRequest.safeParse(body.value);
   if (!input.success) return errorResponse("invalid_request", 400);
 
-  const share = await startShare(context.db, device.value.id, input.data, context.now?.());
-  if (!share) return shareError("unknown_link", 422, "Dieser Link gehört zu keinem Buch aus WebNovel oder Kindle.");
-  return jsonResponse(share);
+  const started = await startShare(context.db, device.value.id, input.data, context.now?.());
+  if (!started) return shareError("unknown_link", 422, "Dieser Link gehört zu keinem Buch aus WebNovel oder Kindle.");
+  return jsonResponse(started);
 }
 
 /** POST /api/v1/share/confirm: the confirmed chapter or percentage becomes an event. */
 export async function handleShareConfirm(request: Request, context: ApiContext): Promise<Response> {
+  return explained(await shareConfirm(request, context));
+}
+
+async function shareConfirm(request: Request, context: ApiContext): Promise<Response> {
   const device = await authenticatePhone(request, context);
   if (!device.ok) return device.response;
   if (!context.limiters.shares.allow(device.value.id)) return tooManyRequests();

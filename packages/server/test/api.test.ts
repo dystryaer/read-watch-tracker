@@ -302,7 +302,52 @@ describe("share endpoints (iOS shortcut)", () => {
   });
 
   it("accepts phone tokens only", async () => {
-    expect((await handleShare(post("/api/v1/share", book), context)).status).toBe(403);
+    const response = await handleShare(post("/api/v1/share", book), context);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: "forbidden", message: expect.stringContaining("iPhone") });
+  });
+
+  it("keeps a phone token to the share endpoints: a leaked shortcut cannot send events or read the rules", async () => {
+    const events = await handleEvents(asPhone("/api/v1/events", { events: [chapterEvent()] }), context);
+    const config = await handleConfig(new Request("http://localhost/api/v1/config", { headers: { authorization: `Bearer ${phone}` } }), context);
+
+    expect(events.status).toBe(403);
+    expect(config.status).toBe(403);
+  });
+
+  it("explains every refusal in words the shortcut can show", async () => {
+    const malformed = await handleShare(asPhone("/api/v1/share", "{not json"), context);
+    const empty = await handleShare(asPhone("/api/v1/share", {}), context);
+    const tooLong = await handleShare(asPhone("/api/v1/share", { text: "x".repeat(20_000) }), context);
+    const plainText = await handleShare(post("/api/v1/share", "Shadow Slave", { authorization: `Bearer ${phone}`, "content-type": "text/plain" }), context);
+
+    for (const [response, status] of [[malformed, 400], [empty, 400], [tooLong, 413], [plainText, 415]] as const) {
+      expect(response.status).toBe(status);
+      expect(await response.json()).toMatchObject({ error: expect.any(String), message: expect.any(String) });
+    }
+  });
+
+  it("explains the rate limit and keeps its retry header", async () => {
+    context = { db: handle.db, limiters: createApiLimiters({ sharesPerMinute: 1 }) };
+    await handleShare(asPhone("/api/v1/share", book), context);
+
+    const response = await handleShare(asPhone("/api/v1/share", book), context);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(await response.json()).toMatchObject({ error: "rate_limited", message: expect.stringContaining("Minute") });
+  });
+
+  it("refuses a number in a form other than plain digits, without using up the share", async () => {
+    const share = await (await handleShare(asPhone("/api/v1/share", book), context)).json();
+
+    for (const chapter of ["1e3", "0x10", "", "12.345"]) {
+      const response = await handleShareConfirm(asPhone("/api/v1/share/confirm", { shareId: share.shareId, chapter }), context);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ message: expect.any(String) });
+    }
+    const saved = await handleShareConfirm(asPhone("/api/v1/share/confirm", { shareId: share.shareId, chapter: "12,5" }), context);
+    expect(saved.status).toBe(200);
   });
 
   it("limits shares per device", async () => {

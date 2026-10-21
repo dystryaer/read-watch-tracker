@@ -26,20 +26,24 @@ const SetupInput = z.object({
 export async function signInAction(_previous: FormState, formData: FormData): Promise<FormState> {
   const requestHeaders = await headers();
   const client = clientAddress(requestHeaders);
-  // Only failed attempts count: guessing fails, signing in does not use up the owner's budget.
-  if (loginLimiterPerClient.isBlocked(client)) {
-    return { error: "Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen." };
-  }
   const input = LoginInput.safeParse({ email: formData.get("email"), password: formData.get("password") });
   if (!input.success) return { error: "Bitte E-Mail-Adresse und Passwort eingeben." };
 
+  // The slot is reserved before the (slow) password check, so parallel guesses cannot slip past the
+  // limit; a successful sign-in gives it back – only failed attempts use up the owner's budget.
+  if (!loginLimiterPerClient.allow(client)) {
+    return { error: "Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen." };
+  }
   try {
     await (await getAuth()).api.signInEmail({ body: input.data, headers: requestHeaders });
   } catch (error) {
-    if (!isAPIError(error)) throw error;
-    loginLimiterPerClient.allow(client);
+    if (!isAPIError(error)) {
+      loginLimiterPerClient.release(client);
+      throw error;
+    }
     return { error: "E-Mail-Adresse oder Passwort ist falsch." };
   }
+  loginLimiterPerClient.release(client);
   redirect(safeNextPath(formData.get("next")));
 }
 

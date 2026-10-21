@@ -24,19 +24,24 @@ export type EventKind = z.infer<typeof EventKind>;
 export const EventOutcome = z.enum(["applied", "no_change", "pending", "ignored", "rejected"]);
 export type EventOutcome = z.infer<typeof EventOutcome>;
 
-/**
- * Single-line text from devices or forms: control characters (including NUL, which Postgres text
- * columns reject) become spaces, whitespace is collapsed, the result is trimmed and length-capped.
- */
 // Bidi controls reorder the rest of a line when displayed ("Dark" + RLO + "…"): titles from
 // devices could otherwise spoof what the inbox shows next to them.
 const BIDI_CONTROLS = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu;
 
+/**
+ * The cleanup of all text from devices and forms: bidi controls go, control characters (including
+ * NUL, which Postgres text columns reject) become spaces, whitespace is collapsed and trimmed.
+ */
+export function cleanTextValue(value: string): string {
+  return value.replace(BIDI_CONTROLS, "").replace(/\p{Cc}+/gu, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Single-line text from devices or forms: cleaned (cleanTextValue), then non-empty and length-capped. */
 export function cleanText(maxLength: number) {
   return z
     .string()
     .max(Math.max(MAX_RAW_TEXT_LENGTH, maxLength * 2))
-    .transform((value) => value.replace(BIDI_CONTROLS, "").replace(/\p{Cc}+/gu, " ").replace(/\s+/g, " ").trim())
+    .transform(cleanTextValue)
     .pipe(z.string().min(1).max(maxLength));
 }
 
@@ -52,10 +57,14 @@ export const SourceKey = z.string().regex(/^[a-z0-9][a-z0-9:._-]{0,99}$/);
 
 const hasAtMostTwoDecimals = (value: number) => Math.round(value * 100) / 100 === value;
 
+/** A chapter number as positions store it; shared with every input that becomes a position. */
+export const ChapterNumber = z.number().min(0).max(99999.99).refine(hasAtMostTwoDecimals, "at most two decimals");
+export const PercentNumber = z.number().min(0).max(100).refine(hasAtMostTwoDecimals, "at most two decimals");
+
 export const Position = z.discriminatedUnion("unit", [
   z.object({
     unit: z.literal("chapter"),
-    chapter: z.number().min(0).max(99999.99).refine(hasAtMostTwoDecimals, "at most two decimals"),
+    chapter: ChapterNumber,
   }),
   z.object({
     unit: z.literal("episode"),
@@ -64,7 +73,7 @@ export const Position = z.discriminatedUnion("unit", [
   }),
   z.object({
     unit: z.literal("percent"),
-    percent: z.number().min(0).max(100).refine(hasAtMostTwoDecimals, "at most two decimals"),
+    percent: PercentNumber,
   }),
   z.object({ unit: z.literal("none") }),
 ]);

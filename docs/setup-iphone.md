@@ -20,6 +20,12 @@ Light Novels (WebNovel-App) und E-Books (Kindle-App) aktualisierst du halbautoma
 2. Der Token erscheint **nur dieses eine Mal**. „Kopieren“ tippen und gleich in Schritt 3 einfügen.
 3. Widerrufen kannst du ihn jederzeit unter **Gekoppelte Geräte**. Danach meldet der Kurzbefehl „Dieser Kurzbefehl ist nicht mehr mit dem Tracker verbunden …“.
 
+> **Sicherheit:** Der Token steckt danach im Kurzbefehl.
+> - **Den Kurzbefehl nicht teilen** (weder per iCloud-Link noch per AirDrop): Wer ihn hat, kann Lesestände in deinen Tracker schreiben.
+> - **Nur mit `https://`-Adresse** verwenden. Über `http://` ginge der Token unverschlüsselt durchs Netz; das Panel im Tracker warnt dann.
+> - **Zwischenablage leeren**: Nach dem Einfügen im Tracker **Fertig** tippen. Das blendet den Token aus und überschreibt die Zwischenablage. Alternativ kopierst du einfach etwas anderes.
+> - Ein iPhone-Token gilt **nur fürs Teilen** (`/api/v1/share…`). Ereignisse senden oder Regeln lesen kann er nicht. Geht das iPhone verloren, den Token unter **Gekoppelte Geräte** widerrufen.
+
 ## 3. Kurzbefehl „Lesestand“ bauen (einmalig, ca. 5 Minuten)
 
 In der App **Kurzbefehle** einen neuen Kurzbefehl „Lesestand“ anlegen. Unter **Details** (ⓘ) **Im Teilen-Menü anzeigen** einschalten und als Typen **URLs** und **Text** wählen. Dann diese Aktionen in dieser Reihenfolge:

@@ -18,6 +18,14 @@ export class RateLimiter {
     return this.hits.size;
   }
 
+  /**
+   * Gives back the slot the last `allow` reserved. Reserve first, release on success: concurrent
+   * attempts cannot slip past the limit while a slow check (a password hash) is running.
+   */
+  release(key: string): void {
+    this.hits.get(key)?.pop();
+  }
+
   /** True when the key used up its limit in the window; asking records nothing. */
   isBlocked(key: string, now = Date.now()): boolean {
     return (this.hits.get(key) ?? []).filter((time) => now - time < this.windowMs).length >= this.limit;

@@ -39,6 +39,17 @@ export const LibraryEntry = z.object({
 });
 export type LibraryEntry = z.infer<typeof LibraryEntry>;
 
+/** An episode on a streaming service's history page (SPEC §7.6). */
+export const HistoryEntry = z.object({
+  seriesTitle: cleanText(MAX_TEXT_LENGTH),
+  season: z.number().int().min(1).max(999).nullable(),
+  episode: z.number().int().min(1).max(99999),
+  seriesUrl: HttpUrlSchema.nullable(),
+});
+
+// Entries are checked one by one in the router: one odd card on the page does not stop the sync.
+const PageEntries = z.array(z.unknown()).max(500);
+
 /** Sent by the reader script on an enabled manga site, or the streaming script on a service's pages. */
 export const ContentMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("reader:hello"), url: HttpUrlSchema }),
@@ -51,18 +62,9 @@ export const ContentMessage = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("stream:library"),
     url: HttpUrlSchema,
-    entries: z
-      .array(
-        z.object({
-          seriesTitle: cleanText(MAX_TEXT_LENGTH),
-          season: z.number().int().min(1).max(999).nullable(),
-          episode: z.number().int().min(1).max(99999),
-          seriesUrl: HttpUrlSchema.nullable(),
-        }),
-      )
-      .max(500),
+    entries: PageEntries,
   }),
-  z.object({ type: z.literal("library:sync"), url: HttpUrlSchema, entries: z.array(LibraryEntry).max(500) }),
+  z.object({ type: z.literal("library:sync"), url: HttpUrlSchema, entries: PageEntries }),
 ]);
 export type ContentMessage = z.infer<typeof ContentMessage>;
 

@@ -1,4 +1,4 @@
-import { parseHttpUrl } from "./safe-url";
+import { MAX_URL_LENGTH, parseHttpUrl } from "./safe-url";
 import { normalizeDomain } from "./services";
 
 /** What the iOS shortcut shared (SPEC §9.4): the app source and its key for the book. */
@@ -8,20 +8,34 @@ export interface SharedBook {
   externalKey: string;
 }
 
-// Share sheets add text around the link; longer input is no share and is not searched.
-const MAX_INPUT_LENGTH = 2000;
+// Share sheets add text around the link; longer input is no share and is not searched. The same
+// cap as ShareRequest's URL field, so every URL the API accepts is searched.
+const MAX_INPUT_LENGTH = MAX_URL_LENGTH;
 const URL_IN_TEXT = /https?:\/\/[^\s"'<>„“”]+/gi;
-const TRAILING_PUNCTUATION = /[.,;:!?)\]]+$/;
+const TRAILING_PUNCTUATION = new Set(".,;:!?)]");
 
 const WEBNOVEL_HOSTS = new Set(["webnovel.com", "m.webnovel.com"]);
 const BOOK_ID_IN_SEGMENT = /(?:^|_)(\d{8,20})$/;
+const WEBNOVEL_BOOK_ID = /^\d{8,20}$/;
 
 const AMAZON_HOST = /^(?:read\.)?amazon\.(?:com|de|co\.uk|fr|it|es|nl|ca|com\.au|co\.jp|in|com\.br|com\.mx)$/;
 const ASIN = /^[A-Z0-9]{10}$/;
 
+// A loop instead of a /[…]+$/ regex, which backtracks quadratically on long punctuation runs.
+function withoutTrailingPunctuation(candidate: string): string {
+  let end = candidate.length;
+  while (end > 0 && TRAILING_PUNCTUATION.has(candidate.charAt(end - 1))) end--;
+  return candidate.slice(0, end);
+}
+
 function urlsIn(input: string): URL[] {
   if (input.length > MAX_INPUT_LENGTH) return [];
-  return (input.match(URL_IN_TEXT) ?? []).flatMap((candidate) => parseHttpUrl(candidate.replace(TRAILING_PUNCTUATION, "")) ?? []);
+  return (input.match(URL_IN_TEXT) ?? []).flatMap((candidate) => parseHttpUrl(withoutTrailingPunctuation(candidate)) ?? []);
+}
+
+/** True for a key in the app's own format (SPEC §5.2): a WebNovel book id or a Kindle ASIN. */
+export function isAppBookKey(source: SharedBook["source"], key: string): boolean {
+  return source === "webnovel" ? WEBNOVEL_BOOK_ID.test(key) : ASIN.test(key);
 }
 
 /** The book id of a WebNovel book or chapter link (`/book/<slug>_<id>[/…]` or `/book/<id>`), also inside shared text. */

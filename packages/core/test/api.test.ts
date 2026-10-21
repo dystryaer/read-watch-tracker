@@ -91,6 +91,14 @@ describe("ShareConfirmRequest", () => {
     [{ shareId, percent: 101 }],
     [{ shareId, chapter: "zwölf" }],
     [{ shareId: "x", chapter: 1 }],
+    // Typed numbers are read strictly and must fit the event schema (at most two decimals).
+    [{ shareId, chapter: "" }],
+    [{ shareId, chapter: "   " }],
+    [{ shareId, chapter: "0x10" }],
+    [{ shareId, chapter: "1e3" }],
+    [{ shareId, chapter: "1,205" }],
+    [{ shareId, chapter: 3.333 }],
+    [{ shareId, percent: "33,333" }],
   ])("refuses %j", (body) => {
     expect(ShareConfirmRequest.safeParse(body).success).toBe(false);
   });

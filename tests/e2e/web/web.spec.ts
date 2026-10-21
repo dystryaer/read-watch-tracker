@@ -182,6 +182,12 @@ test("an iPhone shortcut token is shown once and lets the shortcut save a shared
   const confirmed = await request.post("/api/v1/share/confirm", { data: { shareId: share.shareId, chapter: 12 }, headers: phone });
   expect(await confirmed.json()).toMatchObject({ outcome: "pending", message: "Neuer Titel – bitte im Tracker zuordnen" });
 
+  // The E2E server runs on plain http: the panel says the token would travel unencrypted.
+  await expect(page.getByText("ohne https", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Fertig" }).click();
+  await expect(page.getByLabel("Token")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "iPhone-Kurzbefehl hinzufügen" })).toBeVisible();
+
   await page.reload();
   await expect(page.getByLabel("Token")).toHaveCount(0);
   await expect(page.getByRole("listitem").filter({ hasText: "iPhone-Kurzbefehl" })).toBeVisible();

@@ -69,6 +69,15 @@ describe("startShare", () => {
     expect(source).toMatchObject({ kind: "app", defaultMediaType: "ebook" });
   });
 
+  it("cleans the shared text like every other title: no control or bidi characters", async () => {
+    const [nul, rlo] = [String.fromCharCode(0), String.fromCharCode(0x202e)];
+    const share = await startShare(handle.db, phone, { text: `Shadow${nul}Slave${rlo} ${SHADOW_SLAVE}` }, NOW);
+    expect(share?.title).toBe("Shadow Slave");
+
+    const onlyControls = await startShare(handle.db, phone, { text: `${rlo}${nul} ${SHADOW_SLAVE}` }, NOW);
+    expect(onlyControls?.title).toBe("WebNovel 22196546206090805");
+  });
+
   it("falls back to the service and key when the share has no text", async () => {
     expect(await startShare(handle.db, phone, { url: SHADOW_SLAVE }, NOW)).toMatchObject({ title: "WebNovel 22196546206090805", needsMatch: true });
   });
@@ -139,6 +148,15 @@ describe("confirmShare", () => {
     await expect(confirmShare(handle.db, other, { shareId, chapter: 1205 }, NOW)).rejects.toThrow(ShareNotFoundError);
     await expect(confirmShare(handle.db, phone, { shareId, chapter: 1205 }, minutes(16))).rejects.toThrow(ShareNotFoundError);
     await expect(confirmShare(handle.db, phone, { shareId: crypto.randomUUID(), chapter: 1205 }, NOW)).rejects.toThrow(ShareNotFoundError);
+  });
+
+  it("refuses a number the event schema would refuse, without using up the share", async () => {
+    await linkedShadowSlave(1204);
+    const share = await startShare(handle.db, phone, { url: SHADOW_SLAVE }, NOW);
+    const shareId = share?.shareId ?? "";
+
+    await expect(confirmShare(handle.db, phone, { shareId, chapter: 1.205 }, NOW)).rejects.toThrow(ShareValueError);
+    expect((await confirmShare(handle.db, phone, { shareId, chapter: 1205 }, NOW)).outcome).toBe("applied");
   });
 
   it("refuses a percentage for a book counted in chapters", async () => {
