@@ -265,3 +265,29 @@ describe("router – popup", () => {
     expect(await route({ type: "popup:status", tabId: 4 }, page)).toMatchObject({ page: { ignored: true } });
   });
 });
+
+describe("router – backfill", () => {
+  it("queues one backfill event per entry with a deterministic id", async () => {
+    const { route, queued } = await setup();
+    const entry = { url: chapterUrl, visitedAt: Date.parse("2026-09-01T10:00:00.000Z"), detection };
+
+    expect(await route({ type: "options:backfill", entries: [entry] }, page)).toEqual({ ok: true, queued: 1 });
+    await route({ type: "options:backfill", entries: [entry] }, page);
+
+    expect(queued).toHaveLength(2);
+    expect(queued[0]).toMatchObject({ kind: "backfill", occurredAt: "2026-09-01T10:00:00.000Z", source: { key: "site:asura" } });
+    expect(queued[1]?.id).toBe(queued[0]?.id);
+  });
+
+  it("skips entries of sites that are not enabled", async () => {
+    const { route, queued } = await setup();
+    const entry = { url: "https://unknown.example/manga/x/chapter-1", visitedAt: 0, detection };
+    expect(await route({ type: "options:backfill", entries: [entry] }, page)).toEqual({ ok: true, queued: 0 });
+    expect(queued).toHaveLength(0);
+  });
+
+  it("is not accepted from a content script", async () => {
+    const { route } = await setup();
+    expect(await route({ type: "options:backfill", entries: [] }, content())).toEqual({ ok: false });
+  });
+});

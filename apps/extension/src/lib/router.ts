@@ -1,5 +1,6 @@
 import { DEFAULT_THRESHOLDS, type DeviceConfig, normalizeDomain, parseHttpUrl, ProgressEvent, type SiteRule } from "@rwt/core";
 import type { ApiClient } from "./api-client";
+import { backfillEventId } from "./backfill";
 import { classifySender, ContentMessage, type Detection, ExtensionPageMessage } from "./messages";
 import type { Outbox } from "./outbox";
 import type { RecentReads } from "./recent";
@@ -163,6 +164,35 @@ export function createRouter(deps: RouterDeps) {
     switch (message.type) {
       case "options:sync-now":
         return { ok: true, result: await deps.sync() };
+
+      case "options:backfill": {
+        const current = await config();
+        let queued = 0;
+        for (const entry of message.entries) {
+          // Re-checked here: only enabled sites, whatever the options page sent.
+          const site = findSiteForUrl(current, entry.url);
+          if (!site) continue;
+          const { detection } = entry;
+          await deps.outbox.enqueue(
+            ProgressEvent.parse({
+              id: await backfillEventId(site.sourceKey, detection.seriesKey, detection.chapter),
+              occurredAt: new Date(entry.visitedAt > 0 ? entry.visitedAt : now()).toISOString(),
+              kind: "backfill",
+              source: {
+                key: site.sourceKey,
+                externalKey: detection.seriesKey,
+                rawTitle: detection.title ?? detection.seriesKey,
+                url: entry.url,
+                ...(detection.seriesUrl ? { seriesUrl: detection.seriesUrl } : {}),
+              },
+              position: { unit: "chapter", chapter: detection.chapter },
+            }),
+          );
+          queued++;
+        }
+        if (queued > 0) void deps.outbox.flush();
+        return { ok: true, queued };
+      }
 
       case "popup:status":
         return popupStatus(message.tabId);

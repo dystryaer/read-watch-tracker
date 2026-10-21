@@ -88,7 +88,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T24 Popup + Seite freischalten + Umzug** · M · Abh. T22, T23
   Akz.: Status des Tabs (nur `textContent`), „Diese Seite tracken“ → Permission → Content-Script registrieren → `/sources/enable`; Umzug wählbar; „Serie ignorieren“
 
-- [ ] **T25 Verlaufs-Backfill** · S · Abh. T23, T24
+- [x] **T25 Verlaufs-Backfill** · S · Abh. T23, T24
   Akz.: `history` nur auf Klick; 90 Tage; nur freigeschaltete (auch alte) Domains; max. Kapitel pro Serie als `backfill`
 
 - [ ] **T26 E2E: Web** · M · Abh. T13–T18

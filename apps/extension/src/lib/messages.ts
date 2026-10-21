@@ -38,6 +38,10 @@ export const ExtensionPageMessage = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("popup:ignore-series"), tabId: TabId }),
   z.object({ type: z.literal("options:sync-now") }),
+  z.object({
+    type: z.literal("options:backfill"),
+    entries: z.array(z.object({ url: HttpUrlSchema, visitedAt: z.number().min(0), detection: Detection })).max(2000),
+  }),
 ]);
 export type ExtensionPageMessage = z.infer<typeof ExtensionPageMessage>;
 

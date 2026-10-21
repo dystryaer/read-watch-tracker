@@ -1,13 +1,16 @@
 import { browser } from "wxt/browser";
 import { createApiClient } from "@/lib/api-client";
+import { collectBackfill } from "@/lib/backfill";
 import { h, render } from "@/lib/dom";
 import { readOutboxSummary } from "@/lib/outbox";
 import { pollPairing, startPairing } from "@/lib/pairing";
-import { apiOrigin, loadSettings, type Settings, saveCachedConfig, updateSettings } from "@/lib/settings";
+import { apiOrigin, loadCachedConfig, loadSettings, type Settings, saveCachedConfig, updateSettings } from "@/lib/settings";
 import { createStore } from "@/lib/storage";
 import "./style.css";
 
 const POLL_INTERVAL_MS = 3000;
+// Chromium keeps about 90 days of history by default.
+const BACKFILL_DAYS = 90;
 const store = createStore(browser.storage.local);
 const api = createApiClient((input, init) => fetch(input, init));
 const root = document.getElementById("app");
@@ -126,6 +129,42 @@ async function showPaired(settings: Settings) {
       ...(outbox.dropped > 0 ? [h("dt", {}, "Verworfen (Speicher voll)"), h("dd", { class: "error" }, String(outbox.dropped))] : []),
     ),
     h("div", { class: "actions" }, syncButton, unpairButton),
+    backfillSection(settings),
+  );
+}
+
+function backfillSection(settings: Settings): HTMLElement {
+  const button = h("button", { type: "button" }, `Verlauf der letzten ${BACKFILL_DAYS} Tage durchsuchen`);
+  const status = h("div", {});
+  button.addEventListener("click", async () => {
+    // History access is requested only now, on this click (SPEC §7.9).
+    const granted = await browser.permissions.request({ permissions: ["history"] });
+    if (!granted) return render(status, message("Ohne Zugriff auf den Verlauf ist der Abgleich nicht möglich.", "error"));
+    const cached = await loadCachedConfig(store);
+    if (!cached || cached.config.sites.length === 0) {
+      return render(status, message("Noch keine Seite freigeschaltet. Schalte zuerst deine Manga-Seiten im Popup frei.", "error"));
+    }
+    button.setAttribute("disabled", "");
+    render(status, message("Durchsuche den Verlauf …"));
+    const items = await browser.history.search({ text: "", startTime: Date.now() - BACKFILL_DAYS * 86_400_000, maxResults: 100_000 });
+    const entries = collectBackfill(items, cached.config);
+    await browser.runtime.sendMessage({ type: "options:backfill", entries });
+    button.removeAttribute("disabled");
+    render(
+      status,
+      message(`${entries.length} Serien gefunden und gesendet.`),
+      settings.apiUrl
+        ? h("p", {}, "Bestätige die Zuordnungen im Tracker: ", h("a", { href: `${settings.apiUrl}/inbox`, target: "_blank", rel: "noopener noreferrer" }, "Zuordnungen öffnen"))
+        : null,
+    );
+  });
+  return h(
+    "section",
+    {},
+    h("h2", {}, "Kapitelstände aus dem Verlauf"),
+    h("p", { class: "muted" }, "Sucht in Brave nach Kapiteln deiner freigeschalteten Seiten und schickt pro Serie das höchste Kapitel an den Tracker."),
+    button,
+    status,
   );
 }
 
