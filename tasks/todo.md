@@ -139,7 +139,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 
 ## M3 – Light Novels & E-Books (`feat/m3-mobile`)
 
-- [ ] **T36 core: WebNovel- und Amazon-Parser** · S
+- [x] **T36 core: WebNovel- und Amazon-Parser** · S
   Akz.: Book-ID aus WebNovel-URLs, ASIN aus Amazon-/Kindle-Links; ungültige Eingaben → null
 
 - [ ] **T37 Share-API + iPhone-Token** · M · Abh. T36
