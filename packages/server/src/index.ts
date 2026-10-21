@@ -34,5 +34,5 @@ export { countOpenPending, listOverview, type OverviewRow } from "./overview";
 export { setManualPosition, setWorkStatus, WorkNotFoundError, WorkPositionMismatchError, type WorkStatus } from "./manual";
 export { getWorkDetail, listMergeCandidates, MergeIncompatibleError, mergeWorks, unlinkWork, updateWorkMeta, type WorkDetail } from "./work-detail";
 export { listOpenMatches, type OpenMatch } from "./inbox";
-export { addSiteDomain, getSite, listRecentSiteUrls, listSites, renameSite, type RuleUpdateResult, setSiteTracking, SiteDomainError, type SiteRuleFields, type SiteSummary, updateSiteRule } from "./site-admin";
+export { addSiteDomain, getSite, getSiteId, listRecentSiteUrls, listSites, renameSite, type RuleUpdateResult, setSiteTracking, SiteDomainError, type SiteRuleFields, type SiteSummary, updateSiteRule } from "./site-admin";
 export { ignoreSeries } from "./ignore";

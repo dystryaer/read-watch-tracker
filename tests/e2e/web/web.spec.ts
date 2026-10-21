@@ -138,6 +138,42 @@ test("the stepper saves the chapter after quick clicks", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("app pages reveal nothing without a session, even to crafted RSC requests", async ({ page, playwright, baseURL }) => {
+  await login(page);
+  await page.goto("/");
+  // The router-state header of a real client-side navigation, as an attacker could copy it.
+  const navigation = page.waitForRequest((request) => {
+    const headers = request.headers();
+    return (
+      headers.rsc === "1" &&
+      !headers["next-router-prefetch"] &&
+      Boolean(headers["next-router-state-tree"]) &&
+      new URL(request.url()).pathname === "/settings"
+    );
+  });
+  await page.getByRole("navigation").getByRole("link", { name: "Einstellungen" }).click();
+  const realTree = (await navigation).headers()["next-router-state-tree"];
+  expect(realTree).toBeTruthy();
+
+  const anonymous = await playwright.request.newContext({ baseURL });
+  const trees = [realTree ?? "", encodeURIComponent('["",{"children":["(app)",{"children":["__PAGE__",{}]}]}]')];
+  const variants: Record<string, string>[] = [
+    ...trees.map((tree) => ({ RSC: "1", "Next-Router-State-Tree": tree })),
+    { RSC: "1", "Next-Router-Prefetch": "1", "Next-Router-Segment-Prefetch": "/_tree" },
+    { RSC: "1", "Next-Router-Prefetch": "1", "Next-Router-Segment-Prefetch": "/(app)/settings/__PAGE__" },
+  ];
+  for (const path of ["/", "/settings", "/inbox"]) {
+    for (const headers of variants) {
+      const response = await anonymous.get(path, { headers, maxRedirects: 0 });
+      const body = await response.text();
+      expect(body, `${path} leaked data`).not.toContain("E2E Brave");
+      expect(body, `${path} leaked data`).not.toContain("Overgeared");
+      expect(body, `${path} leaked data`).not.toContain("Gerät koppeln");
+    }
+  }
+  await anonymous.dispose();
+});
+
 test("the list fits a phone screen without horizontal scrolling", async ({ page }) => {
   await login(page);
   await page.setViewportSize({ width: 375, height: 812 });

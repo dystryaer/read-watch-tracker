@@ -72,6 +72,15 @@ export async function listSites(db: Db): Promise<SiteSummary[]> {
   return summarize(db, rows);
 }
 
+/** Id of a website source by key, in one query (for Server Actions that only need the id). */
+export async function getSiteId(db: Db, key: string): Promise<string | null> {
+  const [row] = await db
+    .select({ id: sources.id })
+    .from(sources)
+    .where(and(eq(sources.key, key), eq(sources.kind, "website")));
+  return row?.id ?? null;
+}
+
 export async function getSite(db: Db, key: string): Promise<SiteSummary | null> {
   const rows = await db
     .select()

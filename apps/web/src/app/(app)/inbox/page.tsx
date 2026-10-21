@@ -2,7 +2,7 @@ import { MediaType } from "@rwt/core";
 import { HIGH_CONFIDENCE_SCORE, listOpenMatches, type OpenMatch } from "@rwt/server";
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
-import { getDb } from "@/lib/db";
+import { getAuthorizedDb } from "@/lib/dal";
 import { positionText } from "@/lib/format";
 import { MEDIA_TYPE_LABELS } from "@/lib/overview";
 import { confirmAllAction, ignoreMatchAction, resolveMatchAction } from "./actions";
@@ -74,7 +74,7 @@ function MatchCard({ match }: { match: OpenMatch }) {
 }
 
 export default async function InboxPage() {
-  const matches = await listOpenMatches(await getDb());
+  const matches = await listOpenMatches(await getAuthorizedDb());
   const confident = matches.filter((match) => (match.candidates[0]?.score ?? 0) >= HIGH_CONFIDENCE_SCORE);
 
   return (

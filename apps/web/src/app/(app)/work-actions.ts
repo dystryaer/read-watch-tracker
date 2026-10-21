@@ -4,8 +4,7 @@ import { Position } from "@rwt/core";
 import { setManualPosition, setWorkStatus, WorkNotFoundError, WorkPositionMismatchError } from "@rwt/server";
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { requireSession } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { getAuthorizedDb } from "@/lib/dal";
 
 // Server Actions are public POST endpoints: every argument is untrusted and validated here.
 const SetPositionInput = z.object({ workId: z.uuid(), position: Position });
@@ -26,17 +25,15 @@ async function run(action: () => Promise<void>): Promise<ActionResult> {
 }
 
 export async function setPositionAction(input: unknown): Promise<ActionResult> {
-  await requireSession();
+  const db = await getAuthorizedDb();
   const parsed = SetPositionInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Ungültige Eingabe." };
-  const db = await getDb();
   return run(() => setManualPosition(db, parsed.data.workId, parsed.data.position));
 }
 
 export async function setStatusAction(input: unknown): Promise<ActionResult> {
-  await requireSession();
+  const db = await getAuthorizedDb();
   const parsed = SetStatusInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Ungültige Eingabe." };
-  const db = await getDb();
   return run(() => setWorkStatus(db, parsed.data.workId, parsed.data.status));
 }

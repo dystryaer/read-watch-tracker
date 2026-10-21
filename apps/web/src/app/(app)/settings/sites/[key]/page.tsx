@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { RuleEditor } from "@/components/sites/rule-editor";
-import { getDb } from "@/lib/db";
+import { getAuthorizedDb } from "@/lib/dal";
 import { addDomainAction, renameSiteAction } from "../actions";
 
 const inputClass =
@@ -13,7 +13,7 @@ const inputClass =
 export default async function SitePage({ params }: { params: Promise<{ key: string }> }) {
   const key = SourceKey.safeParse(decodeURIComponent((await params).key));
   if (!key.success) notFound();
-  const db = await getDb();
+  const db = await getAuthorizedDb();
   const site = await getSite(db, key.data);
   if (!site) notFound();
   const sampleUrls = await listRecentSiteUrls(db, site.id);

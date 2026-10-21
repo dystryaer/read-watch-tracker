@@ -1,7 +1,7 @@
 import { listDevices } from "@rwt/server";
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
-import { getDb } from "@/lib/db";
+import { getAuthorizedDb } from "@/lib/dal";
 import { formatDateTime } from "@/lib/format";
 import { approveDeviceAction, revokeDeviceAction } from "./actions";
 
@@ -13,7 +13,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const rawCode = (await searchParams).code;
   // Prefilled from the QR code on the Shield (/pair?code=…); only code characters are kept.
   const code = typeof rawCode === "string" ? rawCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) : "";
-  const devices = await listDevices(await getDb());
+  const devices = await listDevices(await getAuthorizedDb());
 
   return (
     <main className="max-w-3xl">

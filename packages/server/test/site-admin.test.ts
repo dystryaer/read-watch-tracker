@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   addSiteDomain,
   getSite,
+  getSiteId,
   listRecentSiteUrls,
   listSites,
   renameSite,
@@ -54,9 +55,11 @@ describe("listSites / getSite", () => {
   });
 
   it("finds a site by key", async () => {
-    await seedSource(handle.db, { key: "site:asura", name: "Asura" }, ["asuracomic.net"]);
+    const source = await seedSource(handle.db, { key: "site:asura", name: "Asura" }, ["asuracomic.net"]);
     expect((await getSite(handle.db, "site:asura"))?.name).toBe("Asura");
     expect(await getSite(handle.db, "site:missing")).toBeNull();
+    expect(await getSiteId(handle.db, "site:asura")).toBe(source.id);
+    expect(await getSiteId(handle.db, "site:missing")).toBeNull();
   });
 });
 

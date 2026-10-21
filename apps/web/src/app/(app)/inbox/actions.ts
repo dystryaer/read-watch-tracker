@@ -5,8 +5,7 @@ import { confirmMatches, PendingMatchNotFoundError, resolvePendingMatch } from "
 import { refresh } from "next/cache";
 import { z } from "zod";
 import type { FormState } from "@/components/action-form";
-import { requireSession } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { getAuthorizedDb } from "@/lib/dal";
 
 // Server Actions are public POST endpoints: everything from the form is validated here.
 const ResolveInput = z.object({
@@ -30,11 +29,10 @@ async function guarded(action: () => Promise<unknown>, message: string): Promise
 }
 
 export async function resolveMatchAction(_previous: FormState, formData: FormData): Promise<FormState> {
-  await requireSession();
+  const db = await getAuthorizedDb();
   const input = ResolveInput.safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: "Bitte einen Titel wählen oder „Neues Werk anlegen“." };
   const { pendingId, choice, type, title } = input.data;
-  const db = await getDb();
   return guarded(
     () =>
       resolvePendingMatch(
@@ -47,18 +45,16 @@ export async function resolveMatchAction(_previous: FormState, formData: FormDat
 }
 
 export async function ignoreMatchAction(_previous: FormState, formData: FormData): Promise<FormState> {
-  await requireSession();
+  const db = await getAuthorizedDb();
   const input = IgnoreInput.safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: "Ungültige Eingabe." };
-  const db = await getDb();
   return guarded(() => resolvePendingMatch(db, input.data.pendingId, { action: "ignore" }), "Ignoriert.");
 }
 
 export async function confirmAllAction(_previous: FormState, formData: FormData): Promise<FormState> {
-  await requireSession();
+  const db = await getAuthorizedDb();
   const input = ConfirmAllInput.safeParse(formData.getAll("pendingId"));
   if (!input.success) return { error: "Ungültige Eingabe." };
-  const db = await getDb();
   const confirmed = await confirmMatches(db, input.data);
   refresh();
   return { message: `${confirmed} Zuordnungen bestätigt.` };

@@ -1,7 +1,26 @@
+import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 import { buildContentSecurityPolicy, createNonce } from "./lib/csp";
 
+const PUBLIC_PATHS = new Set(["/login", "/setup"]);
+
 export function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+
+  // Optimistic check, also for prefetches: without a session cookie nothing behind the login is
+  // rendered at all. The authoritative check runs at the data source (getAuthorizedDb).
+  if (!PUBLIC_PATHS.has(pathname) && !getSessionCookie(request)) {
+    const login = new URL("/login", request.url);
+    const next = `${pathname}${search}`;
+    if (next !== "/") login.searchParams.set("next", next);
+    return NextResponse.redirect(login);
+  }
+
+  // Prefetch payloads contain no script tags, so they need no nonce.
+  if (request.headers.get("next-router-prefetch") || request.headers.get("purpose") === "prefetch") {
+    return NextResponse.next();
+  }
+
   const nonce = createNonce();
   const policy = buildContentSecurityPolicy(nonce, {
     isDev: process.env.NODE_ENV === "development",
@@ -13,7 +32,7 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", policy);
   // Lets the login send the user back to where they were (validated by safeNextPath).
-  requestHeaders.set("x-pathname", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  requestHeaders.set("x-pathname", `${pathname}${search}`);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", policy);
@@ -21,13 +40,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    {
-      source: "/((?!api|_next/static|_next/image|favicon.ico|icons|manifest.webmanifest).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
-    },
-  ],
+  matcher: ["/((?!api/|_next/static/|_next/image/|favicon.ico|icons/|manifest.webmanifest).*)"],
 };

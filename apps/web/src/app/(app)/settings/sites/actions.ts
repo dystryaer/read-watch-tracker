@@ -1,12 +1,11 @@
 "use server";
 
 import { cleanText, SourceKey } from "@rwt/core";
-import { addSiteDomain, getSite, renameSite, setSiteTracking, SiteDomainError, updateSiteRule } from "@rwt/server";
+import { addSiteDomain, getSiteId, renameSite, setSiteTracking, SiteDomainError, updateSiteRule } from "@rwt/server";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import type { FormState } from "@/components/action-form";
-import { requireSession } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { getAuthorizedDb } from "@/lib/dal";
 
 // Server Actions are public POST endpoints: everything from the form is validated here.
 const optionalText = (max: number) => z.preprocess((value) => (value === "" ? undefined : value), z.string().max(max).optional());
@@ -33,41 +32,37 @@ const FIELD_NAMES = {
 
 const FIELD_ORDER = ["chapterPattern", "seriesPattern", "titleSelector", "endSelector", "nextUrlTemplate"] as const;
 
-async function siteId(key: string): Promise<string | null> {
-  return (await getSite(await getDb(), key))?.id ?? null;
-}
-
 export async function setTrackingAction(_previous: FormState, formData: FormData): Promise<FormState> {
-  await requireSession();
+  const db = await getAuthorizedDb();
   const input = TrackingInput.safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: "Ungültige Eingabe." };
-  const id = await siteId(input.data.siteKey);
+  const id = await getSiteId(db, input.data.siteKey);
   if (!id) return { error: "Seite nicht gefunden." };
-  await setSiteTracking(await getDb(), id, input.data.enabled === "true");
+  await setSiteTracking(db, id, input.data.enabled === "true");
   refresh();
   return { message: input.data.enabled === "true" ? "Tracking an." : "Tracking aus." };
 }
 
 export async function renameSiteAction(_previous: FormState, formData: FormData): Promise<FormState> {
-  await requireSession();
+  const db = await getAuthorizedDb();
   const input = RenameInput.safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: "Bitte einen Namen mit höchstens 100 Zeichen angeben." };
-  const id = await siteId(input.data.siteKey);
+  const id = await getSiteId(db, input.data.siteKey);
   if (!id) return { error: "Seite nicht gefunden." };
-  await renameSite(await getDb(), id, input.data.name);
+  await renameSite(db, id, input.data.name);
   refresh();
   return { message: "Umbenannt." };
 }
 
 export async function saveRuleAction(_previous: FormState, formData: FormData): Promise<FormState> {
-  await requireSession();
+  const db = await getAuthorizedDb();
   const input = RuleInput.safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: "Ungültige Eingabe." };
   const { siteKey, ...fields } = input.data;
-  const id = await siteId(siteKey);
+  const id = await getSiteId(db, siteKey);
   if (!id) return { error: "Seite nicht gefunden." };
 
-  const result = await updateSiteRule(await getDb(), id, fields);
+  const result = await updateSiteRule(db, id, fields);
   if (!result.ok) {
     const details = FIELD_ORDER.flatMap((field) =>
       result.errors[field] ? [`${FIELD_NAMES[field]}: ${result.errors[field]}`] : [],
@@ -79,13 +74,13 @@ export async function saveRuleAction(_previous: FormState, formData: FormData): 
 }
 
 export async function addDomainAction(_previous: FormState, formData: FormData): Promise<FormState> {
-  await requireSession();
+  const db = await getAuthorizedDb();
   const input = DomainInput.safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: "Bitte eine Domain angeben." };
-  const id = await siteId(input.data.siteKey);
+  const id = await getSiteId(db, input.data.siteKey);
   if (!id) return { error: "Seite nicht gefunden." };
   try {
-    await addSiteDomain(await getDb(), id, input.data.domain, { makeCurrent: input.data.makeCurrent === "on" });
+    await addSiteDomain(db, id, input.data.domain, { makeCurrent: input.data.makeCurrent === "on" });
   } catch (error) {
     if (error instanceof SiteDomainError) return { error: error.message };
     throw error;

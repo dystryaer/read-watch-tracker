@@ -1,11 +1,11 @@
 import { listSites } from "@rwt/server";
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
-import { getDb } from "@/lib/db";
+import { getAuthorizedDb } from "@/lib/dal";
 import { setTrackingAction } from "./actions";
 
 export default async function SitesPage() {
-  const sites = await listSites(await getDb());
+  const sites = await listSites(await getAuthorizedDb());
   return (
     <main className="max-w-3xl">
       <Link href="/settings" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">

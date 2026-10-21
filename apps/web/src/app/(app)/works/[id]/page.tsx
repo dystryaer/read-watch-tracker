@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { ActionForm } from "@/components/action-form";
 import { HistoryTable } from "@/components/work-detail/history-table";
-import { getDb } from "@/lib/db";
+import { getAuthorizedDb } from "@/lib/dal";
 import { positionText } from "@/lib/format";
 import { MEDIA_TYPE_LABELS } from "@/lib/overview";
 import { mergeAction, setPositionFormAction, setStatusFormAction, unlinkAction, updateMetaAction } from "./actions";
@@ -26,7 +26,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default async function WorkPage({ params }: { params: Promise<{ id: string }> }) {
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const db = await getDb();
+  const db = await getAuthorizedDb();
   const [detail, mergeCandidates] = await Promise.all([getWorkDetail(db, id.data), listMergeCandidates(db, id.data)]);
   if (!detail) notFound();
   const { work, links, events } = detail;
