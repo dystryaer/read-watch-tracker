@@ -8,6 +8,7 @@ const XSS_TITLE = '<img src=x onerror="alert(document.cookie)"><script>alert(1)<
 test.describe.configure({ mode: "serial" });
 
 let token = "";
+let phone: Record<string, string> = {};
 
 function chapterEvent(externalKey: string, rawTitle: string, chapter: number) {
   return {
@@ -168,7 +169,7 @@ test("an iPhone shortcut token is shown once and lets the shortcut save a shared
   await page.getByRole("button", { name: "iPhone-Kurzbefehl hinzufügen" }).click();
   const tokenField = page.getByLabel("Token");
   await expect(tokenField).toHaveValue(/^[A-Za-z0-9_-]{43}$/);
-  const phone = { authorization: `Bearer ${await tokenField.inputValue()}` };
+  phone = { authorization: `Bearer ${await tokenField.inputValue()}` };
 
   const shared = await request.post("/api/v1/share", {
     data: { url: "https://m.webnovel.com/book/22196546206090805", text: "Shadow Slave" },
@@ -184,6 +185,49 @@ test("an iPhone shortcut token is shown once and lets the shortcut save a shared
   await page.reload();
   await expect(page.getByLabel("Token")).toHaveCount(0);
   await expect(page.getByRole("listitem").filter({ hasText: "iPhone-Kurzbefehl" })).toBeVisible();
+});
+
+test("the web app can be installed: manifest and icons load without a session", async ({ playwright, baseURL }) => {
+  const anonymous = await playwright.request.newContext({ baseURL });
+  const manifest = await anonymous.get("/manifest.webmanifest", { maxRedirects: 0 });
+  expect(manifest.status()).toBe(200);
+  expect(await manifest.json()).toMatchObject({ start_url: "/quick", display: "standalone" });
+  for (const icon of ["/icon", "/apple-icon"]) {
+    const response = await anonymous.get(icon, { maxRedirects: 0 });
+    expect(response.status(), icon).toBe(200);
+    expect(response.headers()["content-type"]).toContain("image/png");
+  }
+  await anonymous.dispose();
+});
+
+test("the quick update saves the next chapter of a light novel and an e-book's percentage", async ({ page, request }) => {
+  const kindle = await (
+    await request.post("/api/v1/share", { data: { url: "https://read.amazon.com/kp/kshare?asin=B08FHBV4ZX", text: "Project Hail Mary" }, headers: phone })
+  ).json();
+  await request.post("/api/v1/share/confirm", { data: { shareId: kindle.shareId, percent: 40 }, headers: phone });
+
+  await login(page);
+  await page.goto("/inbox");
+  for (const title of ["Shadow Slave", "Project Hail Mary"]) {
+    const card = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: `„${title}“` }) });
+    await card.getByRole("radio", { name: /Neues Werk anlegen/ }).check();
+    await card.getByRole("button", { name: "Zuordnen" }).click();
+    await expect(page.getByRole("heading", { name: `„${title}“` })).toHaveCount(0);
+  }
+
+  await page.goto("/quick");
+  const novel = page.getByRole("listitem").filter({ hasText: "Shadow Slave" });
+  await expect(novel.getByText("Kap. 12")).toBeVisible();
+  await novel.getByRole("button", { name: "Ein Kapitel weiter" }).click();
+  const slider = page.getByRole("slider", { name: "Fortschritt von Project Hail Mary" });
+  await slider.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("listitem").filter({ hasText: "Project Hail Mary" }).getByText("40,5 %")).toBeVisible();
+  await page.waitForTimeout(1500); // debounce + save
+
+  await page.reload();
+  await expect(page.getByRole("listitem").filter({ hasText: "Shadow Slave" }).getByText("Kap. 13")).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "Project Hail Mary" }).getByText("40,5 %")).toBeVisible();
 });
 
 test("app pages reveal nothing without a session, even to crafted RSC requests", async ({ page, playwright, baseURL }) => {

@@ -23,6 +23,8 @@ export interface OverviewItem {
   positionLabel: string;
   positionUnknown: boolean;
   chapter: number | null;
+  /** E-book progress for the quick-update slider. */
+  percent: number | null;
   /** −/+ control for chapter and episode types; null for e-books and movies. */
   stepper: StepperState | null;
   source: { label: string; initial: string } | null;
@@ -122,6 +124,7 @@ export function toOverviewItem(row: OverviewRow, now: Date): OverviewItem {
     positionLabel: label,
     positionUnknown: unknown,
     chapter: row.chapter,
+    percent: row.percent,
     stepper: stepperFor(row),
     source:
       row.source && sourceName
@@ -151,4 +154,18 @@ export function filterAndSort(items: OverviewItem[], filter: OverviewFilter): Ov
   if (filter.sort === "title") return visible.sort(byTitle);
   // Most recent first; works without activity (e.g. just imported) go last.
   return visible.sort((a, b) => (b.lastProgressAt ?? -Infinity) - (a.lastProgressAt ?? -Infinity) || byTitle(a, b));
+}
+
+const QUICK_TYPES: MediaType[] = ["light_novel", "ebook"];
+const QUICK_LIMIT = 8;
+
+/**
+ * The quick-update screen (SPEC §9.3): the eight most recently active light novels and e-books
+ * still being read, so the next chapter or percentage is two taps away.
+ */
+export function quickUpdateItems(items: OverviewItem[]): OverviewItem[] {
+  return items
+    .filter((item) => QUICK_TYPES.includes(item.type) && item.status === "reading")
+    .sort((a, b) => (b.lastProgressAt ?? -1) - (a.lastProgressAt ?? -1) || byTitle(a, b))
+    .slice(0, QUICK_LIMIT);
 }

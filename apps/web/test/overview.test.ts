@@ -1,6 +1,6 @@
 import type { OverviewRow } from "@rwt/server";
 import { describe, expect, it } from "vitest";
-import { filterAndSort, formatRelative, type OverviewItem, toOverviewItem } from "../src/lib/overview";
+import { filterAndSort, formatRelative, type OverviewItem, quickUpdateItems, toOverviewItem } from "../src/lib/overview";
 
 const NOW = new Date("2026-10-21T20:00:00.000Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
@@ -211,5 +211,44 @@ describe("filterAndSort", () => {
 
   it("ignores a query made only of punctuation", () => {
     expect(filterAndSort(items, { ...base, query: " ?! " })).toHaveLength(4);
+  });
+});
+
+describe("quickUpdateItems (SPEC §9.3)", () => {
+  it("shows the eight most recently active light novels and e-books", () => {
+    const novels = Array.from({ length: 10 }, (_, i) =>
+      toOverviewItem(row({ type: "light_novel", title: `Novel ${i}`, chapter: i, lastProgressAt: hoursAgo(i) }), NOW),
+    );
+    const others = [
+      toOverviewItem(row({ type: "manhwa", title: "Manhwa", lastProgressAt: hoursAgo(0) }), NOW),
+      toOverviewItem(row({ type: "anime", title: "Anime", chapter: null, episode: 3, lastProgressAt: hoursAgo(0) }), NOW),
+    ];
+
+    const quick = quickUpdateItems([...others, ...novels]);
+
+    expect(quick.map((item) => item.title)).toEqual(["Novel 0", "Novel 1", "Novel 2", "Novel 3", "Novel 4", "Novel 5", "Novel 6", "Novel 7"]);
+  });
+
+  it("puts never-updated titles after active ones, alphabetically", () => {
+    const quick = quickUpdateItems([
+      toOverviewItem(row({ type: "ebook", title: "Zebra", chapter: null, percent: null }), NOW),
+      toOverviewItem(row({ type: "ebook", title: "Apfel", chapter: null, percent: null }), NOW),
+      toOverviewItem(row({ type: "ebook", title: "Mitte", chapter: null, percent: 40, lastProgressAt: hoursAgo(5) }), NOW),
+    ]);
+    expect(quick.map((item) => item.title)).toEqual(["Mitte", "Apfel", "Zebra"]);
+  });
+
+  it("leaves out completed and dropped titles", () => {
+    const quick = quickUpdateItems([
+      toOverviewItem(row({ type: "light_novel", title: "Done", status: "completed" }), NOW),
+      toOverviewItem(row({ type: "light_novel", title: "Open" }), NOW),
+    ]);
+    expect(quick.map((item) => item.title)).toEqual(["Open"]);
+  });
+
+  it("carries the percentage of an e-book for its slider", () => {
+    const [item] = quickUpdateItems([toOverviewItem(row({ type: "ebook", title: "Hail Mary", chapter: null, percent: 43.5 }), NOW)]);
+    expect(item?.percent).toBe(43.5);
+    expect(item?.stepper).toBeNull();
   });
 });

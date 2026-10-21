@@ -12,6 +12,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           Read-Watch-Tracker
         </Link>
         <nav aria-label="Hauptnavigation" className="flex items-center gap-4 text-sm">
+          <Link href="/quick" className="hover:underline">
+            Schnell-Update
+          </Link>
           <Link href="/settings" className="hover:underline">
             Einstellungen
           </Link>

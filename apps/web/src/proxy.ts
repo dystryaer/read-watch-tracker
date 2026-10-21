@@ -40,5 +40,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/|_next/static/|_next/image/|favicon.ico|icons/|manifest.webmanifest).*)"],
+  // Manifest and app icons are fetched without a session (install prompt, iOS home screen).
+  matcher: ["/((?!api/|_next/static/|_next/image/|favicon.ico|icons/|manifest.webmanifest|icon$|apple-icon$).*)"],
 };

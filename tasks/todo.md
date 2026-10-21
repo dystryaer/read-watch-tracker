@@ -145,7 +145,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T37 Share-API + iPhone-Token** · M · Abh. T36
   Akz.: `POST /share`, `/share/confirm` (Server erzeugt UUID); unbekannter Titel → Pending; Einstellungen: „iPhone-Kurzbefehl hinzufügen“ zeigt Token einmalig
 
-- [ ] **T38 Schnell-Update-PWA** · M
+- [x] **T38 Schnell-Update-PWA** · M
   Akz.: Manifest, Icons, iOS-Meta; 8 zuletzt aktive LN/E-Books; Stepper/Prozent; ≤ 2 Taps
 
 - [ ] **T39 Extension: WebNovel- und Kindle-Bibliothek** · M · Abh. T36

@@ -8,11 +8,14 @@ export const metadata: Metadata = {
   description: "Wo stehe ich bei meinen Manga, Novels, E-Books und Serien?",
   referrer: "no-referrer",
   robots: { index: false, follow: false },
+  // Added to the iPhone home screen it opens full screen on the quick update (SPEC §9.3).
+  appleWebApp: { capable: true, title: "Lesestand", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#0f766e",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
