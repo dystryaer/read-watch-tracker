@@ -65,7 +65,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T17 Einstellungen: Geräte** · S · Abh. T09, T11
   Akz.: Code eingeben + Gerätenamen bestätigen, Liste mit „zuletzt gesehen“, Widerruf
 
-- [ ] **T18 Einstellungen: Seiten, Regeln, Umzug** · M · Abh. T04, T11
+- [x] **T18 Einstellungen: Seiten, Regeln, Umzug** · M · Abh. T04, T11
   Akz.: Quellen-Liste, Tracking an/aus, Regel-Editor mit Live-Test (gleicher core-Code), Regex-Prüfung beim Speichern, Domain hinzufügen/umziehen
 
 - [x] **T19 Excel-Import** · S · Abh. T07

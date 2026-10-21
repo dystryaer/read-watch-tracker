@@ -32,15 +32,15 @@ function captureGroupCount(pattern: string): number {
   return match ? match.length - 1 : 0;
 }
 
-const Hostname = z.string().trim().toLowerCase().regex(HOSTNAME, "must be a bare host name");
+const Hostname = z.string().trim().toLowerCase().regex(HOSTNAME, "nur der Host-Name, z. B. asurascans.com");
 
 const Pattern = z
   .string()
   .min(1)
   .max(MAX_PATTERN_LENGTH)
-  .refine((pattern) => compileRulePattern(pattern) !== null, "invalid regular expression")
-  .refine((pattern) => captureGroupCount(pattern) >= 1, "needs a capture group ( … )")
-  .refine((pattern) => !NESTED_QUANTIFIER.test(pattern), "nested quantifiers are not allowed");
+  .refine((pattern) => compileRulePattern(pattern) !== null, "kein gültiger regulärer Ausdruck")
+  .refine((pattern) => captureGroupCount(pattern) >= 1, "braucht eine Gruppe ( … ) für den Wert")
+  .refine((pattern) => !NESTED_QUANTIFIER.test(pattern), "verschachtelte Wiederholungen wie (a+)+ sind nicht erlaubt");
 
 const Selector = z.string().trim().min(1).max(MAX_SELECTOR_LENGTH);
 
@@ -51,14 +51,14 @@ const NextUrlTemplate = z
   .max(MAX_TEMPLATE_LENGTH)
   .refine(
     (template) => /^(?:\{origin\}|\{seriesUrl\}|https?:\/\/)/.test(template),
-    "must start with {origin}, {seriesUrl} or http(s)://",
+    "muss mit {origin}, {seriesUrl} oder http(s):// beginnen",
   )
   .refine(
     (template) =>
       [...template.matchAll(/\{([^}]*)\}/g)].every((m) => NEXT_URL_PLACEHOLDERS.has(m[1] ?? "")),
-    "unknown placeholder",
+    "unbekannter Platzhalter (erlaubt: {origin}, {seriesUrl}, {series}, {next})",
   )
-  .refine((template) => template.includes("{next}"), "must contain {next}");
+  .refine((template) => template.includes("{next}"), "muss {next} enthalten");
 
 export const SiteRule = z.object({
   sourceKey: SourceKey,

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import "@/lib/zod-locale";
 
 export const metadata: Metadata = {
   title: "Read-Watch-Tracker",
