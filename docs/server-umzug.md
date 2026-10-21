@@ -19,6 +19,10 @@ Datei `.env` neben `docker-compose.yml` anlegen (nicht committen):
 POSTGRES_PASSWORD=<langes zufälliges Passwort>
 BETTER_AUTH_SECRET=<32+ zufällige Zeichen>
 BETTER_AUTH_URL=https://tracker.example
+# Nur für ein neues Konto nötig (bei übernommenen Daten existiert es schon):
+# SETUP_TOKEN=<16+ zufällige Zeichen>
+# Proxys vor der App, die X-Forwarded-For ergänzen (ein Caddy/Traefik: 1):
+# TRUSTED_PROXY_HOPS=1
 ```
 
 ## 2. Starten

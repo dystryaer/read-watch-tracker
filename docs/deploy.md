@@ -25,9 +25,11 @@ Beide Dienste haben kostenlose Tarife. Accounts und Secrets legst du selbst an; 
    | `DATABASE_URL` | Connection String von Neon (Pooling) |
    | `BETTER_AUTH_SECRET` | 32+ zufällige Zeichen, z. B. `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` |
    | `BETTER_AUTH_URL` | die öffentliche Adresse, z. B. `https://dein-tracker.vercel.app` |
+   | `SETUP_TOKEN` | 16+ zufällige Zeichen (gleicher Befehl). Ohne ihn ist `/setup` in Production gesperrt, damit niemand vor dir das Konto anlegt. Nach der Einrichtung darf er bleiben oder gelöscht werden. |
    | `APP_TIME_ZONE` | optional, Standard `Europe/Berlin` |
+   | `TRUSTED_PROXY_HOPS` | optional, Standard `1` (richtig für Vercel). Wie viele Proxys vor der App `X-Forwarded-For` ergänzen; nur für Rate-Limits. |
 
-4. Deployen. Danach `https://…/setup` öffnen und **dein** Konto anlegen. Ab dann ist keine Registrierung mehr möglich.
+4. Deployen. Danach `https://…/setup` öffnen, den `SETUP_TOKEN` als Einrichtungs-Code eingeben und **dein** Konto anlegen. Ab dann ist keine Registrierung mehr möglich.
 
 ## 3. Geräte verbinden
 

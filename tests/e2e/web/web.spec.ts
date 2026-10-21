@@ -37,9 +37,23 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("the one-time setup refuses a wrong setup code", async ({ page }) => {
+  await page.goto("/setup");
+  await page.getByLabel("Einrichtungs-Code").fill("wrong-code-0123456789");
+  await page.getByLabel("Name").fill(OWNER.name);
+  await page.getByLabel("E-Mail-Adresse").fill(OWNER.email);
+  await page.getByLabel(/^Passwort/).fill(OWNER.password);
+  await page.getByRole("button", { name: "Konto anlegen" }).click();
+
+  await expect(page.getByText("Der Einrichtungs-Code stimmt nicht.")).toBeVisible();
+  await expect(page).toHaveURL(/\/setup$/);
+});
+
 test("first visit leads to the one-time setup", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/setup$/);
+  // Same value as SETUP_TOKEN in playwright.config.ts.
+  await page.getByLabel("Einrichtungs-Code").fill("e2e-setup-token-0123456789");
   await page.getByLabel("Name").fill(OWNER.name);
   await page.getByLabel("E-Mail-Adresse").fill(OWNER.email);
   await page.getByLabel(/^Passwort/).fill(OWNER.password);
@@ -77,11 +91,21 @@ test("a device is paired through the settings page", async ({ page, request }) =
   await login(page);
   const start = await (await request.post("/api/v1/pairing", { data: { kind: "extension", name: "E2E Brave" } })).json();
 
+  await page.goto("/settings");
+  await page.getByLabel("Code").fill("ZZZZZZ");
+  await page.getByRole("button", { name: "Weiter" }).click();
+  await expect(page.getByText("Code unbekannt, abgelaufen oder schon benutzt.")).toBeVisible();
+
+  // The QR code leads to a confirmation that names the device, never straight to pairing.
   await page.goto(`/pair?code=${start.code}`);
-  await expect(page.getByLabel("Code")).toHaveValue(start.code);
-  await page.getByRole("button", { name: "Koppeln" }).click();
-  await expect(page.getByText("Gerät gekoppelt.")).toBeVisible();
   await expect(page.getByText("E2E Brave")).toBeVisible();
+  await expect(page.getByText(/Browser-Extension · angefragt gerade eben/)).toBeVisible();
+  const pending = await (await request.post("/api/v1/pairing/poll", { data: { pollSecret: start.pollSecret } })).json();
+  expect(pending.status).toBe("pending");
+
+  await page.getByRole("button", { name: "Koppeln bestätigen" }).click();
+  await expect(page.getByText("Gerät gekoppelt.")).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "E2E Brave" })).toBeVisible();
 
   const poll = await (await request.post("/api/v1/pairing/poll", { data: { pollSecret: start.pollSecret } })).json();
   expect(poll.status).toBe("approved");

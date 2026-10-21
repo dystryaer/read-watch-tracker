@@ -3,6 +3,7 @@
 import { DeviceName } from "@rwt/core";
 import { approvePairing, PairingCodeInvalidError, revokeDevice } from "@rwt/server";
 import { refresh } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { FormState } from "@/components/action-form";
 import { getAuthorizedDb } from "@/lib/dal";
@@ -24,8 +25,8 @@ export async function approveDeviceAction(_previous: FormState, formData: FormDa
     if (error instanceof PairingCodeInvalidError) return { error: "Code unbekannt, abgelaufen oder schon benutzt." };
     throw error;
   }
-  refresh();
-  return { message: "Gerät gekoppelt. Es meldet sich in wenigen Sekunden." };
+  // Leaves the confirmation (?code=…) so the used code is not looked up again.
+  redirect("/settings?paired=1");
 }
 
 export async function revokeDeviceAction(_previous: FormState, formData: FormData): Promise<FormState> {

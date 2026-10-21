@@ -19,6 +19,10 @@ export type ConfigResult = { ok: true; notModified: true } | { ok: true; notModi
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
+// No cookies, no caching, and no redirects: a redirect would carry the Authorization header to
+// whatever host the server (or someone in between) names.
+const REQUEST_DEFAULTS = { credentials: "omit", cache: "no-store", redirect: "error" } as const satisfies RequestInit;
+
 function retryAfterMs(response: Response): number | undefined {
   const seconds = Number(response.headers.get("retry-after"));
   return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 3600) * 1000 : undefined;
@@ -36,7 +40,7 @@ export function createApiClient(fetchFn: Fetch) {
   ): Promise<ApiResult<T>> {
     let response: Response;
     try {
-      response = await fetchFn(url, { ...init, credentials: "omit", cache: "no-store" });
+      response = await fetchFn(url, { ...init, ...REQUEST_DEFAULTS });
     } catch (error) {
       return { ok: false, kind: "retry", message: error instanceof Error ? error.message : "Netzwerkfehler" };
     }
@@ -64,7 +68,7 @@ export function createApiClient(fetchFn: Fetch) {
     async postEvents(apiUrl: string, token: string, events: ProgressEvent[]): Promise<PostEventsResult> {
       let response: Response;
       try {
-        response = await fetchFn(`${apiUrl}/api/v1/events`, { ...json({ events }, token), credentials: "omit", cache: "no-store" });
+        response = await fetchFn(`${apiUrl}/api/v1/events`, { ...json({ events }, token), ...REQUEST_DEFAULTS });
       } catch (error) {
         return { ok: false, kind: "retry", message: error instanceof Error ? error.message : "Netzwerkfehler" };
       }
@@ -86,8 +90,7 @@ export function createApiClient(fetchFn: Fetch) {
       try {
         response = await fetchFn(`${apiUrl}/api/v1/config`, {
           headers: { authorization: `Bearer ${token}`, ...(etag ? { "if-none-match": etag } : {}) },
-          credentials: "omit",
-          cache: "no-store",
+          ...REQUEST_DEFAULTS,
         });
       } catch (error) {
         return { ok: false, kind: "retry", message: error instanceof Error ? error.message : "Netzwerkfehler" };

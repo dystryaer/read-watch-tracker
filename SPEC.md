@@ -375,12 +375,12 @@ Interne Aktionen der Web-UI (Kopplung bestätigen, Zuordnung auflösen, Stand ä
 Funktioniert wie der OAuth-Device-Flow und ist für TV-Fernbedienungen gemacht, auf denen man keine Tokens eintippen will:
 
 1. Der Client ruft `POST /pairing` auf und zeigt den Code groß an (z. B. `K7P-3QX`), dazu einen QR-Code auf `<APP_URL>/pair?code=K7P3QX`.
-2. Ich öffne die Web-App (eingeloggt), gebe den Code ein und bestätige den Gerätenamen.
+2. Ich öffne die Web-App (eingeloggt) und gebe den Code ein. Die Web-App zeigt zuerst, was gekoppelt werden will (Art, Name, wie lange die Anfrage her ist), mit dem Hinweis, nur ein Gerät zu bestätigen, das ich vor mir habe. Erst „Koppeln bestätigen“ koppelt; der Name lässt sich dabei ändern. Auch der QR-Code führt nur zu dieser Bestätigung.
 3. Der Client fragt alle 3 s `POST /pairing/poll` ab und erhält das Token. Gespeichert wird es lokal: in der Extension unter `chrome.storage.local`, auf der Shield in privaten SharedPreferences.
 
 **iPhone-Kurzbefehl:** Ein Kurzbefehl kann den Poll-Ablauf nicht sinnvoll abbilden. Unter „Einstellungen → Geräte → iPhone-Kurzbefehl hinzufügen“ erzeugt die Web-App deshalb direkt ein `phone`-Token und zeigt es einmalig an. Beim Hinzufügen des vorbereiteten Kurzbefehls fragt iOS das Token ab (Import-Frage). Anleitung: `docs/setup-iphone.md`.
 
-Token: 32 zufällige Bytes, base64url. Widerruf in den Einstellungen setzt `revoked_at`; ab dann liefert die API `401`.
+Token: 32 zufällige Bytes, base64url. Es wird beim ersten erfolgreichen Poll atomar vergeben, sodass zwei gleichzeitige Polls nie beide ein Token bekommen. Fehlgeschlagene Token-Prüfungen sind pro Client-Adresse begrenzt (30/min). Widerruf in den Einstellungen setzt `revoked_at`; ab dann liefert die API `401`.
 
 ### 6.3 Event-Vertrag
 

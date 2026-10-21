@@ -92,6 +92,23 @@ describe("ingestEvents – linked series", () => {
     expect(link?.seriesUrl).toBe("https://asuracomic.net/series/overgeared");
   });
 
+  it("drops URLs that are not on the website source's domains", async () => {
+    const { work } = await seedLinkedOvergeared();
+    const event = chapterEvent({
+      chapter: 345,
+      source: { url: "https://evil.example/phish/chapter/345", seriesUrl: "https://evil.example/phish" },
+    });
+
+    const [result] = await ingestEvents(handle.db, null, [event], NOW);
+
+    expect(result?.outcome).toBe("applied");
+    expect((await workById(work.id))?.lastUrl).toBeNull();
+    const [stored] = await handle.db.select().from(events).where(eq(events.id, event.id));
+    expect(stored?.url).toBeNull();
+    const [link] = await handle.db.select().from(workLinks);
+    expect(link?.seriesUrl).toBeNull();
+  });
+
   it("does not apply a position that does not fit the work's type", async () => {
     const { work } = await seedLinkedOvergeared();
     const event = chapterEvent({ position: { unit: "episode", season: 1, episode: 3 } });

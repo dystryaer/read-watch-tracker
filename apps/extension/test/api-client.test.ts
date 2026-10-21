@@ -90,3 +90,21 @@ describe("pairing", () => {
     });
   });
 });
+
+describe("redirects", () => {
+  it("never follows a redirect, so the token cannot be sent on to another host", async () => {
+    const fetchFn = vi.fn(async () => new Response("{}", { status: 200 }));
+    const client = createApiClient(fetchFn);
+
+    await client.postEvents(API, TOKEN, [event()]);
+    await client.getConfig(API, TOKEN, null);
+    await client.startPairing(API, "Brave");
+    await client.pollPairing(API, "s".repeat(43));
+    await client.enableSource(API, TOKEN, { origin: "https://asuracomic.net" });
+    await client.ignoreSeries(API, TOKEN, { sourceKey: "site:asura", externalKey: "x", rawTitle: "X" });
+
+    const inits = fetchFn.mock.calls.map((call) => (call as unknown as [string, RequestInit])[1]);
+    expect(inits).toHaveLength(6);
+    for (const init of inits) expect(init.redirect).toBe("error");
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeNextPath } from "../src/lib/next-path";
+import { decodeSegment, safeNextPath } from "../src/lib/next-path";
 
 describe("safeNextPath", () => {
   it.each([["/"], ["/inbox"], ["/pair?code=K7P3QX"], ["/works/9a86ad4e-ed0c-4ba2-b852-8f84284d6adc"], ["/settings#geraete"]])(
@@ -31,5 +31,20 @@ describe("safeNextPath", () => {
   it("does not send the user back to the login itself", () => {
     expect(safeNextPath("/login")).toBe("/");
     expect(safeNextPath("/login?next=/inbox")).toBe("/");
+  });
+});
+
+describe("decodeSegment", () => {
+  it("decodes an encoded dynamic segment", () => {
+    expect(decodeSegment("site%3Aasura")).toBe("site:asura");
+  });
+
+  it("leaves an already decoded segment alone", () => {
+    expect(decodeSegment("site:asura")).toBe("site:asura");
+  });
+
+  it("returns null for malformed escapes instead of throwing", () => {
+    expect(decodeSegment("%E0%A4%A")).toBeNull();
+    expect(decodeSegment("%")).toBeNull();
   });
 });

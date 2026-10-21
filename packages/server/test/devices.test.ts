@@ -7,6 +7,7 @@ import {
   approvePairing,
   authenticateDevice,
   createDeviceWithToken,
+  describePairing,
   listDevices,
   PairingCodeInvalidError,
   pollPairing,
@@ -159,5 +160,24 @@ describe("listDevices", () => {
 
     expect(list.map((d) => d.name)).toEqual(["Shield", "Brave"]);
     expect(list[0]).not.toHaveProperty("tokenHash");
+  });
+});
+
+describe("describePairing", () => {
+  it("shows what is asking to be paired, without approving it", async () => {
+    const pairing = await startPairing(handle.db, { kind: "shield", name: "Shield Wohnzimmer" }, NOW);
+
+    const described = await describePairing(handle.db, ` ${pairing.code.toLowerCase()} `, minutes(1));
+
+    expect(described).toEqual({ code: pairing.code, kind: "shield", deviceName: "Shield Wohnzimmer", requestedAt: NOW });
+    expect(await pollPairing(handle.db, pairing.pollSecret, minutes(1))).toEqual({ status: "pending" });
+  });
+
+  it("returns null for unknown, expired or already approved codes", async () => {
+    const pairing = await startPairing(handle.db, { kind: "shield", name: "Shield" }, NOW);
+    expect(await describePairing(handle.db, "ZZZZZZ", NOW)).toBeNull();
+    expect(await describePairing(handle.db, pairing.code, minutes(11))).toBeNull();
+    await approvePairing(handle.db, pairing.code, undefined, minutes(1));
+    expect(await describePairing(handle.db, pairing.code, minutes(2))).toBeNull();
   });
 });

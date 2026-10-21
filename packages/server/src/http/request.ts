@@ -12,10 +12,23 @@ export function errorResponse(error: string, status: number, headers: Record<str
   return jsonResponse({ error }, status, headers);
 }
 
-/** Client address behind a proxy such as Vercel; only used as a rate-limit key. */
-export function clientAddress(headers: Headers): string {
-  const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwarded || headers.get("x-real-ip") || "unknown";
+function trustedProxyHops(): number {
+  const hops = Number(process.env.TRUSTED_PROXY_HOPS ?? 1);
+  return Number.isInteger(hops) && hops >= 1 ? hops : 1;
+}
+
+/**
+ * Client address behind proxies, only used as a rate-limit key. Read from the right of
+ * X-Forwarded-For: the left entries come from the client and can be forged, the entry `hops`
+ * from the right was added by the trusted proxy (Vercel: 1, one nginx or Caddy in front: 1).
+ */
+export function clientAddress(headers: Headers, hops = trustedProxyHops()): string {
+  const entries = (headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+  const forwarded = entries.length >= hops ? entries[entries.length - hops] : undefined;
+  return forwarded ?? headers.get("x-real-ip") ?? "unknown";
 }
 
 export function bearerToken(request: Request): string | null {

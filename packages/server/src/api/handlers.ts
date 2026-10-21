@@ -21,6 +21,7 @@ const MAX_EVENTS_BODY_BYTES = 512 * 1024;
 const MAX_SMALL_BODY_BYTES = 4 * 1024;
 
 export interface ApiLimiters {
+  authFailures: RateLimiter;
   events: RateLimiter;
   config: RateLimiter;
   sources: RateLimiter;
@@ -29,9 +30,11 @@ export interface ApiLimiters {
 }
 
 export function createApiLimiters(
-  overrides: { eventsPerMinute?: number; pairingStartsPerMinute?: number } = {},
+  overrides: { eventsPerMinute?: number; pairingStartsPerMinute?: number; authFailuresPerMinute?: number } = {},
 ): ApiLimiters {
   return {
+    // Wrong tokens per client address: guessing is hopeless (256 bit), but each try costs a query.
+    authFailures: new RateLimiter({ limit: overrides.authFailuresPerMinute ?? 30, windowMs: MINUTE }),
     events: new RateLimiter({ limit: overrides.eventsPerMinute ?? 60, windowMs: MINUTE }),
     config: new RateLimiter({ limit: 30, windowMs: MINUTE }),
     sources: new RateLimiter({ limit: 30, windowMs: MINUTE }),
@@ -52,8 +55,9 @@ const tooManyRequests = () => errorResponse("rate_limited", 429, { "retry-after"
 async function authenticate(request: Request, context: ApiContext): Promise<Parsed<DeviceSummary>> {
   const token = bearerToken(request);
   const device = token ? await authenticateDevice(context.db, token, context.now?.()) : null;
-  if (!device) return { ok: false, response: errorResponse("unauthorized", 401, { "www-authenticate": "Bearer" }) };
-  return { ok: true, value: device };
+  if (device) return { ok: true, value: device };
+  if (!context.limiters.authFailures.allow(clientAddress(request.headers))) return { ok: false, response: tooManyRequests() };
+  return { ok: false, response: errorResponse("unauthorized", 401, { "www-authenticate": "Bearer" }) };
 }
 
 /** POST /api/v1/events (SPEC §6.1). */

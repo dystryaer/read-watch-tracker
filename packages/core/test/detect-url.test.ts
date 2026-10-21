@@ -51,6 +51,14 @@ describe("detectChapterFromUrl – generic", () => {
     });
   });
 
+  it("skips a volume segment before the chapter segment when looking for the series", () => {
+    expect(detectChapterFromUrl("https://site.example/manga/one-piece/vol-3/chapter-5", "")).toMatchObject({
+      chapter: 5,
+      seriesKey: "one-piece",
+      seriesUrl: "https://site.example/manga/one-piece",
+    });
+  });
+
   it("skips generic segments such as /manga/ when looking for the series", () => {
     expect(
       detectChapterFromUrl("https://site.example/manga/chapter-5", "One Piece Chapter 5 - Site"),
@@ -161,6 +169,15 @@ describe("detectChapterFromUrl – with a site rule", () => {
   it("ignores an invalid pattern instead of throwing", () => {
     const broken = { ...rule, chapterPattern: "(unclosed" } as SiteRule;
     expect(() => detectChapterFromUrl("https://reader.example/read/x/1", "", broken)).not.toThrow();
+  });
+
+  it("runs rule patterns on at most the first 512 characters of the path", () => {
+    const tail: SiteRule = { ...rule, seriesPattern: undefined, chapterPattern: String.raw`/c(\d+)$` };
+    const near = `https://reader.example/manga/solo-leveling/${"a".repeat(400)}/c12`;
+    const far = `https://reader.example/manga/solo-leveling/${"a".repeat(600)}/c12`;
+
+    expect(detectChapterFromUrl(near, "", tail)?.chapter).toBe(12);
+    expect(detectChapterFromUrl(far, "", tail)).toBeNull();
   });
 });
 

@@ -32,7 +32,7 @@ async function workById(id: string) {
 
 describe("resolvePendingMatch – link", () => {
   it("links the key and replays waiting events in time order", async () => {
-    await seedSource(handle.db, { key: "site:asura" });
+    await seedSource(handle.db, { key: "site:asura" }, ["asuracomic.net"]);
     const work = await seedWork(handle.db, { title: "Overgeared" });
     await ingestEvents(
       handle.db,

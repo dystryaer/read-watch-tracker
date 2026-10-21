@@ -13,6 +13,8 @@ export interface UrlDetection {
 
 const MAX_CHAPTER = 99999.99;
 const MAX_PAGE_TITLE_LENGTH = 1000;
+/** Bounds the work a user-written rule pattern can cause, on top of the shape checks in SiteRule. */
+const MAX_RULE_INPUT_LENGTH = 512;
 
 // Lookbehind instead of \b so "match-12" or "epic" never count as "ch"/"ep" tokens.
 const PATH_CHAPTER_TOKEN =
@@ -61,13 +63,15 @@ export function detectChapterFromUrl(
   const path = url.pathname;
   const title = cleanChapterTitle(pageTitle);
 
+  const rulePath = path.slice(0, MAX_RULE_INPUT_LENGTH);
+
   const chapterMatch = rule?.chapterPattern
-    ? matchRuleChapter(path, rule.chapterPattern)
+    ? matchRuleChapter(rulePath, rule.chapterPattern)
     : (matchPathChapter(path) ?? matchTitleChapter(pageTitle));
   if (chapterMatch === null) return null;
 
   const series = rule?.seriesPattern
-    ? matchRuleSeries(path, rule.seriesPattern)
+    ? matchRuleSeries(rulePath, rule.seriesPattern)
     : chapterMatch.pathIndex === null
       ? null
       : seriesFromPath(path, chapterMatch.pathIndex);
@@ -119,7 +123,10 @@ function matchRuleSeries(path: string, pattern: string): { raw: string; path: st
   return { raw: match[1], path: path.slice(0, span[1]) };
 }
 
-/** The series is the text before the chapter token in the same segment, else the nearest non-generic segment. */
+/**
+ * The series is the text before the chapter token in the same segment, else the nearest segment
+ * that is neither generic (/manga/) nor a volume (/vol-3/).
+ */
 function seriesFromPath(path: string, tokenIndex: number): { raw: string; path: string | null } | null {
   const segments = path.slice(0, tokenIndex).split("/");
   const partial = (segments.pop() ?? "").replace(/[-_.]+$/, "");
@@ -127,7 +134,7 @@ function seriesFromPath(path: string, tokenIndex: number): { raw: string; path: 
 
   for (let i = segments.length - 1; i >= 0; i--) {
     const segment = segments[i] ?? "";
-    if (segment === "" || GENERIC_SEGMENTS.has(segment.toLowerCase())) continue;
+    if (segment === "" || GENERIC_SEGMENTS.has(segment.toLowerCase()) || VOLUME_PREFIX.test(segment)) continue;
     return { raw: segment, path: segments.slice(0, i + 1).join("/") };
   }
   return null;

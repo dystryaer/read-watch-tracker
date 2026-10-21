@@ -105,6 +105,15 @@ describe("POST /api/v1/events", () => {
     expect(response.status).toBe(415);
   });
 
+  it("limits failed token checks per client address", async () => {
+    const limited: ApiContext = { ...context, limiters: createApiLimiters({ authFailuresPerMinute: 2 }) };
+    const attempt = () =>
+      handleEvents(post("/api/v1/events", { events: [chapterEvent()] }, { authorization: `Bearer ${"X".repeat(43)}`, "x-forwarded-for": "10.0.0.9" }), limited);
+    expect((await attempt()).status).toBe(401);
+    expect((await attempt()).status).toBe(401);
+    expect((await attempt()).status).toBe(429);
+  });
+
   it("answers 429 when a device sends too many requests", async () => {
     const limited: ApiContext = { ...context, limiters: createApiLimiters({ eventsPerMinute: 1 }) };
     await handleEvents(post("/api/v1/events", { events: [chapterEvent()] }), limited);

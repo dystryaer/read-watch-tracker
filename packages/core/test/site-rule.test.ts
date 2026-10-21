@@ -33,9 +33,14 @@ describe("SiteRule", () => {
     [["https://asuracomic.net"]],
     [["asuracomic.net/path"]],
     [["-bad.example"]],
-    [Array.from({ length: 21 }, (_, i) => `d${i}.example`)],
+    [Array.from({ length: 51 }, (_, i) => `d${i}.example`)],
   ])("rejects the domain list %j", (domains) => {
     expect(SiteRule.safeParse({ ...baseRule, domains }).success).toBe(false);
+  });
+
+  it("accepts up to 50 domains, as many as a source can collect through domain moves", () => {
+    const domains = Array.from({ length: 50 }, (_, i) => `d${i}.example`);
+    expect(SiteRule.safeParse({ ...baseRule, domains }).success).toBe(true);
   });
 
   it("accepts localhost with a port-free name for local testing", () => {
@@ -57,12 +62,37 @@ describe("SiteRule", () => {
     expect(SiteRule.safeParse({ ...baseRule, chapterPattern }).success).toBe(false);
   });
 
-  it.each([[String.raw`(\d+)+$`], [String.raw`((a+)*)`], [String.raw`(\w*){2,}`]])(
-    "rejects the nested quantifier pattern %j",
-    (chapterPattern) => {
-      expect(SiteRule.safeParse({ ...baseRule, chapterPattern }).success).toBe(false);
-    },
-  );
+  it.each([
+    [String.raw`(\d+)+$`],
+    [String.raw`((a+)*)`],
+    [String.raw`(\w*){2,}`],
+    // Bypasses of the earlier nested-quantifier heuristic (security review M1).
+    [String.raw`/chapter-((\d+))+x`],
+    [String.raw`((?:\d|\d)*)x`],
+    [String.raw`(?:-\d)*(\d+)`],
+    [String.raw`(\d){3}`],
+  ])("rejects the repeated group %j", (chapterPattern) => {
+    const result = SiteRule.safeParse({ ...baseRule, chapterPattern });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toMatch(/nur mit \? optional/);
+  });
+
+  it.each([[String.raw`(\d+)-\1`], [String.raw`(?<n>\d+)\k<n>`]])("rejects the backreference %j", (chapterPattern) => {
+    const result = SiteRule.safeParse({ ...baseRule, chapterPattern });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toMatch(/Rückverweise/);
+  });
+
+  it.each([
+    [String.raw`/chapter/(\d+(?:\.\d+)?)`],
+    [String.raw`(?:-(\d+))?$`],
+    [String.raw`\)+(\d+)`],
+    [String.raw`[)]+(\d+)`],
+    [String.raw`[\]()]*(\d+)`],
+    [String.raw`chapter-(\d+)[\1]`],
+  ])("accepts the safe pattern %j", (chapterPattern) => {
+    expect(SiteRule.safeParse({ ...baseRule, chapterPattern }).success).toBe(true);
+  });
 
   it("rejects an unknown placeholder in the next-URL template", () => {
     expect(SiteRule.safeParse({ ...baseRule, nextUrlTemplate: "{origin}/{evil}" }).success).toBe(

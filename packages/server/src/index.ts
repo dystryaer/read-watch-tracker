@@ -5,6 +5,7 @@ export {
   approvePairing,
   authenticateDevice,
   createDeviceWithToken,
+  describePairing,
   type Device,
   type DeviceKind,
   type DeviceSummary,

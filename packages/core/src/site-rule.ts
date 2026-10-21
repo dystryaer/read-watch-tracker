@@ -6,10 +6,6 @@ const MAX_SELECTOR_LENGTH = 200;
 const MAX_TEMPLATE_LENGTH = 500;
 const NEXT_URL_PLACEHOLDERS = new Set(["origin", "seriesUrl", "series", "next"]);
 
-// A quantified group that itself contains a quantifier, e.g. (\d+)+ or (a*){2,}:
-// the classic catastrophic-backtracking shape. A heuristic, not a full ReDoS proof.
-const NESTED_QUANTIFIER = /\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)\s*[+*{]/;
-
 const HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
 
 export function isHostname(value: string): boolean {
@@ -26,6 +22,29 @@ export function compileRulePattern(pattern: string, flags = "i"): RegExp | null 
   }
 }
 
+/**
+ * Rejects the shapes behind catastrophic backtracking instead of trying to recognize every
+ * dangerous one: a repeated group – (\d+)+, (a|a)*, (x){3} – and backreferences. Groups may only
+ * be made optional with "?". Escaped parentheses and character classes are skipped.
+ */
+function unsafeShape(pattern: string): "repeated_group" | "backreference" | null {
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const char = pattern[i];
+    if (char === "\\") {
+      if (!inClass && /[1-9k]/.test(pattern[i + 1] ?? "")) return "backreference";
+      i++;
+    } else if (inClass) {
+      if (char === "]") inClass = false;
+    } else if (char === "[") {
+      inClass = true;
+    } else if (char === ")" && /[+*{]/.test(pattern[i + 1] ?? "")) {
+      return "repeated_group";
+    }
+  }
+  return null;
+}
+
 function captureGroupCount(pattern: string): number {
   // An empty alternative makes the regex match "" and exposes every group in the result.
   const match = compileRulePattern(`${pattern}|`)?.exec("");
@@ -40,7 +59,11 @@ const Pattern = z
   .max(MAX_PATTERN_LENGTH)
   .refine((pattern) => compileRulePattern(pattern) !== null, "kein gültiger regulärer Ausdruck")
   .refine((pattern) => captureGroupCount(pattern) >= 1, "braucht eine Gruppe ( … ) für den Wert")
-  .refine((pattern) => !NESTED_QUANTIFIER.test(pattern), "verschachtelte Wiederholungen wie (a+)+ sind nicht erlaubt");
+  .refine(
+    (pattern) => unsafeShape(pattern) !== "repeated_group",
+    "Gruppen dürfen nur mit ? optional sein, nicht wiederholt werden (wie (a+)+ oder (ab)*)",
+  )
+  .refine((pattern) => unsafeShape(pattern) !== "backreference", "Rückverweise wie \\1 sind nicht erlaubt");
 
 const Selector = z.string().trim().min(1).max(MAX_SELECTOR_LENGTH);
 
@@ -62,7 +85,7 @@ const NextUrlTemplate = z
 
 export const SiteRule = z.object({
   sourceKey: SourceKey,
-  domains: z.array(Hostname).min(1).max(20),
+  domains: z.array(Hostname).min(1).max(50),
   chapterPattern: Pattern.optional(),
   seriesPattern: Pattern.optional(),
   titleSelector: Selector.optional(),

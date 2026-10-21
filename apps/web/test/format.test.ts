@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventKindLabel, eventOutcomeLabel, formatDateTime, positionText } from "../src/lib/format";
+import { eventKindLabel, eventOutcomeLabel, formatAge, formatDateTime, positionText } from "../src/lib/format";
 
 describe("positionText", () => {
   it.each([
@@ -35,5 +35,25 @@ describe("formatDateTime", () => {
   it("formats in the German time zone regardless of the server's zone", () => {
     expect(formatDateTime(new Date("2026-10-21T18:30:00Z"))).toBe("21.10.2026, 20:30");
     expect(formatDateTime(new Date("2026-12-21T18:30:00Z"))).toBe("21.12.2026, 19:30");
+  });
+});
+
+describe("formatAge", () => {
+  const now = new Date("2026-10-21T20:00:00Z");
+  const before = (ms: number) => new Date(now.getTime() - ms);
+
+  it.each([
+    [0, "gerade eben"],
+    [59_000, "gerade eben"],
+    [60_000, "vor 1 Minute"],
+    [9 * 60_000 + 59_000, "vor 9 Minuten"],
+    [60 * 60_000, "vor 1 Stunde"],
+    [5 * 60 * 60_000, "vor 5 Stunden"],
+  ])("formats %i ms ago as %j", (ms, expected) => {
+    expect(formatAge(before(ms), now)).toBe(expected);
+  });
+
+  it("treats a time in the future (clock skew) as just now", () => {
+    expect(formatAge(new Date(now.getTime() + 30_000), now)).toBe("gerade eben");
   });
 });

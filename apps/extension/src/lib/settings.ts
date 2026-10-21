@@ -3,16 +3,24 @@ import { z } from "zod";
 import type { Store } from "./storage";
 
 const SETTINGS_KEY = "settings";
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** https, or plain http only on this machine: the device token must never travel unencrypted. */
+function isTrackerOrigin(value: string): boolean {
+  const url = parseHttpUrl(value);
+  return url !== null && (url.protocol === "https:" || LOCAL_HOSTS.has(url.hostname));
+}
+const TrackerUrl = HttpUrlSchema.refine(isTrackerOrigin);
 const CONFIG_KEY = "config";
 
 const Settings = z.object({
   // Origin of the tracker, e.g. https://tracker.example – checked again on every load.
-  apiUrl: HttpUrlSchema.nullable().catch(null),
+  apiUrl: TrackerUrl.nullable().catch(null),
   deviceToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/).nullable().catch(null),
   deviceName: z.string().max(100).catch("Brave"),
   pairing: z
     .object({
-      apiUrl: HttpUrlSchema,
+      apiUrl: TrackerUrl,
       code: z.string().regex(/^[A-Z0-9]{6}$/),
       pollSecret: z.string().min(20).max(100),
       expiresAt: z.iso.datetime({ offset: true }),
@@ -35,7 +43,8 @@ export async function updateSettings(store: Store, patch: Partial<Settings>): Pr
 
 /** Origin of an API address typed by the user ("https://tracker.example/settings" → "https://tracker.example"). */
 export function apiOrigin(raw: string): string | null {
-  return parseHttpUrl(raw.trim())?.origin ?? null;
+  const origin = parseHttpUrl(raw.trim())?.origin;
+  return origin && isTrackerOrigin(origin) ? origin : null;
 }
 
 const CachedConfig = z.object({

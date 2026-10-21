@@ -32,6 +32,15 @@ export const eventKindLabel = (kind: EventKind) => KIND_LABELS[kind];
 export const eventOutcomeLabel = (outcome: EventOutcome) => OUTCOME_LABELS[outcome];
 export const formatDateTime = (date: Date) => dateTimeFormat.format(date);
 
+/** Short relative age for recent moments, e.g. when a pairing code was requested. */
+export function formatAge(date: Date, now = new Date()): string {
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000);
+  if (minutes < 1) return "gerade eben";
+  if (minutes < 60) return minutes === 1 ? "vor 1 Minute" : `vor ${minutes} Minuten`;
+  const hours = Math.floor(minutes / 60);
+  return hours === 1 ? "vor 1 Stunde" : `vor ${hours} Stunden`;
+}
+
 export function positionText(columns: {
   chapter: number | null;
   season: number | null;

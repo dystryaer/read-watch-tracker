@@ -64,6 +64,25 @@ export async function startPairing(
   throw new Error("Could not allocate a pairing code");
 }
 
+/**
+ * What is asking to be paired (SPEC §6.2), shown before the user approves, so a code sent by
+ * someone else ("phishing") is recognizable as a device the user does not have in front of them.
+ */
+export async function describePairing(
+  db: Db,
+  typedCode: string,
+  now = new Date(),
+): Promise<{ code: string; kind: DeviceKind; deviceName: string; requestedAt: Date } | null> {
+  const code = typedCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const [pairing] = await db
+    .select()
+    .from(pairingCodes)
+    .where(and(eq(pairingCodes.code, code), gt(pairingCodes.expiresAt, now), isNull(pairingCodes.approvedDeviceId)));
+  return pairing
+    ? { code: pairing.code, kind: pairing.deviceKind, deviceName: pairing.deviceName, requestedAt: pairing.createdAt }
+    : null;
+}
+
 /** Step 2: the logged-in user enters the code in the web app. */
 export async function approvePairing(
   db: Db,
@@ -103,9 +122,16 @@ export async function pollPairing(db: Db, pollSecret: string, now = new Date()):
       return pairing.expiresAt.getTime() > now.getTime() ? { status: "pending" } : { status: "expired" };
     }
 
+    // Claimed atomically first: two concurrent polls can never both receive a token.
+    const claimed = await tx
+      .update(pairingCodes)
+      .set({ tokenIssuedAt: now })
+      .where(and(eq(pairingCodes.code, pairing.code), isNull(pairingCodes.tokenIssuedAt)))
+      .returning({ code: pairingCodes.code });
+    if (claimed.length === 0) return { status: "expired" };
+
     const deviceToken = randomToken();
     await tx.update(devices).set({ tokenHash: sha256(deviceToken) }).where(eq(devices.id, pairing.approvedDeviceId));
-    await tx.update(pairingCodes).set({ tokenIssuedAt: now }).where(eq(pairingCodes.code, pairing.code));
     return { status: "approved", deviceToken };
   });
 }

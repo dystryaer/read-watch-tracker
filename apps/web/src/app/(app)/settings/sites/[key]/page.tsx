@@ -5,13 +5,14 @@ import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { RuleEditor } from "@/components/sites/rule-editor";
 import { getAuthorizedDb } from "@/lib/dal";
+import { decodeSegment } from "@/lib/next-path";
 import { addDomainAction, renameSiteAction } from "../actions";
 
 const inputClass =
   "rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900";
 
 export default async function SitePage({ params }: { params: Promise<{ key: string }> }) {
-  const key = SourceKey.safeParse(decodeURIComponent((await params).key));
+  const key = SourceKey.safeParse(decodeSegment((await params).key));
   if (!key.success) notFound();
   const db = await getAuthorizedDb();
   const site = await getSite(db, key.data);

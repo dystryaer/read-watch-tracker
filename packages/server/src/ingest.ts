@@ -54,6 +54,7 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
 
   const occurredAt = clampToNow(new Date(event.occurredAt), now);
   const source = await resolveSource(db, event.source);
+  const urls = await urlsOnSource(db, source, event.source);
   const work = await findLinkedWork(db, source.id, event);
 
   let outcome: EventOutcome;
@@ -61,13 +62,13 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
     outcome = await applyProgress(
       db,
       work,
-      { position: event.position, kind: event.kind, sourceId: source.id, url: event.source.url ?? null, occurredAt },
+      { position: event.position, kind: event.kind, sourceId: source.id, url: urls.url, occurredAt },
       now,
     );
-    if (event.source.seriesUrl) {
+    if (urls.seriesUrl) {
       await db
         .update(workLinks)
-        .set({ seriesUrl: event.source.seriesUrl })
+        .set({ seriesUrl: urls.seriesUrl })
         .where(and(eq(workLinks.sourceId, source.id), eq(workLinks.externalKey, event.source.externalKey)));
     }
   } else if (await isIgnored(db, source.id, event.source.externalKey)) {
@@ -84,7 +85,7 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
     kind: event.kind,
     externalKey: event.source.externalKey,
     rawTitle: event.source.rawTitle,
-    url: event.source.url ?? null,
+    url: urls.url,
     ...positionColumns(event.position),
     occurredAt,
     receivedAt: now,
@@ -92,6 +93,25 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
     outcome,
   });
   return outcome;
+}
+
+/**
+ * For websites only URLs on the source's own domains are kept: a stolen device token must not be
+ * able to plant links to other hosts behind "Weiterlesen". Services and apps keep theirs.
+ */
+async function urlsOnSource(
+  db: Db,
+  source: Source,
+  input: ProgressEvent["source"],
+): Promise<{ url: string | null; seriesUrl: string | null }> {
+  if (source.kind !== "website") return { url: input.url ?? null, seriesUrl: input.seriesUrl ?? null };
+  const rows = await db.select({ domain: sourceDomains.domain }).from(sourceDomains).where(eq(sourceDomains.sourceId, source.id));
+  const domains = new Set(rows.map((row) => row.domain));
+  const onSource = (value: string | undefined) => {
+    const host = parseHttpUrl(value)?.hostname;
+    return value && host && domains.has(normalizeDomain(host)) ? value : null;
+  };
+  return { url: onSource(input.url), seriesUrl: onSource(input.seriesUrl) };
 }
 
 function clampToNow(occurredAt: Date, now: Date): Date {

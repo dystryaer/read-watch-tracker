@@ -28,6 +28,7 @@ export default defineConfig({
       DATABASE_URL: "pglite:./.data/e2e",
       BETTER_AUTH_SECRET: "e2e-only-secret-e2e-only-secret-e2e",
       BETTER_AUTH_URL: WEB_URL,
+      SETUP_TOKEN: "e2e-setup-token-0123456789",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },

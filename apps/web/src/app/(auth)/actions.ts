@@ -7,7 +7,8 @@ import { z } from "zod";
 import { getAuth, hasOwnerAccount } from "@/lib/auth";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/auth-config";
 import { safeNextPath } from "@/lib/next-path";
-import { clientAddress, loginLimiterOverall, loginLimiterPerClient } from "@/lib/request";
+import { clientAddress, loginLimiterPerClient } from "@/lib/request";
+import { setupGate, setupTokenMatches } from "@/lib/setup-token";
 
 export type FormState = { error: string } | null;
 
@@ -24,7 +25,7 @@ const SetupInput = z.object({
 
 export async function signInAction(_previous: FormState, formData: FormData): Promise<FormState> {
   const requestHeaders = await headers();
-  if (!loginLimiterPerClient.allow(clientAddress(requestHeaders)) || !loginLimiterOverall.allow("all")) {
+  if (!loginLimiterPerClient.allow(clientAddress(requestHeaders))) {
     return { error: "Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen." };
   }
   const input = LoginInput.safeParse({ email: formData.get("email"), password: formData.get("password") });
@@ -41,6 +42,18 @@ export async function signInAction(_previous: FormState, formData: FormData): Pr
 
 export async function setupAction(_previous: FormState, formData: FormData): Promise<FormState> {
   if (await hasOwnerAccount()) redirect("/login");
+  const requestHeaders = await headers();
+  const gate = setupGate(process.env);
+  if (gate === "disabled") return { error: "Die Einrichtung ist gesperrt, solange SETUP_TOKEN nicht gesetzt ist." };
+  if (gate === "token") {
+    if (!loginLimiterPerClient.allow(clientAddress(requestHeaders))) {
+      return { error: "Zu viele Versuche. Bitte in 15 Minuten erneut versuchen." };
+    }
+    if (!setupTokenMatches(formData.get("setupToken"), process.env.SETUP_TOKEN ?? "")) {
+      return { error: "Der Einrichtungs-Code stimmt nicht." };
+    }
+  }
+
   const input = SetupInput.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -53,7 +66,7 @@ export async function setupAction(_previous: FormState, formData: FormData): Pro
   }
 
   try {
-    await (await getAuth()).api.signUpEmail({ body: input.data, headers: await headers() });
+    await (await getAuth()).api.signUpEmail({ body: input.data, headers: requestHeaders });
   } catch (error) {
     if (isAPIError(error)) return { error: "Das Konto konnte nicht angelegt werden." };
     throw error;

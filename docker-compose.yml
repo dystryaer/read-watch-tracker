@@ -29,6 +29,8 @@ services:
       DATABASE_URL: postgres://tracker:${POSTGRES_PASSWORD}@db:5432/tracker
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?set BETTER_AUTH_URL in .env}
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:

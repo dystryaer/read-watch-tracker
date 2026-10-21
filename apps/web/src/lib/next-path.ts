@@ -13,3 +13,12 @@ export function safeNextPath(raw: unknown): string {
   if (/^\/login(?:[/?#]|$)/.test(raw)) return "/";
   return raw;
 }
+
+/** Dynamic route segment as text; malformed escapes such as "%E0%A4%A" yield null instead of a 500. */
+export function decodeSegment(raw: string): string | null {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+}

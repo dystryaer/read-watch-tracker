@@ -18,7 +18,7 @@ Nach einem Update erneut bauen und in `brave://extensions` auf **Neu laden** kli
 1. Rechtsklick auf das Extension-Symbol → **Optionen**.
 2. Adresse deines Trackers (z. B. `https://dein-tracker.vercel.app`) und einen Gerätenamen eintragen, **Koppeln** klicken.
 3. Brave fragt nach Zugriff auf genau diese Adresse → erlauben.
-4. Der sechsstellige Code erscheint. Im Tracker unter **Einstellungen → Gerät koppeln** eingeben (oder auf „Im Tracker öffnen“ klicken). Nach wenigen Sekunden zeigt die Optionsseite „Gekoppelt“.
+4. Der sechsstellige Code erscheint. Im Tracker unter **Einstellungen → Gerät koppeln** eingeben (oder auf „Im Tracker öffnen“ klicken). Der Tracker zeigt, welches Gerät sich koppeln will; prüfen und **Koppeln bestätigen** klicken. Nach wenigen Sekunden zeigt die Optionsseite „Gekoppelt“.
 
 ## 3. Manga-Seiten freischalten
 

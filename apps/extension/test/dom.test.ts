@@ -31,6 +31,29 @@ describe("h", () => {
     expect(() => h("div", { style: "background:url(javascript:alert(1))" })).toThrow();
   });
 
+  it.each([["formaction"], ["srcdoc"], ["action"], ["xlink:href"], ["poster"], ["src"]])(
+    "refuses the attribute %j, which is not on the allowlist",
+    (name) => {
+      expect(() => h("button", { [name]: "https://tracker.example" })).toThrow();
+    },
+  );
+
+  it("accepts the attributes the popup and options page use", () => {
+    const input = h("input", {
+      type: "text",
+      name: "apiUrl",
+      value: "x",
+      placeholder: "https://…",
+      autocomplete: "off",
+      maxlength: "100",
+      required: "",
+      class: "wide",
+      "aria-label": "Adresse",
+      role: "status",
+    });
+    expect(input.getAttribute("aria-label")).toBe("Adresse");
+  });
+
   it("skips null children", () => {
     expect(h("div", {}, null, "x").textContent).toBe("x");
   });
