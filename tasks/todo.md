@@ -59,7 +59,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T15 Detailansicht + Zusammenführen** · M · Abh. T14
   Akz.: umbenennen, Typ, Stand (auch rückwärts), Links lösen, letzte 50 Events, Merge (Links + Events übertragen, höherer Stand gewinnt) · Prüfung: Integrationstests
 
-- [ ] **T16 Zuordnungs-Inbox** · M · Abh. T08, T13
+- [x] **T16 Zuordnungs-Inbox** · M · Abh. T08, T13
   Akz.: SPEC §4.5: Karten, Kandidat vorausgewählt, neues Werk mit Typ, Ignorieren, Sammelbestätigung ≥ 0.9 mit Vorschau; Banner auf dem Core-Screen
 
 - [ ] **T17 Einstellungen: Geräte** · S · Abh. T09, T11
