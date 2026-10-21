@@ -16,7 +16,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T02 Event-Vertrag (zod) + JSON Schema** · S · Abh. T01
   Akz.: `MediaType`, `Position`, `ProgressEvent`, `EventBatch` (1–100), `EventResult`; URLs nur http/https, ≤ 2048 Zeichen; Längenlimits für Titel/Schlüssel; `event.schema.json` generiert, Test prüft Aktualität · Dateien: `packages/core/src/event.ts`, `scripts/`, Test
 
-- [ ] **T03 Fortschrittsregeln** · S · Abh. T02
+- [x] **T03 Fortschrittsregeln** · S · Abh. T02
   Akz.: `comparePositions`, `shouldAdvance` (unbekannt → übernehmen; nur vorwärts; fehlende Staffel = aktuelle), `positionUnitFor(mediaType)`; Einheiten-Mismatch wirft · Dateien: `progress.ts` + Test
 
 - [ ] **T04 Serienschlüssel + URL-Erkennung + Seitenregeln** · M · Abh. T01

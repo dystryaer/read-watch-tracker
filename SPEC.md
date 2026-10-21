@@ -344,7 +344,7 @@ Nicht-lateinische Schriften (Hangul, Kana, Hanzi) bleiben unverändert erhalten.
 
 **Fortschritt** (`core/progress.ts`, reine Funktion):
 - Stand unbekannt → jede gemeldete Position wird übernommen.
-- Sonst wird nur übernommen, wenn die neue Position **größer** ist. Kapitel und Prozent werden numerisch verglichen, Folgen als `(season, episode)`. Fehlt die Staffel beim Event, wird die aktuelle Staffel angenommen.
+- Sonst wird nur übernommen, wenn die neue Position **größer** ist. Kapitel und Prozent werden numerisch verglichen, Folgen als `(season, episode)`. Fehlt die Staffel auf einer der beiden Seiten (z. B. beim Event von der Shield), werden nur die Folgen verglichen.
 - `watched` bei `movie` setzt den Status `completed`.
 - Manuelle Änderungen aus der Web-UI (`kind = manual`) dürfen den Stand auch verringern.
 - Bei `applied` werden `last_source_id`, `last_url` und `last_progress_at` aktualisiert, ebenso `work_links.series_url`, falls sie mitgeliefert wurde.
@@ -785,24 +785,19 @@ export function shouldAdvance(current: Position | null, incoming: Position): boo
 }
 
 export function comparePositions(a: Position, b: Position): number {
-  if (a.unit !== b.unit) throw new PositionUnitMismatch(a.unit, b.unit);
-  switch (a.unit) {
-    case "chapter":
-      return a.chapter - (b as typeof a).chapter;
-    case "percent":
-      return a.percent - (b as typeof a).percent;
-    case "episode": {
-      const other = b as typeof a;
-      const season = a.season ?? other.season ?? 0;
-      return season - (other.season ?? 0) || a.episode - other.episode;
-    }
-    case "none":
-      return 0;
+  if (a.unit === "chapter" && b.unit === "chapter") return a.chapter - b.chapter;
+  if (a.unit === "percent" && b.unit === "percent") return a.percent - b.percent;
+  if (a.unit === "episode" && b.unit === "episode") {
+    // A side without a season (e.g. the Shield) is assumed to be in the other side's season.
+    const seasonDelta = a.season !== null && b.season !== null ? a.season - b.season : 0;
+    return seasonDelta || a.episode - b.episode;
   }
+  if (a.unit === "none" && b.unit === "none") return 0;
+  throw new PositionUnitMismatchError(a.unit, b.unit);
 }
 ```
 
-- **TypeScript strict**, kein `any`, kein `as` außer bei verengten Unions wie oben.
+- **TypeScript strict**, kein `any`, kein `as` – Unions werden über Typprüfungen verengt wie oben.
 - **Reine Funktionen in `core`**, keine I/O. Seiteneffekte stehen nur in `apps/*/server` bzw. den Entrypoints.
 - **zod an jeder Systemgrenze** (API-Eingang, Storage-Lesen in der Extension, Excel-Zeilen).
 - Benennung: Dateien `kebab-case.ts`, Typen `PascalCase`, Funktionen `camelCase`, DB `snake_case`. Nur Named Exports.
