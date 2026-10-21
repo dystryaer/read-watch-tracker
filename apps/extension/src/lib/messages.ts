@@ -72,6 +72,7 @@ export const PopupStatus = z.object({
   apiUrl: HttpUrlSchema.nullable(),
   page: z
     .object({
+      url: HttpUrlSchema,
       origin: HttpUrlSchema,
       domain: z.string().max(253),
       site: z.object({ sourceKey: SourceKey, domains: z.array(z.string().max(253)) }).nullable(),

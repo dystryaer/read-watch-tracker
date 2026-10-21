@@ -1,7 +1,7 @@
 import type { PairingPollResponse } from "@rwt/core";
 import { describe, expect, it, vi } from "vitest";
 import type { ApiResult } from "../src/lib/api-client";
-import { pollPairing, startPairing } from "../src/lib/pairing";
+import { pollPairing, repeatUntilDone, startPairing } from "../src/lib/pairing";
 import { loadSettings } from "../src/lib/settings";
 import { createStore } from "../src/lib/storage";
 import { fakeStorage } from "./fakes";
@@ -85,5 +85,43 @@ describe("loadSettings", () => {
   it("ignores a planted non-http API address", async () => {
     const store = createStore(fakeStorage({ settings: { apiUrl: "javascript:alert(1)", deviceToken: null, deviceName: "x", pairing: null } }), () => {});
     expect((await loadSettings(store)).apiUrl).toBeNull();
+  });
+});
+
+describe("repeatUntilDone", () => {
+  it("starts the next poll only after the previous one has answered", async () => {
+    vi.useFakeTimers();
+    const answers: ((done: boolean) => void)[] = [];
+    const task = vi.fn(() => new Promise<boolean>((resolve) => answers.push(resolve)));
+    const stop = repeatUntilDone(task, 3000);
+
+    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(9000); // a slow server: no second request meanwhile
+    expect(task).toHaveBeenCalledTimes(1);
+
+    answers[0]?.(false);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(task).toHaveBeenCalledTimes(2);
+
+    answers[1]?.(true);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(task).toHaveBeenCalledTimes(2);
+    stop();
+    vi.useRealTimers();
+  });
+
+  it("stops when asked, even with a poll in flight", async () => {
+    vi.useFakeTimers();
+    let answer: ((done: boolean) => void) | undefined;
+    const task = vi.fn(() => new Promise<boolean>((resolve) => (answer = resolve)));
+    const stop = repeatUntilDone(task, 3000);
+    await vi.advanceTimersByTimeAsync(3000);
+
+    stop();
+    answer?.(false);
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(task).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });

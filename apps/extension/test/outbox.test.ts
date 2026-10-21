@@ -180,3 +180,25 @@ describe("Outbox", () => {
     expect((await outbox.state()).events).toHaveLength(1);
   });
 });
+
+describe("Outbox.enqueueMany", () => {
+  it("queues many events with a single storage write", async () => {
+    const { area, outbox } = setup(acceptAll);
+    const writes = vi.spyOn(area, "set");
+
+    await outbox.enqueueMany(Array.from({ length: 2000 }, (_, i) => event(i)));
+
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect((await outbox.state()).events).toHaveLength(2000);
+  });
+
+  it("keeps the limit and counts what it dropped", async () => {
+    const { outbox } = setup(acceptAll);
+    await outbox.enqueueMany(Array.from({ length: OUTBOX_LIMIT + 3 }, (_, i) => event(i)));
+
+    const state = await outbox.state();
+    expect(state.events).toHaveLength(OUTBOX_LIMIT);
+    expect(state.dropped).toBe(3);
+    expect(state.events[0]?.position).toEqual({ unit: "chapter", chapter: 3 });
+  });
+});

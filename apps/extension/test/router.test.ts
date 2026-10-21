@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { RecentReads } from "../src/lib/recent";
 import { createRouter } from "../src/lib/router";
 import { saveCachedConfig, saveSettings } from "../src/lib/settings";
-import { createStore } from "../src/lib/storage";
+import { createStore, type StorageArea } from "../src/lib/storage";
+import { createTabStates } from "../src/lib/tab-states";
 import { fakeStorage } from "./fakes";
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
@@ -21,7 +22,7 @@ const page = { id: EXT, url: `chrome-extension://${EXT}/popup.html` };
 
 const paired = { apiUrl: "https://tracker.example", deviceToken: "T".repeat(43), deviceName: "Brave", pairing: null };
 
-async function setup(options: { paired?: boolean; tabUrl?: string; permission?: boolean } = {}) {
+async function setup(options: { paired?: boolean; tabUrl?: string; permission?: boolean; session?: StorageArea } = {}) {
   const store = createStore(fakeStorage());
   await saveCachedConfig(store, { config, etag: null, fetchedAt: 0 });
   if (options.paired !== false) await saveSettings(store, paired);
@@ -29,6 +30,9 @@ async function setup(options: { paired?: boolean; tabUrl?: string; permission?: 
   const outbox = {
     enqueue: vi.fn(async (event: ProgressEvent) => {
       queued.push(event);
+    }),
+    enqueueMany: vi.fn(async (events: ProgressEvent[]) => {
+      queued.push(...events);
     }),
     flush: vi.fn(async () => ({ sent: 0, remaining: 0 })),
     state: vi.fn(async () => ({ events: queued, attempts: 0, nextAttemptAt: null, lastSyncAt: 5, lastError: null, dropped: 0 })),
@@ -48,6 +52,7 @@ async function setup(options: { paired?: boolean; tabUrl?: string; permission?: 
     store,
     outbox,
     recent: new RecentReads(store),
+    tabStates: createTabStates(createStore(options.session ?? fakeStorage())),
     api,
     sync,
     browser,
@@ -289,5 +294,38 @@ describe("router – backfill", () => {
   it("is not accepted from a content script", async () => {
     const { route } = await setup();
     expect(await route({ type: "options:backfill", entries: [] }, content())).toEqual({ ok: false });
+  });
+});
+
+describe("router – service worker restarts", () => {
+  const next = { ...detection, chapter: 346 };
+  const nextUrl = chapterUrl.replace("345", "346");
+
+  it("still counts the previous chapter after the worker was stopped while reading", async () => {
+    const session = fakeStorage();
+    const before = await setup({ session });
+    await before.route({ type: "reader:detected", url: chapterUrl, detection }, content());
+
+    const after = await setup({ session }); // fresh worker: memory gone, session storage kept
+    await after.route({ type: "reader:detected", url: nextUrl, detection: next }, content(nextUrl));
+
+    expect(after.queued.map((event) => event.position)).toEqual([{ unit: "chapter", chapter: 345 }]);
+  });
+
+  it("still knows the series for the popup and for ignoring it", async () => {
+    const session = fakeStorage();
+    await (await setup({ session })).route({ type: "reader:detected", url: chapterUrl, detection }, content());
+
+    const after = await setup({ session });
+
+    expect(await after.route({ type: "popup:status", tabId: 4 }, page)).toMatchObject({ page: { detection } });
+    expect(await after.route({ type: "popup:ignore-series", tabId: 4 }, page)).toEqual({ ok: true });
+  });
+
+  it("does not trust a tampered tab state", async () => {
+    const session = fakeStorage({ "tab:4": { url: "javascript:alert(1)", sourceKey: "site:asura", detection, counted: false } });
+    const { route } = await setup({ session });
+
+    expect(await route({ type: "popup:status", tabId: 4 }, page)).toMatchObject({ page: { detection: null } });
   });
 });

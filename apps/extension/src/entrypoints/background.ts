@@ -8,9 +8,11 @@ import { createRouter } from "@/lib/router";
 import { loadSettings, saveCachedConfig, updateSettings } from "@/lib/settings";
 import { syncReaderScripts } from "@/lib/sites";
 import { createStore } from "@/lib/storage";
+import { createTabStates } from "@/lib/tab-states";
 
 export default defineBackground(() => {
   const store = createStore(browser.storage.local);
+  const tabStates = createTabStates(createStore(browser.storage.session));
   const api = createApiClient((input, init) => fetch(input, init));
 
   // A revoked device stops tracking: token and config are dropped, reader scripts removed.
@@ -40,6 +42,7 @@ export default defineBackground(() => {
     store,
     outbox,
     recent: new RecentReads(store),
+    tabStates,
     api,
     sync,
     // Only these browser APIs are used for routing.
@@ -55,6 +58,7 @@ export default defineBackground(() => {
     return true; // answer asynchronously
   });
 
+  browser.tabs.onRemoved.addListener((tabId) => void tabStates.remove(tabId));
   browser.runtime.onInstalled.addListener(() => void sync());
   browser.runtime.onStartup.addListener(() => void sync());
   void browser.alarms.create("flush", { periodInMinutes: 1 });

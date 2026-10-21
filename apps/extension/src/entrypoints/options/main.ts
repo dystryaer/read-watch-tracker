@@ -3,7 +3,7 @@ import { createApiClient } from "@/lib/api-client";
 import { collectBackfill } from "@/lib/backfill";
 import { h, render } from "@/lib/dom";
 import { readOutboxSummary } from "@/lib/outbox";
-import { pollPairing, startPairing } from "@/lib/pairing";
+import { pollPairing, repeatUntilDone, startPairing } from "@/lib/pairing";
 import { apiOrigin, loadCachedConfig, loadSettings, type Settings, saveCachedConfig, updateSettings } from "@/lib/settings";
 import { createStore } from "@/lib/storage";
 import "./style.css";
@@ -15,7 +15,7 @@ const store = createStore(browser.storage.local);
 const api = createApiClient((input, init) => fetch(input, init));
 const root = document.getElementById("app");
 const timeFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" });
-let pollTimer: ReturnType<typeof setInterval> | undefined;
+let stopPolling: (() => void) | null = null;
 
 function message(text: string, kind: "error" | "info" = "info") {
   return h("p", { class: kind, role: kind === "error" ? "alert" : "status" }, text);
@@ -82,17 +82,18 @@ async function showPairing(settings: Settings) {
     status,
   );
 
-  clearInterval(pollTimer);
-  pollTimer = setInterval(async () => {
+  stopPolling?.();
+  stopPolling = repeatUntilDone(async () => {
     const result = await pollPairing({ store, api });
-    if (result === "pending" || result === "error") return;
-    clearInterval(pollTimer);
+    if (result === "pending" || result === "error") return false;
+    stopPolling = null;
     if (result === "paired") {
       await browser.runtime.sendMessage({ type: "options:sync-now" });
       await show();
     } else {
       showSetup(await loadSettings(store), message("Der Code ist abgelaufen. Bitte erneut koppeln.", "error"));
     }
+    return true;
   }, POLL_INTERVAL_MS);
 }
 
@@ -169,6 +170,6 @@ function backfillSection(settings: Settings): HTMLElement {
 }
 
 browser.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && ("outbox" in changes || "settings" in changes) && !pollTimer) void show();
+  if (area === "local" && ("outbox" in changes || "settings" in changes) && !stopPolling) void show();
 });
 void show();

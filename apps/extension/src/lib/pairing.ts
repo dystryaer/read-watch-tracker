@@ -14,6 +14,24 @@ interface Deps {
 }
 
 /** Device flow, step 1 (SPEC §6.2): ask for a code the user then enters in the web app. */
+/**
+ * Runs `task` every `intervalMs` until it reports done. The next run is scheduled only after the
+ * previous one has answered, so a slow server never has two polls in flight.
+ */
+export function repeatUntilDone(task: () => Promise<boolean>, intervalMs: number): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const tick = async () => {
+    const done = await task().catch(() => false);
+    if (!done && !stopped) timer = setTimeout(() => void tick(), intervalMs);
+  };
+  timer = setTimeout(() => void tick(), intervalMs);
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
+}
+
 export async function startPairing(
   { store, api }: Deps,
   rawApiUrl: string,

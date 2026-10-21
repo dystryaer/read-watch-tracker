@@ -7,14 +7,7 @@ import type { RecentReads } from "./recent";
 import { loadCachedConfig, loadSettings } from "./settings";
 import { findSiteForUrl } from "./sites";
 import type { Store } from "./storage";
-
-export interface TabState {
-  url: string;
-  sourceKey: string | null;
-  detection: Detection | null;
-  counted: boolean;
-  ignored?: boolean;
-}
+import type { TabStates } from "./tab-states";
 
 /** The browser APIs the router needs, so tests can pass fakes. */
 export interface BrowserApis {
@@ -27,8 +20,9 @@ export interface BrowserApis {
 export interface RouterDeps {
   extensionId: string;
   store: Store;
-  outbox: Pick<Outbox, "enqueue" | "flush" | "state">;
+  outbox: Pick<Outbox, "enqueue" | "enqueueMany" | "flush" | "state">;
   recent: Pick<RecentReads, "claim">;
+  tabStates: TabStates;
   api: Pick<ApiClient, "enableSource" | "ignoreSeries">;
   sync: () => Promise<unknown>;
   browser: BrowserApis;
@@ -48,7 +42,7 @@ interface SenderLike {
  */
 export function createRouter(deps: RouterDeps) {
   const now = deps.now ?? Date.now;
-  const tabs = new Map<number, TabState>();
+  const tabs = deps.tabStates;
 
   async function config(): Promise<DeviceConfig | null> {
     return (await loadCachedConfig(deps.store))?.config ?? null;
@@ -92,8 +86,8 @@ export function createRouter(deps: RouterDeps) {
 
       case "reader:detected": {
         const site = siteFor(current, message.url, senderUrl);
-        const previous = tabs.get(tabId);
-        tabs.set(tabId, { url: message.url, sourceKey: site?.sourceKey ?? null, detection: message.detection, counted: false });
+        const previous = await tabs.get(tabId);
+        await tabs.set(tabId, { url: message.url, sourceKey: site?.sourceKey ?? null, detection: message.detection, counted: false });
         // Signal 3 (SPEC §7.4): opening a higher chapter of the same series counts the previous one.
         if (
           site &&
@@ -112,7 +106,7 @@ export function createRouter(deps: RouterDeps) {
       case "reader:chapter-read": {
         const site = siteFor(current, message.url, senderUrl);
         if (!site) return { ok: false };
-        tabs.set(tabId, { url: message.url, sourceKey: site.sourceKey, detection: message.detection, counted: true });
+        await tabs.set(tabId, { url: message.url, sourceKey: site.sourceKey, detection: message.detection, counted: true });
         return (await countRead(site, message.url, message.detection)) === "duplicate" ? { ok: true, duplicate: true } : { ok: true };
       }
     }
@@ -130,7 +124,7 @@ export function createRouter(deps: RouterDeps) {
     const [settings, current, outbox] = await Promise.all([loadSettings(deps.store), config(), deps.outbox.state()]);
     const url = await tabUrl(tabId);
     const site = url ? findSiteForUrl(current, url.href) : undefined;
-    const state = tabs.get(tabId);
+    const state = await tabs.get(tabId);
     const sameTab = state && url && parseHttpUrl(state.url)?.hostname === url.hostname;
     return {
       ok: true,
@@ -138,6 +132,7 @@ export function createRouter(deps: RouterDeps) {
       apiUrl: settings.apiUrl,
       page: url
         ? {
+            url: url.href,
             origin: url.origin,
             domain: normalizeDomain(url.hostname),
             site: site ? { sourceKey: site.sourceKey, domains: site.domains } : null,
@@ -170,13 +165,13 @@ export function createRouter(deps: RouterDeps) {
 
       case "options:backfill": {
         const current = await config();
-        let queued = 0;
+        const events: ProgressEvent[] = [];
         for (const entry of message.entries) {
           // Re-checked here: only enabled sites, whatever the options page sent.
           const site = findSiteForUrl(current, entry.url);
           if (!site) continue;
           const { detection } = entry;
-          await deps.outbox.enqueue(
+          events.push(
             ProgressEvent.parse({
               id: await backfillEventId(site.sourceKey, detection.seriesKey, detection.chapter),
               occurredAt: new Date(entry.visitedAt > 0 ? entry.visitedAt : now()).toISOString(),
@@ -191,10 +186,12 @@ export function createRouter(deps: RouterDeps) {
               position: { unit: "chapter", chapter: detection.chapter },
             }),
           );
-          queued++;
         }
-        if (queued > 0) void deps.outbox.flush();
-        return { ok: true, queued };
+        if (events.length > 0) {
+          await deps.outbox.enqueueMany(events);
+          void deps.outbox.flush();
+        }
+        return { ok: true, queued: events.length };
       }
 
       case "popup:status":
@@ -225,7 +222,7 @@ export function createRouter(deps: RouterDeps) {
 
       case "popup:ignore-series": {
         const { apiUrl, deviceToken } = await loadSettings(deps.store);
-        const state = tabs.get(message.tabId);
+        const state = await tabs.get(message.tabId);
         if (!apiUrl || !deviceToken) return { ok: false, error: "Bitte zuerst in den Einstellungen koppeln." };
         if (!state?.detection || !state.sourceKey) return { ok: false, error: "Hier wurde keine Serie erkannt." };
         const result = await deps.api.ignoreSeries(apiUrl, deviceToken, {
@@ -234,7 +231,7 @@ export function createRouter(deps: RouterDeps) {
           rawTitle: state.detection.title ?? state.detection.seriesKey,
         });
         if (!result.ok) return { ok: false, error: refusal(result) };
-        tabs.set(message.tabId, { ...state, ignored: true });
+        await tabs.set(message.tabId, { ...state, ignored: true });
         return { ok: true };
       }
     }

@@ -1,6 +1,6 @@
 import type { DeviceConfig } from "@rwt/core";
 import { describe, expect, it, vi } from "vitest";
-import { findSiteForUrl, readerPatterns, syncReaderScripts } from "../src/lib/sites";
+import { findSiteForUrl, readerPatterns, ruleEditorUrl, syncReaderScripts } from "../src/lib/sites";
 
 const config: DeviceConfig = {
   sites: [
@@ -82,5 +82,17 @@ describe("syncReaderScripts", () => {
     const scripting = fakeScripting([{ id: "reader:site:asura", matches: [] }]);
     await syncReaderScripts(scripting, null);
     expect(scripting.scripts.size).toBe(0);
+  });
+});
+
+describe("ruleEditorUrl", () => {
+  it("opens the site's rule editor with the current page as test URL", () => {
+    expect(ruleEditorUrl("https://tracker.example", "site:asura", "https://asuracomic.net/series/x/chapter/5?a=1&b=2")).toBe(
+      "https://tracker.example/settings/sites/site%3Aasura?url=https%3A%2F%2Fasuracomic.net%2Fseries%2Fx%2Fchapter%2F5%3Fa%3D1%26b%3D2",
+    );
+  });
+
+  it("leaves the test URL out when there is none", () => {
+    expect(ruleEditorUrl("https://tracker.example", "site:asura", null)).toBe("https://tracker.example/settings/sites/site%3Aasura");
   });
 });

@@ -52,9 +52,14 @@ export class Outbox {
   }
 
   enqueue(event: ProgressEvent): Promise<void> {
+    return this.enqueueMany([event]);
+  }
+
+  /** Queues several events with one storage write (a backfill brings thousands). */
+  enqueueMany(events: ProgressEvent[]): Promise<void> {
     return this.exclusive(async () => {
       const state = await this.load();
-      state.events.push(event);
+      state.events.push(...events);
       const overflow = state.events.length - OUTBOX_LIMIT;
       if (overflow > 0) {
         state.events.splice(0, overflow);

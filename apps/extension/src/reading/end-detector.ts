@@ -1,4 +1,4 @@
-export type EndSignal = "scroll" | "end-visible";
+export type EndSignal = "scroll" | "end-visible" | "next-chapter";
 
 interface Metrics {
   scrollTop: number;
@@ -27,6 +27,14 @@ const LARGE_IMAGE_PX = 300;
 const RESCAN_DELAY_MS = 500;
 // Below this a page is a paged reader (one image per page), where scroll depth says nothing.
 const SCROLLABLE_FACTOR = 1.5;
+// "Next chapter", "Nächstes Kapitel", "next chap", "Next episode". A bare "Next" may only turn the page.
+const NEXT_CHAPTER = /\b(?:next|nächste[nrs]?)\s+(?:chapter|chap|ch\.?|kapitel|episode|ep\.?)(?![a-z])/i;
+const MAX_LABEL_LENGTH = 200;
+
+function isNextChapterControl(control: Element): boolean {
+  const label = [control.textContent, control.getAttribute("aria-label"), control.getAttribute("title")].join(" ");
+  return NEXT_CHAPTER.test(label.replace(/\s+/g, " ").slice(0, MAX_LABEL_LENGTH));
+}
 
 function imageHeight(image: HTMLImageElement): number {
   return image.getBoundingClientRect().height || image.naturalHeight || Number(image.getAttribute("height")) || 0;
@@ -42,8 +50,9 @@ function queryAll(doc: Document, selector: string): Element[] | null {
 
 /**
  * Calls `onEnd` once, when the end of a chapter is reached (SPEC §7.4): scroll depth on long-strip
- * pages, or the rule's end element (generic: the last large image) coming into view. There is no
- * fixed reading time, so short and long chapters are treated alike.
+ * pages, the rule's end element (generic: the last large image) coming into view, or a click on a
+ * "next chapter" link or button – the generic signal that also works on paged readers. There is
+ * no fixed reading time, so short and long chapters are treated alike.
  */
 export function watchChapterEnd(options: WatchOptions): () => void {
   const { window: win, document: doc } = options;
@@ -76,6 +85,11 @@ export function watchChapterEnd(options: WatchOptions): () => void {
     if (((scrollTop + viewportHeight) / scrollHeight) * 100 >= options.scrollDepthPercent) finish("scroll");
   }
 
+  function onClick(event: Event) {
+    const control = event.target instanceof Element ? event.target.closest("a, button") : null;
+    if (control && isNextChapterControl(control)) finish("next-chapter");
+  }
+
   const observer = createObserver((entries) => {
     if (entries.some((entry) => entry.isIntersecting)) finish("end-visible");
   });
@@ -103,12 +117,15 @@ export function watchChapterEnd(options: WatchOptions): () => void {
   function stop() {
     done = true;
     win.removeEventListener("scroll", onScroll);
+    doc.removeEventListener("click", onClick, true);
     observer.disconnect();
     mutations.disconnect();
     clearTimeout(rescanTimer);
   }
 
   win.addEventListener("scroll", onScroll, { passive: true });
+  // Capture phase: the click is seen before the page's own handler navigates away.
+  doc.addEventListener("click", onClick, true);
   mutations.observe(doc.body, { childList: true, subtree: true });
   observeCandidates();
   return stop;

@@ -94,6 +94,16 @@ test("opening the next chapter counts the previous one", async () => {
   await page.close();
 });
 
+test("clicking “Nächstes Kapitel” counts the chapter on a paged reader without a rule", async () => {
+  const page = await context.newPage();
+  await page.goto(`http://localhost:${site.port}/paged/lookism/chapter-7`);
+  await page.waitForTimeout(2500); // the reader waits for a stable detection
+  await page.getByRole("link", { name: "Nächstes Kapitel" }).click();
+
+  await expect.poll(() => eventsFor("lookism").map((event) => event.position.chapter), { timeout: 10_000 }).toEqual([7]);
+  await page.close();
+});
+
 test("pages of sites that are not enabled send nothing", async () => {
   const before = api.requests.filter((request) => request.path === "/api/v1/events").length;
   const page = await context.newPage();

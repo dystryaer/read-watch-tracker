@@ -491,8 +491,8 @@ Ein Feld der Seitenregel überschreibt jeweils nur den entsprechenden generische
 Es gibt **keine feste Verweildauer**, weil Kapitel unterschiedlich lang sind. Ein Kapitel zählt, sobald die Erkennung stabil ist (gleiche Detection für ≥ 2 s) **und** eines dieser Signale für „Ende erreicht“ eintritt:
 
 1. **Scrolltiefe ≥ 60 %** der Kapitelseite (Long-Strip-Reader; Schwelle per `/config` einstellbar).
-2. **Ende sichtbar:** Das Element aus `endSelector` erscheint im Viewport (IntersectionObserver). Ohne Regel gilt generisch: das letzte große Bild im Reader-Bereich oder ein Link bzw. Button „Next“/„Nächstes Kapitel“. Das deckt seitenweise Reader ab, bei denen nicht gescrollt wird.
-3. **Weiter zum nächsten Kapitel:** Öffne ich im selben Tab ein höheres Kapitel derselben Serie, zählt das vorherige als gelesen, auch wenn Signal 1 oder 2 nicht ausgelöst hat.
+2. **Ende sichtbar:** Das Element aus `endSelector` erscheint im Viewport (IntersectionObserver). Ohne Regel gilt generisch das letzte große Bild im Reader-Bereich (nur auf scrollbaren Seiten). Generisch, auch ohne Regel und auf seitenweisen Readern, zählt außerdem ein **Klick** auf einen Link bzw. Button „Next chapter“/„Nächstes Kapitel“ (auch „next chap“, „Next episode“). Sichtbarkeit allein genügt dafür nicht, weil viele Reader diesen Button schon oben auf der Seite zeigen; ein bloßes „Next“ zählt nicht, weil es bei seitenweisen Readern oft nur umblättert.
+3. **Weiter zum nächsten Kapitel:** Öffne ich im selben Tab ein höheres Kapitel derselben Serie, zählt das vorherige als gelesen, auch wenn Signal 1 oder 2 nicht ausgelöst hat. Der Stand pro Tab liegt dafür in `chrome.storage.session`, weil MV3 den Service Worker nach etwa 30 s Leerlauf beendet.
 
 Pro (Serie, Kapitel) wird höchstens 1 Event in 12 h gesendet.
 

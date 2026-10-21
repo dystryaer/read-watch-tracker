@@ -1,6 +1,8 @@
 import {
   detectChapterFromUrl,
   nextChapterUrl,
+  normalizeDomain,
+  parseHttpUrl,
   parseRuleFields,
   RULE_FIELDS,
   type RuleField,
@@ -11,6 +13,16 @@ import {
 export { RULE_FIELDS, type RuleField, type RuleFields };
 
 const MAX_SAMPLES = 20;
+
+/**
+ * The test URLs for the editor, with the page the extension's "Regel bearbeiten" link came from
+ * first (`?url=`). Only an http(s) URL on one of the site's domains is taken.
+ */
+export function withSampleUrl(sampleUrls: string[], raw: unknown, domains: string[]): string[] {
+  const url = typeof raw === "string" ? parseHttpUrl(raw) : null;
+  if (!url || !domains.includes(normalizeDomain(url.hostname))) return sampleUrls;
+  return [url.href, ...sampleUrls.filter((sample) => sample !== url.href)];
+}
 
 export interface RuleEvaluation {
   errors: Partial<Record<RuleField, string>>;

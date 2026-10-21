@@ -6,18 +6,30 @@ import { ActionForm } from "@/components/action-form";
 import { RuleEditor } from "@/components/sites/rule-editor";
 import { getAuthorizedDb } from "@/lib/dal";
 import { decodeSegment } from "@/lib/next-path";
+import { withSampleUrl } from "@/lib/rule-test";
 import { addDomainAction, renameSiteAction } from "../actions";
 
 const inputClass =
   "rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900";
 
-export default async function SitePage({ params }: { params: Promise<{ key: string }> }) {
+export default async function SitePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ key: string }>;
+  searchParams: Promise<{ url?: string | string[] }>;
+}) {
   const key = SourceKey.safeParse(decodeSegment((await params).key));
   if (!key.success) notFound();
   const db = await getAuthorizedDb();
   const site = await getSite(db, key.data);
   if (!site) notFound();
-  const sampleUrls = await listRecentSiteUrls(db, site.id);
+  // `?url=` comes from the extension's "Regel bearbeiten" link: the page that was just open.
+  const sampleUrls = withSampleUrl(
+    await listRecentSiteUrls(db, site.id),
+    (await searchParams).url,
+    site.domains.map((domain) => domain.domain),
+  );
   const siteKeyField = <input type="hidden" name="siteKey" value={site.key} />;
 
   return (

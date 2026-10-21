@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateRule } from "../src/lib/rule-test";
+import { evaluateRule, withSampleUrl } from "../src/lib/rule-test";
 
 const site = { sourceKey: "site:reader", domains: ["reader.example"] };
 
@@ -53,5 +53,24 @@ describe("evaluateRule", () => {
 
   it("validates a site without domains against a placeholder", () => {
     expect(evaluateRule({ chapterPattern: String.raw`/c(\d+)` }, { sourceKey: "site:x", domains: [] }, "").errors).toEqual({});
+  });
+});
+
+describe("withSampleUrl", () => {
+  const recent = ["https://reader.example/manga/x/chapter-2", "https://reader.example/manga/x/chapter-1"];
+
+  it("puts the page the popup came from first", () => {
+    expect(withSampleUrl(recent, "https://www.reader.example/manga/y/c5", site.domains)).toEqual([
+      "https://www.reader.example/manga/y/c5",
+      ...recent,
+    ]);
+  });
+
+  it("does not repeat a URL that is already a sample", () => {
+    expect(withSampleUrl(recent, recent[1], site.domains)).toEqual([recent[1], recent[0]]);
+  });
+
+  it.each([["https://evil.example/x"], ["javascript:alert(1)"], [""], [undefined], [["a", "b"]]])("ignores %j", (raw) => {
+    expect(withSampleUrl(recent, raw, site.domains)).toEqual(recent);
   });
 });

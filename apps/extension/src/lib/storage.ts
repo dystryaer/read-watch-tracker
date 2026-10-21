@@ -10,6 +10,7 @@ export interface StorageArea {
 export interface Store {
   read<T>(key: string, schema: z.ZodType<T>, fallback: T): Promise<T>;
   write(key: string, value: unknown): Promise<void>;
+  remove(key: string): Promise<void>;
 }
 
 /**
@@ -29,6 +30,9 @@ export function createStore(area: StorageArea, warn: (message: string) => void =
     },
     async write(key, value) {
       await area.set({ [key]: value });
+    },
+    async remove(key) {
+      await area.remove(key);
     },
   };
 }

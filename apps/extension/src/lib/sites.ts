@@ -3,6 +3,12 @@ import { type DeviceConfig, normalizeDomain, parseHttpUrl, type SiteRule } from 
 const READER_PREFIX = "reader:";
 
 /** Match patterns for a site domain: bare and www host, http and https. */
+/** The tracker's rule editor for a site, with the current page as test URL (SPEC §7.3). */
+export function ruleEditorUrl(apiUrl: string, sourceKey: string, pageUrl: string | null): string {
+  const editor = `${apiUrl}/settings/sites/${encodeURIComponent(sourceKey)}`;
+  return pageUrl ? `${editor}?url=${encodeURIComponent(pageUrl)}` : editor;
+}
+
 export function readerPatterns(domain: string): string[] {
   return [`https://${domain}/*`, `http://${domain}/*`, `https://www.${domain}/*`, `http://www.${domain}/*`];
 }

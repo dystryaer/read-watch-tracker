@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import { h, render } from "@/lib/dom";
 import { ActionReply, PopupStatus } from "@/lib/messages";
+import { ruleEditorUrl } from "@/lib/sites";
 import "./style.css";
 
 const root = document.getElementById("app");
@@ -63,7 +64,7 @@ function enabledSite(tabId: number, status: PopupStatus, page: NonNullable<Popup
   const site = page.site;
   if (!site) return [];
   const ruleLink = status.apiUrl
-    ? h("a", { href: `${status.apiUrl}/settings/sites/${encodeURIComponent(site.sourceKey)}`, target: "_blank", rel: "noopener noreferrer" }, "Regel bearbeiten")
+    ? h("a", { href: ruleEditorUrl(status.apiUrl, site.sourceKey, page.url), target: "_blank", rel: "noopener noreferrer" }, "Regel bearbeiten")
     : null;
   const disable = h("button", { type: "button", class: "secondary" }, "Deaktivieren");
   disable.addEventListener("click", async () => {

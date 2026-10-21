@@ -72,9 +72,24 @@ function chapterPage(series: string, chapter: number): string {
 <a class="next" href="/manga/${series.toLowerCase().replaceAll(" ", "-")}/chapter-${chapter + 1}">Next</a></body></html>`;
 }
 
-/** A manga site with long-strip chapter pages, reachable as localhost and 127.0.0.1. */
+function pagedChapterPage(series: string, chapter: number): string {
+  // A paged reader: one page in view, nothing to scroll. Its "next chapter" link leads to a page
+  // that is not a chapter, so only the click itself can count the chapter.
+  const pixel = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+  return `<!doctype html><html><head><title>${series} Chapter ${chapter} - Fixture Reader</title></head>
+<body style="margin:0"><img src="${pixel}" width="400" height="400" alt="">
+<a class="next" href="/about">Nächstes Kapitel</a></body></html>`;
+}
+
+/** A manga site with long-strip (/manga/) and paged (/paged/) chapter pages, reachable as localhost and 127.0.0.1. */
 export async function startFixtureSite(): Promise<{ port: number; close(): Promise<void> }> {
   const server = createServer((request, response) => {
+    if (request.url === "/about") return response.writeHead(200, { "content-type": "text/html" }).end("<p>About</p>");
+    const paged = /^\/paged\/([a-z-]+)\/chapter-(\d+)$/.exec(request.url ?? "");
+    if (paged?.[1] && paged[2]) {
+      const title = paged[1].split("-").map((word) => word[0]?.toUpperCase() + word.slice(1)).join(" ");
+      return response.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(pagedChapterPage(title, Number(paged[2])));
+    }
     const match = /^\/manga\/([a-z-]+)\/chapter-(\d+)$/.exec(request.url ?? "");
     if (!match?.[1] || !match[2]) return response.writeHead(404).end("not found");
     const series = match[1].split("-").map((word) => word[0]?.toUpperCase() + word.slice(1)).join(" ");

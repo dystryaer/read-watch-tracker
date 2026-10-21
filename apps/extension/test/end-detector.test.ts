@@ -144,3 +144,36 @@ describe("watchChapterEnd – lazy loading", () => {
     expect(observers.observed.map((element) => element.id)).toContain("late");
   });
 });
+
+describe("watchChapterEnd – next-chapter control", () => {
+  it.each([
+    ['<a href="/x/chapter-346">Next Chapter</a>'],
+    ['<a href="/x/chapter-346">Nächstes Kapitel ›</a>'],
+    ['<button type="button">next chap</button>'],
+    ['<a href="/x/346" aria-label="Next episode"><svg></svg></a>'],
+  ])("fires when the reader clicks %s, also on a paged reader without a rule", (html) => {
+    metrics = { scrollTop: 0, viewportHeight: 800, scrollHeight: 900 };
+    document.body.innerHTML = html;
+    start();
+    const control = document.querySelector("a, button");
+    control?.addEventListener("click", (event) => event.preventDefault());
+
+    (control?.querySelector("svg") ?? control)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(signals).toEqual(["next-chapter"]);
+  });
+
+  it.each([['<a href="/x/chapter-345?page=2">Next</a>'], ['<button type="button">Next page</button>'], ['<a href="/">Chapter list</a>']])(
+    "does not take %s for the end of the chapter",
+    (html) => {
+      document.body.innerHTML = html;
+      start();
+      const control = document.querySelector("a, button");
+      control?.addEventListener("click", (event) => event.preventDefault());
+
+      control?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      expect(signals).toEqual([]);
+    },
+  );
+});
