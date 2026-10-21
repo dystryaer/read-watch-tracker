@@ -1,15 +1,14 @@
-import { detectChapterFromUrl, nextChapterUrl, SiteRule, type UrlDetection } from "@rwt/core";
+import {
+  detectChapterFromUrl,
+  nextChapterUrl,
+  parseRuleFields,
+  RULE_FIELDS,
+  type RuleField,
+  type RuleFields,
+  type UrlDetection,
+} from "@rwt/core";
 
-export type RuleField = "chapterPattern" | "seriesPattern" | "titleSelector" | "endSelector" | "nextUrlTemplate";
-export type RuleFields = Partial<Record<RuleField, string>>;
-
-export const RULE_FIELDS: readonly RuleField[] = [
-  "chapterPattern",
-  "seriesPattern",
-  "titleSelector",
-  "endSelector",
-  "nextUrlTemplate",
-];
+export { RULE_FIELDS, type RuleField, type RuleFields };
 
 const MAX_SAMPLES = 20;
 
@@ -29,26 +28,12 @@ export function evaluateRule(
   site: { sourceKey: string; domains: string[] },
   samples: string,
 ): RuleEvaluation {
-  const filled = Object.fromEntries(
-    RULE_FIELDS.flatMap((field) => {
-      const value = fields[field]?.trim();
-      return value ? [[field, value]] : [];
-    }),
-  );
-  const parsed = SiteRule.safeParse({
+  const parsed = parseRuleFields(fields, {
     sourceKey: site.sourceKey,
     domains: site.domains.length > 0 ? site.domains : ["example.org"],
-    ...filled,
   });
-
-  const errors: RuleEvaluation["errors"] = {};
-  if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      const field = RULE_FIELDS.find((name) => name === issue.path[0]);
-      if (field && !errors[field]) errors[field] = issue.message;
-    }
-  }
-  const rule = parsed.success ? parsed.data : undefined;
+  const errors = parsed.ok ? {} : parsed.errors;
+  const rule = parsed.ok ? parsed.rule : undefined;
 
   const results = samples
     .split("\n")
@@ -64,5 +49,5 @@ export function evaluateRule(
       return { url, detection, next: next?.kind === "next" ? next.href : null };
     });
 
-  return { errors, usesRule: rule !== undefined && Object.keys(filled).length > 0, results };
+  return { errors, usesRule: rule !== undefined && RULE_FIELDS.some((field) => rule[field] !== undefined), results };
 }

@@ -340,3 +340,70 @@ describe("ingestEvents – other media", () => {
     expect((await workById(work.id))?.percent).toBe(43.5);
   });
 });
+
+describe("ingestEvents – review fixes", () => {
+  it("closes the open inbox card of a key that step 4 links and replays its waiting events first", async () => {
+    const source = await seedSource(handle.db, { key: "site:asura" }, ["asuracomic.net"]);
+    const work = await seedWork(handle.db, { title: "Overgeared", chapter: 5 });
+    const early = chapterEvent({ source: { externalKey: "new-slug" }, chapter: 10, occurredAt: "2026-10-21T17:00:00.000Z" });
+    await ingestEvents(handle.db, null, [early], NOW);
+    await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: "overgeared", externalTitle: "Overgeared" });
+
+    const [result] = await ingestEvents(handle.db, null, [chapterEvent({ source: { externalKey: "new-slug" }, chapter: 11 })], NOW);
+
+    expect(result?.outcome).toBe("applied");
+    expect((await workById(work.id))?.chapter).toBe(11);
+    const [card] = await handle.db.select().from(pendingMatches);
+    expect(card).toMatchObject({ resolution: "linked", resolvedAt: NOW });
+    const [replayed] = await handle.db.select().from(events).where(eq(events.id, early.id));
+    expect(replayed).toMatchObject({ outcome: "applied", workId: work.id });
+  });
+
+  it("drops a series URL on another host from the inbox card, which later becomes the link's", async () => {
+    await seedSource(handle.db, { key: "site:asura" }, ["asuracomic.net"]);
+    const foreign = chapterEvent({ source: { seriesUrl: "https://evil.example/series/overgeared" } });
+
+    await ingestEvents(handle.db, null, [foreign], NOW);
+
+    const [card] = await handle.db.select().from(pendingMatches);
+    expect(card?.seriesUrl).toBeNull();
+  });
+
+  it("keeps an ignored key ignored even when its title matches a link on the same source", async () => {
+    const { source } = await seedLinkedOvergeared();
+    await handle.db.insert(pendingMatches).values({
+      sourceId: source.id,
+      externalKey: "overgeared-raw",
+      rawTitle: "Overgeared",
+      resolvedAt: NOW,
+      resolution: "ignored",
+    });
+
+    const [result] = await ingestEvents(handle.db, null, [chapterEvent({ source: { externalKey: "overgeared-raw" }, chapter: 400 })], NOW);
+
+    expect(result?.outcome).toBe("ignored");
+    expect(await handle.db.select().from(workLinks)).toHaveLength(1);
+  });
+
+  it("updates the link's series URL only from an applied event", async () => {
+    await seedLinkedOvergeared({ chapter: 344 });
+    const reread = chapterEvent({ chapter: 300, source: { seriesUrl: "https://asuracomic.net/series/elsewhere" } });
+
+    const [result] = await ingestEvents(handle.db, null, [reread], NOW);
+
+    expect(result?.outcome).toBe("no_change");
+    const [link] = await handle.db.select().from(workLinks);
+    expect(link?.seriesUrl).toBeNull();
+  });
+
+  it("never moves the last activity back for an older event that still advances", async () => {
+    const { work } = await seedLinkedOvergeared({ chapter: 344 });
+    const recent = new Date("2026-10-21T19:00:00.000Z");
+    await handle.db.update(works).set({ lastProgressAt: recent }).where(eq(works.id, work.id));
+
+    const [result] = await ingestEvents(handle.db, null, [chapterEvent({ chapter: 345, occurredAt: "2026-10-01T12:00:00.000Z" })], NOW);
+
+    expect(result?.outcome).toBe("applied");
+    expect((await workById(work.id))?.lastProgressAt).toEqual(recent);
+  });
+});

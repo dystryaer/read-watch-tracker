@@ -4,21 +4,13 @@ import {
   normalizeDomain,
   normalizeTitle,
   parseHttpUrl,
-  type Position,
   type ProgressEvent,
 } from "@rwt/core";
-import {
-  type Db,
-  events,
-  type MatchCandidate,
-  pendingMatches,
-  sourceDomains,
-  sources,
-  workLinks,
-  works,
-} from "@rwt/db";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { applyProgress, mediaTypesFor, positionColumns, type Work } from "./work-progress";
+import { type Db, events, pendingMatches, sourceDomains, sources, workLinks, works } from "@rwt/db";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { findCandidates } from "./candidates";
+import { answerOpenMatch } from "./resolve";
+import { applyProgress, lockWork, mediaTypesFor, positionColumns, type Work } from "./work-progress";
 
 export interface IngestResult {
   id: string;
@@ -26,9 +18,15 @@ export interface IngestResult {
 }
 
 type Source = typeof sources.$inferSelect;
+interface SourceUrls {
+  url: string | null;
+  seriesUrl: string | null;
+}
 
 const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
-const MAX_CANDIDATES = 3;
+
+/** Raised when a concurrent request stored the same event id first; its transaction is rolled back. */
+class DuplicateEventError extends Error {}
 
 /**
  * Processes validated events in order (SPEC §5.3). Each event runs in its own transaction,
@@ -42,7 +40,13 @@ export async function ingestEvents(
 ): Promise<IngestResult[]> {
   const results: IngestResult[] = [];
   for (const event of batch) {
-    const outcome = await db.transaction((tx) => ingestOne(tx, deviceId, event, now));
+    let outcome: EventOutcome;
+    try {
+      outcome = await db.transaction((tx) => ingestOne(tx, deviceId, event, now));
+    } catch (error) {
+      if (!(error instanceof DuplicateEventError)) throw error;
+      outcome = "no_change";
+    }
     results.push({ id: event.id, outcome });
   }
   return results;
@@ -55,43 +59,58 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
   const occurredAt = clampToNow(new Date(event.occurredAt), now);
   const source = await resolveSource(db, event.source);
   const urls = await urlsOnSource(db, source, event.source);
-  const work = await findLinkedWork(db, source.id, event);
+  const key = event.source.externalKey;
+
+  // Step 3 (exact link) wins over an earlier "ignore"; step 4 (same title) must not undo one.
+  let work = await findExactLink(db, source.id, key);
+  const ignored = !work && (await isIgnored(db, source.id, key));
+  if (!work && !ignored) work = await reRecognize(db, source.id, event, urls.seriesUrl);
 
   let outcome: EventOutcome;
   if (work) {
+    // A card that waited for this key is answered by the link; its older events go first.
+    await answerOpenMatch(db, source.id, key, work.id, now);
+    const locked = await lockWork(db, work.id);
+    if (!locked) throw new Error(`Work ${work.id} not found`);
     outcome = await applyProgress(
       db,
-      work,
+      locked,
       { position: event.position, kind: event.kind, sourceId: source.id, url: urls.url, occurredAt },
       now,
     );
-    if (urls.seriesUrl) {
+    if (outcome === "applied" && urls.seriesUrl) {
       await db
         .update(workLinks)
         .set({ seriesUrl: urls.seriesUrl })
-        .where(and(eq(workLinks.sourceId, source.id), eq(workLinks.externalKey, event.source.externalKey)));
+        .where(and(eq(workLinks.sourceId, source.id), eq(workLinks.externalKey, key)));
     }
-  } else if (await isIgnored(db, source.id, event.source.externalKey)) {
+  } else if (ignored) {
     outcome = "ignored";
   } else {
-    await upsertPendingMatch(db, source.id, event, now);
+    await upsertPendingMatch(db, source.id, event, urls.seriesUrl, now);
     outcome = "pending";
   }
 
-  await db.insert(events).values({
-    id: event.id,
-    deviceId,
-    sourceId: source.id,
-    kind: event.kind,
-    externalKey: event.source.externalKey,
-    rawTitle: event.source.rawTitle,
-    url: urls.url,
-    ...positionColumns(event.position),
-    occurredAt,
-    receivedAt: now,
-    workId: work?.id ?? null,
-    outcome,
-  });
+  const stored = await db
+    .insert(events)
+    .values({
+      id: event.id,
+      deviceId,
+      sourceId: source.id,
+      kind: event.kind,
+      externalKey: key,
+      rawTitle: event.source.rawTitle,
+      url: urls.url,
+      ...positionColumns(event.position),
+      occurredAt,
+      receivedAt: now,
+      workId: work?.id ?? null,
+      outcome,
+    })
+    // The idempotency gate under concurrency: the second writer of an id waits, then backs out.
+    .onConflictDoNothing()
+    .returning({ id: events.id });
+  if (stored.length === 0) throw new DuplicateEventError();
   return outcome;
 }
 
@@ -99,11 +118,7 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
  * For websites only URLs on the source's own domains are kept: a stolen device token must not be
  * able to plant links to other hosts behind "Weiterlesen". Services and apps keep theirs.
  */
-async function urlsOnSource(
-  db: Db,
-  source: Source,
-  input: ProgressEvent["source"],
-): Promise<{ url: string | null; seriesUrl: string | null }> {
+async function urlsOnSource(db: Db, source: Source, input: ProgressEvent["source"]): Promise<SourceUrls> {
   if (source.kind !== "website") return { url: input.url ?? null, seriesUrl: input.seriesUrl ?? null };
   const rows = await db.select({ domain: sourceDomains.domain }).from(sourceDomains).where(eq(sourceDomains.sourceId, source.id));
   const domains = new Set(rows.map((row) => row.domain));
@@ -150,18 +165,21 @@ async function resolveSource(db: Db, input: ProgressEvent["source"]): Promise<So
   return existing;
 }
 
-/**
- * Exact link first (step 3). Otherwise a bereits bestätigte series whose title is exactly the same
- * on this source is re-recognized under the new key (step 4) – only when that is unambiguous.
- */
-async function findLinkedWork(db: Db, sourceId: string, event: ProgressEvent): Promise<Work | null> {
+/** Step 3: the key is linked to a work. */
+async function findExactLink(db: Db, sourceId: string, externalKey: string): Promise<Work | null> {
   const [linked] = await db
     .select({ work: works })
     .from(workLinks)
     .innerJoin(works, eq(works.id, workLinks.workId))
-    .where(and(eq(workLinks.sourceId, sourceId), eq(workLinks.externalKey, event.source.externalKey)));
-  if (linked) return linked.work;
+    .where(and(eq(workLinks.sourceId, sourceId), eq(workLinks.externalKey, externalKey)));
+  return linked?.work ?? null;
+}
 
+/**
+ * Step 4: a confirmed series whose title is exactly the same on this source is re-recognized
+ * under the new key – only when that is unambiguous.
+ */
+async function reRecognize(db: Db, sourceId: string, event: ProgressEvent, seriesUrl: string | null): Promise<Work | null> {
   const titleKey = normalizeTitle(event.source.rawTitle);
   if (titleKey === "" || event.position.unit === "none") return null;
 
@@ -188,7 +206,7 @@ async function findLinkedWork(db: Db, sourceId: string, event: ProgressEvent): P
       externalKey: event.source.externalKey,
       externalTitle: event.source.rawTitle,
       externalTitleNormalized: titleKey,
-      seriesUrl: event.source.seriesUrl ?? null,
+      seriesUrl,
     })
     .onConflictDoNothing();
   return match.work;
@@ -209,11 +227,42 @@ async function isIgnored(db: Db, sourceId: string, externalKey: string): Promise
   return ignored !== undefined;
 }
 
-async function upsertPendingMatch(db: Db, sourceId: string, event: ProgressEvent, now: Date): Promise<void> {
+async function upsertPendingMatch(
+  db: Db,
+  sourceId: string,
+  event: ProgressEvent,
+  seriesUrl: string | null,
+  now: Date,
+): Promise<void> {
   const candidates = await findCandidates(db, normalizeTitle(event.source.rawTitle), event.position.unit);
-  const [open] = await db
-    .select()
-    .from(pendingMatches)
+  const [created] = await db
+    .insert(pendingMatches)
+    .values({
+      sourceId,
+      externalKey: event.source.externalKey,
+      rawTitle: event.source.rawTitle,
+      mediaTypeHint: event.mediaTypeHint ?? null,
+      seriesUrl,
+      candidates,
+      eventCount: 1,
+      firstSeenAt: now,
+      lastSeenAt: now,
+    })
+    // At most one open card per key (partial unique index), also against a concurrent insert.
+    .onConflictDoNothing()
+    .returning({ id: pendingMatches.id });
+  if (created) return;
+
+  await db
+    .update(pendingMatches)
+    .set({
+      rawTitle: event.source.rawTitle,
+      candidates,
+      eventCount: sql`${pendingMatches.eventCount} + 1`,
+      lastSeenAt: now,
+      ...(seriesUrl ? { seriesUrl } : {}),
+      ...(event.mediaTypeHint ? { mediaTypeHint: event.mediaTypeHint } : {}),
+    })
     .where(
       and(
         eq(pendingMatches.sourceId, sourceId),
@@ -221,63 +270,4 @@ async function upsertPendingMatch(db: Db, sourceId: string, event: ProgressEvent
         isNull(pendingMatches.resolvedAt),
       ),
     );
-
-  if (open) {
-    await db
-      .update(pendingMatches)
-      .set({
-        rawTitle: event.source.rawTitle,
-        candidates,
-        eventCount: open.eventCount + 1,
-        lastSeenAt: now,
-        seriesUrl: event.source.seriesUrl ?? open.seriesUrl,
-        mediaTypeHint: event.mediaTypeHint ?? open.mediaTypeHint,
-      })
-      .where(eq(pendingMatches.id, open.id));
-    return;
-  }
-
-  await db.insert(pendingMatches).values({
-    sourceId,
-    externalKey: event.source.externalKey,
-    rawTitle: event.source.rawTitle,
-    mediaTypeHint: event.mediaTypeHint ?? null,
-    seriesUrl: event.source.seriesUrl ?? null,
-    candidates,
-    eventCount: 1,
-    firstSeenAt: now,
-    lastSeenAt: now,
-  });
-}
-
-/** Up to three works with trigram similarity ≥ 0.3 (pg_trgm's `%` threshold) whose type fits. */
-export async function findCandidates(db: Db, titleKey: string, unit: Position["unit"]): Promise<MatchCandidate[]> {
-  if (titleKey === "") return [];
-  const typeFilter = unit === "none" ? undefined : inArray(works.type, mediaTypesFor(unit));
-
-  const workScore = sql<number>`similarity(${works.titleNormalized}, ${titleKey})`.mapWith(Number);
-  const byTitle = await db
-    .select({ workId: works.id, score: workScore })
-    .from(works)
-    .where(and(sql`${works.titleNormalized} % ${titleKey}`, typeFilter))
-    .orderBy(desc(workScore))
-    .limit(10);
-
-  const linkScore = sql<number>`similarity(${workLinks.externalTitleNormalized}, ${titleKey})`.mapWith(Number);
-  const byAlias = await db
-    .select({ workId: workLinks.workId, score: linkScore })
-    .from(workLinks)
-    .innerJoin(works, eq(works.id, workLinks.workId))
-    .where(and(sql`${workLinks.externalTitleNormalized} % ${titleKey}`, typeFilter))
-    .orderBy(desc(linkScore))
-    .limit(10);
-
-  const best = new Map<string, number>();
-  for (const { workId, score } of [...byTitle, ...byAlias]) {
-    best.set(workId, Math.max(best.get(workId) ?? 0, score));
-  }
-  return [...best]
-    .map(([workId, score]) => ({ workId, score: Math.round(score * 100) / 100 }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, MAX_CANDIDATES);
 }

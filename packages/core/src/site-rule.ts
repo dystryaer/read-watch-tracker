@@ -93,3 +93,33 @@ export const SiteRule = z.object({
   nextUrlTemplate: NextUrlTemplate.optional(),
 });
 export type SiteRule = z.infer<typeof SiteRule>;
+
+/** The fields of a site rule the user edits (SPEC §7.3). */
+export const RULE_FIELDS = ["chapterPattern", "seriesPattern", "titleSelector", "endSelector", "nextUrlTemplate"] as const;
+export type RuleField = (typeof RULE_FIELDS)[number];
+export type RuleFields = Partial<Record<RuleField, string>>;
+
+/**
+ * Checks rule fields typed into the editor with the schema the devices apply. Blank fields are
+ * dropped; errors are reported per field (first message only).
+ */
+export function parseRuleFields(
+  fields: RuleFields,
+  site: { sourceKey: string; domains: string[] } = { sourceKey: "site:validation", domains: ["validation.example"] },
+): { ok: true; rule: SiteRule } | { ok: false; errors: Partial<Record<RuleField, string>> } {
+  const filled = Object.fromEntries(
+    RULE_FIELDS.flatMap((field) => {
+      const value = fields[field]?.trim();
+      return value ? [[field, value]] : [];
+    }),
+  );
+  const parsed = SiteRule.safeParse({ ...site, ...filled });
+  if (parsed.success) return { ok: true, rule: parsed.data };
+
+  const errors: Partial<Record<RuleField, string>> = {};
+  for (const issue of parsed.error.issues) {
+    const field = RULE_FIELDS.find((name) => name === issue.path[0]);
+    if (field && !errors[field]) errors[field] = issue.message;
+  }
+  return { ok: false, errors };
+}

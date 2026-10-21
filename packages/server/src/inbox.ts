@@ -1,6 +1,8 @@
-import type { MediaType } from "@rwt/core";
+import { type MediaType, normalizeTitle } from "@rwt/core";
 import { type Db, events, pendingMatches, sources, works } from "@rwt/db";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { findCandidates } from "./candidates";
+import { positionFromColumns } from "./work-progress";
 
 interface PositionColumns {
   chapter: number | null;
@@ -64,7 +66,18 @@ export async function listOpenMatches(db: Db): Promise<OpenMatch[]> {
     if (!newestWaiting.has(key)) newestWaiting.set(key, position);
   }
 
-  const candidateIds = [...new Set(open.flatMap(({ match }) => match.candidates.map((c) => c.workId)))];
+  // Computed now rather than taken from the card: works created or merged since its events
+  // arrived must count, or the user ends up creating a duplicate.
+  const candidatesById = new Map(
+    await Promise.all(
+      open.map(async ({ match }) => {
+        const lastPosition = newestWaiting.get(`${match.sourceId}\n${match.externalKey}`);
+        const unit = lastPosition ? positionFromColumns(lastPosition).unit : "none";
+        return [match.id, await findCandidates(db, normalizeTitle(match.rawTitle), unit)] as const;
+      }),
+    ),
+  );
+  const candidateIds = [...new Set([...candidatesById.values()].flat().map((candidate) => candidate.workId))];
   const candidateWorks =
     candidateIds.length === 0
       ? []
@@ -93,8 +106,7 @@ export async function listOpenMatches(db: Db): Promise<OpenMatch[]> {
       lastSeenAt: match.lastSeenAt,
       lastPosition,
       suggestedType: match.mediaTypeHint ?? sourceDefaultType ?? typeForPosition(lastPosition),
-      // Candidates are stored as ids; a work merged away since then simply drops out.
-      candidates: match.candidates.flatMap(({ workId, score }) => {
+      candidates: (candidatesById.get(match.id) ?? []).flatMap(({ workId, score }) => {
         const work = worksById.get(workId);
         if (!work) return [];
         const { title, type, chapter, season, episode, percent } = work;

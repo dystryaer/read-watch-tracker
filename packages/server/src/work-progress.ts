@@ -13,18 +13,31 @@ export interface ProgressUpdate {
   occurredAt: Date;
 }
 
+interface PositionColumnValues {
+  chapter: number | null;
+  season: number | null;
+  episode: number | null;
+  percent: number | null;
+}
+
+/** The position held by stored columns (a work's or an event's); "none" when none is set. */
+export function positionFromColumns(columns: PositionColumnValues): Position {
+  if (columns.chapter !== null) return { unit: "chapter", chapter: columns.chapter };
+  if (columns.episode !== null) return { unit: "episode", season: columns.season, episode: columns.episode };
+  if (columns.percent !== null) return { unit: "percent", percent: columns.percent };
+  return { unit: "none" };
+}
+
 /** The stored position of a work, or null when it is unknown (e.g. imported without chapter). */
 export function currentPosition(work: Work): Position | null {
-  switch (positionUnitFor(work.type)) {
-    case "chapter":
-      return work.chapter === null ? null : { unit: "chapter", chapter: work.chapter };
-    case "episode":
-      return work.episode === null ? null : { unit: "episode", season: work.season, episode: work.episode };
-    case "percent":
-      return work.percent === null ? null : { unit: "percent", percent: work.percent };
-    case "none":
-      return null;
-  }
+  const position = positionFromColumns(work);
+  return position.unit !== "none" && position.unit === positionUnitFor(work.type) ? position : null;
+}
+
+/** Loads a work and locks its row until the transaction ends, so concurrent events cannot overwrite each other. */
+export async function lockWork(db: Db, workId: string): Promise<Work | null> {
+  const [work] = await db.select().from(works).where(eq(works.id, workId)).for("update");
+  return work ?? null;
 }
 
 /** Column values for a position; an episode without season keeps the stored season. */
@@ -52,7 +65,9 @@ export async function applyProgress(
     lastSourceId: update.sourceId,
     // Without a URL the old one would point at an older chapter, so it is cleared.
     lastUrl: update.url,
-    lastProgressAt: update.occurredAt,
+    // Replayed or backfilled events can be weeks old: "Zuletzt aktiv" never moves back.
+    lastProgressAt:
+      work.lastProgressAt !== null && work.lastProgressAt > update.occurredAt ? work.lastProgressAt : update.occurredAt,
     updatedAt: now,
   };
 

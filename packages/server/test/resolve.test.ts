@@ -83,7 +83,7 @@ describe("resolvePendingMatch – link", () => {
   });
 
   it("stores the source's title and series URL on the link", async () => {
-    await seedSource(handle.db, { key: "site:asura" });
+    await seedSource(handle.db, { key: "site:asura" }, ["asuracomic.net"]);
     const work = await seedWork(handle.db, { title: "Overgeared" });
     await ingestEvents(
       handle.db,
@@ -181,30 +181,82 @@ describe("resolvePendingMatch – errors", () => {
 });
 
 describe("confirmMatches", () => {
-  it("links only matches whose best candidate scores at least 0.9", async () => {
-    await seedSource(handle.db, { key: "site:asura" });
+  async function twoCards() {
+    await seedSource(handle.db, { key: "site:asura" }, ["asuracomic.net"]);
     const overgeared = await seedWork(handle.db, { title: "Overgeared" });
-    await seedWork(handle.db, { title: "Solo Leveling Ragnarok" });
+    const ragnarok = await seedWork(handle.db, { title: "Solo Leveling Ragnarok" });
     await ingestEvents(
       handle.db,
       null,
-      [
-        chapterEvent({ chapter: 3 }),
-        chapterEvent({ source: { externalKey: "solo-leveling", rawTitle: "Solo Leveling" } }),
-      ],
+      [chapterEvent({ chapter: 3 }), chapterEvent({ source: { externalKey: "solo-leveling", rawTitle: "Solo Leveling" } })],
       NOW,
     );
-    const ids = (await handle.db.select().from(pendingMatches)).map((p) => p.id);
+    const cards = await handle.db.select().from(pendingMatches);
+    const card = (key: string) => cards.find((c) => c.externalKey === key)?.id ?? "";
+    return { overgeared, ragnarok, overgearedCard: card("overgeared"), soloCard: card("solo-leveling") };
+  }
 
-    const confirmed = await confirmMatches(handle.db, ids, NOW);
+  it("links the pairs the user saw when their work is still a strong candidate", async () => {
+    const { overgeared, overgearedCard } = await twoCards();
+
+    const confirmed = await confirmMatches(handle.db, [{ pendingId: overgearedCard, workId: overgeared.id }], NOW);
 
     expect(confirmed).toBe(1);
     expect((await workById(overgeared.id))?.chapter).toBe(3);
-    const open = await handle.db.select().from(pendingMatches).where(eq(pendingMatches.externalKey, "solo-leveling"));
-    expect(open[0]?.resolvedAt).toBeNull();
+  });
+
+  it("skips a pair whose work is not a candidate scoring at least 0.9", async () => {
+    const { ragnarok, soloCard } = await twoCards();
+
+    expect(await confirmMatches(handle.db, [{ pendingId: soloCard, workId: ragnarok.id }], NOW)).toBe(0);
+    const [open] = await handle.db.select().from(pendingMatches).where(eq(pendingMatches.id, soloCard));
+    expect(open?.resolvedAt).toBeNull();
+  });
+
+  it("skips a work that was merged away meanwhile and still confirms the rest", async () => {
+    const { overgeared, overgearedCard, soloCard } = await twoCards();
+    const solo = await seedWork(handle.db, { title: "Solo Leveling" });
+    await handle.db.delete(works).where(eq(works.id, overgeared.id));
+
+    const confirmed = await confirmMatches(
+      handle.db,
+      [
+        { pendingId: overgearedCard, workId: overgeared.id },
+        { pendingId: soloCard, workId: solo.id },
+      ],
+      NOW,
+    );
+
+    expect(confirmed).toBe(1);
+    expect(await handle.db.select().from(workLinks).where(eq(workLinks.workId, solo.id))).toHaveLength(1);
   });
 
   it("skips ids that are unknown or already resolved", async () => {
-    expect(await confirmMatches(handle.db, [crypto.randomUUID()], NOW)).toBe(0);
+    const { overgeared } = await twoCards();
+    expect(await confirmMatches(handle.db, [{ pendingId: crypto.randomUUID(), workId: overgeared.id }], NOW)).toBe(0);
+  });
+});
+
+describe("resolvePendingMatch – key linked meanwhile", () => {
+  it("moves an existing link of the key to the chosen work instead of failing", async () => {
+    const source = await seedSource(handle.db, { key: "site:asura" }, ["asuracomic.net"]);
+    const other = await seedWork(handle.db, { title: "Other" });
+    const chosen = await seedWork(handle.db, { title: "Overgeared" });
+    await ingestEvents(handle.db, null, [chapterEvent({ chapter: 7 })], NOW);
+    await handle.db.insert(workLinks).values({
+      workId: other.id,
+      sourceId: source.id,
+      externalKey: "overgeared",
+      externalTitle: "Overgeared",
+      externalTitleNormalized: "overgeared",
+    });
+    const pending = await openMatch();
+
+    const result = await resolvePendingMatch(handle.db, pending.id, { action: "link", workId: chosen.id }, NOW);
+
+    expect(result).toEqual({ workId: chosen.id, applied: 1 });
+    const links = await handle.db.select().from(workLinks);
+    expect(links).toHaveLength(1);
+    expect(links[0]?.workId).toBe(chosen.id);
   });
 });

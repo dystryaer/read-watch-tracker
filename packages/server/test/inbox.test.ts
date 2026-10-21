@@ -3,6 +3,7 @@ import { createTestDb, resetDb } from "@rwt/db/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { listOpenMatches } from "../src/inbox";
 import { ingestEvents } from "../src/ingest";
+import { resolvePendingMatch } from "../src/resolve";
 import { chapterEvent, seedSource, seedWork } from "./helpers";
 
 let handle: DbHandle;
@@ -92,5 +93,32 @@ describe("listOpenMatches", () => {
     ]);
 
     expect((await listOpenMatches(handle.db)).map((m) => m.rawTitle)).toEqual(["New", "Old"]);
+  });
+});
+
+describe("listOpenMatches – fresh candidates", () => {
+  it("suggests a work created after the card's events arrived", async () => {
+    await seedSource(handle.db, { key: "site:asura" }, ["asuracomic.net"]);
+    await seedSource(handle.db, { key: "site:flame" }, ["flamecomics.xyz"]);
+    await ingestEvents(
+      handle.db,
+      null,
+      [
+        chapterEvent(),
+        chapterEvent({
+          source: { key: "site:flame", externalKey: "overgeared-flame", url: "https://flamecomics.xyz/series/overgeared/345" },
+        }),
+      ],
+      NOW,
+    );
+    const cards = await listOpenMatches(handle.db);
+    const asura = cards.find((card) => card.externalKey === "overgeared");
+    if (!asura) throw new Error("asura card missing");
+    const { workId } = await resolvePendingMatch(handle.db, asura.id, { action: "new_work", type: "manhwa" }, NOW);
+
+    const [flame] = await listOpenMatches(handle.db);
+
+    expect(flame?.externalKey).toBe("overgeared-flame");
+    expect(flame?.candidates).toMatchObject([{ workId, title: "Overgeared", score: 1 }]);
   });
 });

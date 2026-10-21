@@ -8,6 +8,15 @@ describe("nextChapterUrl – generic", () => {
     ).toEqual({ kind: "next", href: "https://site.example/manga/solo-leveling/chapter-217/" });
   });
 
+  it("follows a manual change: the chapter in the last URL is replaced, not reopened", () => {
+    const lastUrl = "https://site.example/manga/solo-leveling/chapter-216/";
+    expect(nextChapterUrl({ lastUrl, chapter: 217 })).toEqual({
+      kind: "next",
+      href: "https://site.example/manga/solo-leveling/chapter-218/",
+    });
+    expect(nextChapterUrl({ lastUrl, chapter: 214 })?.href).toBe("https://site.example/manga/solo-leveling/chapter-215/");
+  });
+
   it("handles a purely numeric last segment", () => {
     expect(nextChapterUrl({ lastUrl: "https://site.example/series/x/chapter/345", chapter: 345 })).toEqual({
       kind: "next",
@@ -32,10 +41,11 @@ describe("nextChapterUrl – generic", () => {
     ).toBe("https://site.example/manga/x/chapter-13?ref=12");
   });
 
-  it("does not replace the number when it is part of a larger number", () => {
+  it("never replaces digits inside a larger number, only the URL's whole chapter", () => {
+    // Stored 12 (set by hand), last URL at 1200: the result is chapter 13, never chapter-1300.
     expect(nextChapterUrl({ lastUrl: "https://site.example/manga/x/chapter-1200", chapter: 12 })).toEqual({
-      kind: "last",
-      href: "https://site.example/manga/x/chapter-1200",
+      kind: "next",
+      href: "https://site.example/manga/x/chapter-13",
     });
   });
 
@@ -126,6 +136,12 @@ describe("nextChapterUrl – domain move", () => {
     expect(
       nextChapterUrl({ lastUrl: "https://old.example:8443/x/chapter-1", chapter: 1, currentDomain: "new.example" })?.href,
     ).toBe("https://new.example/x/chapter-2");
+  });
+
+  it("keeps a www host of the current domain, which is stored without www", () => {
+    expect(
+      nextChapterUrl({ lastUrl: "https://www.site.example/x/chapter-1", chapter: 1, currentDomain: "site.example" })?.href,
+    ).toBe("https://www.site.example/x/chapter-2");
   });
 
   it("ignores an invalid current domain", () => {

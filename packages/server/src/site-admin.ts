@@ -1,6 +1,7 @@
-import { isHostname, normalizeDomain, SiteRule } from "@rwt/core";
+import { isHostname, normalizeDomain, parseRuleFields, type RuleFields } from "@rwt/core";
 import { type Db, events, sourceDomains, sources, workLinks } from "@rwt/db";
 import { and, asc, count, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { ruleColumns, storedRuleFields } from "./rule-columns";
 
 export class SiteDomainError extends Error {
   constructor(message: string) {
@@ -9,13 +10,7 @@ export class SiteDomainError extends Error {
   }
 }
 
-export interface SiteRuleFields {
-  chapterPattern?: string;
-  seriesPattern?: string;
-  titleSelector?: string;
-  endSelector?: string;
-  nextUrlTemplate?: string;
-}
+export type SiteRuleFields = RuleFields;
 
 export interface SiteSummary {
   id: string;
@@ -28,16 +23,6 @@ export interface SiteSummary {
 }
 
 type SourceRow = typeof sources.$inferSelect;
-
-function ruleOf(source: SourceRow): SiteRuleFields {
-  return {
-    ...(source.ruleChapterPattern ? { chapterPattern: source.ruleChapterPattern } : {}),
-    ...(source.ruleSeriesPattern ? { seriesPattern: source.ruleSeriesPattern } : {}),
-    ...(source.ruleTitleSelector ? { titleSelector: source.ruleTitleSelector } : {}),
-    ...(source.ruleEndSelector ? { endSelector: source.ruleEndSelector } : {}),
-    ...(source.ruleNextUrlTemplate ? { nextUrlTemplate: source.ruleNextUrlTemplate } : {}),
-  };
-}
 
 async function summarize(db: Db, rows: SourceRow[]): Promise<SiteSummary[]> {
   if (rows.length === 0) return [];
@@ -62,7 +47,7 @@ async function summarize(db: Db, rows: SourceRow[]): Promise<SiteSummary[]> {
     domains: domains
       .filter((domain) => domain.sourceId === row.id)
       .map(({ domain, isCurrent }) => ({ domain, isCurrent })),
-    rule: ruleOf(row),
+    rule: storedRuleFields(row),
   }));
 }
 
@@ -91,8 +76,6 @@ export async function getSite(db: Db, key: string): Promise<SiteSummary | null> 
 
 export type RuleUpdateResult = { ok: true } | { ok: false; errors: Partial<Record<keyof SiteRuleFields, string>> };
 
-const RULE_FIELDS = ["chapterPattern", "seriesPattern", "titleSelector", "endSelector", "nextUrlTemplate"] as const;
-
 /** Saves the site rule (SPEC §7.3) after the same validation the devices apply; empty fields are cleared. */
 export async function updateSiteRule(
   db: Db,
@@ -100,32 +83,12 @@ export async function updateSiteRule(
   fields: SiteRuleFields,
   now = new Date(),
 ): Promise<RuleUpdateResult> {
-  const filled = Object.fromEntries(
-    RULE_FIELDS.flatMap((field) => {
-      const value = fields[field]?.trim();
-      return value ? [[field, value]] : [];
-    }),
-  );
-  const parsed = SiteRule.safeParse({ sourceKey: "site:validation", domains: ["validation.example"], ...filled });
-  if (!parsed.success) {
-    const errors: Partial<Record<keyof SiteRuleFields, string>> = {};
-    for (const issue of parsed.error.issues) {
-      const field = RULE_FIELDS.find((name) => name === issue.path[0]);
-      if (field && !errors[field]) errors[field] = issue.message;
-    }
-    return { ok: false, errors };
-  }
+  const parsed = parseRuleFields(fields);
+  if (!parsed.ok) return { ok: false, errors: parsed.errors };
 
   await db
     .update(sources)
-    .set({
-      ruleChapterPattern: parsed.data.chapterPattern ?? null,
-      ruleSeriesPattern: parsed.data.seriesPattern ?? null,
-      ruleTitleSelector: parsed.data.titleSelector ?? null,
-      ruleEndSelector: parsed.data.endSelector ?? null,
-      ruleNextUrlTemplate: parsed.data.nextUrlTemplate ?? null,
-      ruleUpdatedAt: now,
-    })
+    .set({ ...ruleColumns(parsed.rule), ruleUpdatedAt: now })
     .where(eq(sources.id, sourceId));
   return { ok: true };
 }

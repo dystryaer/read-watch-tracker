@@ -15,7 +15,16 @@ const ResolveInput = z.object({
   title: z.preprocess((value) => (value === "" ? undefined : value), cleanText(MAX_TEXT_LENGTH).optional()),
 });
 const IgnoreInput = z.object({ pendingId: z.uuid() });
-const ConfirmAllInput = z.array(z.uuid()).min(1).max(500);
+// "pendingId:workId" – the pairs the list showed, so the server links exactly what the user saw.
+const ConfirmPair = z
+  .string()
+  .max(80)
+  .transform((value) => {
+    const [pendingId, workId] = value.split(":");
+    return { pendingId, workId };
+  })
+  .pipe(z.object({ pendingId: z.uuid(), workId: z.uuid() }));
+const ConfirmAllInput = z.array(ConfirmPair).min(1).max(500);
 
 async function guarded(action: () => Promise<unknown>, message: string): Promise<FormState> {
   try {
@@ -53,7 +62,7 @@ export async function ignoreMatchAction(_previous: FormState, formData: FormData
 
 export async function confirmAllAction(_previous: FormState, formData: FormData): Promise<FormState> {
   const db = await getAuthorizedDb();
-  const input = ConfirmAllInput.safeParse(formData.getAll("pendingId"));
+  const input = ConfirmAllInput.safeParse(formData.getAll("pair"));
   if (!input.success) return { error: "Ungültige Eingabe." };
   const confirmed = await confirmMatches(db, input.data);
   refresh();

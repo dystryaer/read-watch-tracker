@@ -1,7 +1,8 @@
-import { type MediaType, normalizeTitle, type Position } from "@rwt/core";
+import { type MediaType, normalizeTitle } from "@rwt/core";
 import { type Db, events, pendingMatches, workLinks, works } from "@rwt/db";
 import { and, asc, eq, isNull } from "drizzle-orm";
-import { applyProgress } from "./work-progress";
+import { currentCandidates } from "./candidates";
+import { applyProgress, lockWork, positionFromColumns } from "./work-progress";
 
 export type Resolution =
   | { action: "link"; workId: string }
@@ -18,7 +19,6 @@ export class PendingMatchNotFoundError extends Error {
 export const HIGH_CONFIDENCE_SCORE = 0.9;
 
 type PendingMatch = typeof pendingMatches.$inferSelect;
-type StoredEvent = typeof events.$inferSelect;
 
 /** Resolves an inbox card (SPEC §4.5) and replays its waiting events in time order. */
 export async function resolvePendingMatch(
@@ -45,34 +45,66 @@ export async function resolvePendingMatch(
 
     const workId =
       resolution.action === "link" ? resolution.workId : await createWork(tx, resolution.type, resolution.title ?? pending.rawTitle);
-    await tx.insert(workLinks).values({
-      workId,
-      sourceId: pending.sourceId,
-      externalKey: pending.externalKey,
-      externalTitle: pending.rawTitle,
-      externalTitleNormalized: normalizeTitle(pending.rawTitle),
-      seriesUrl: pending.seriesUrl,
-    });
+    await tx
+      .insert(workLinks)
+      .values({
+        workId,
+        sourceId: pending.sourceId,
+        externalKey: pending.externalKey,
+        externalTitle: pending.rawTitle,
+        externalTitleNormalized: normalizeTitle(pending.rawTitle),
+        seriesUrl: pending.seriesUrl,
+      })
+      // The key may have been linked meanwhile (e.g. by a concurrent event): the user's choice wins.
+      .onConflictDoUpdate({ target: [workLinks.sourceId, workLinks.externalKey], set: { workId } });
     const applied = await replayWaitingEvents(tx, pending, workId, now);
     await markResolved(tx, pending.id, resolution.action === "link" ? "linked" : "new_work", now);
     return { workId, applied };
   });
 }
 
-/** Bulk action after a backfill: links every given match whose best candidate scores ≥ 0.9. */
-export async function confirmMatches(db: Db, pendingIds: string[], now = new Date()): Promise<number> {
+/**
+ * Bulk action after a backfill: links the (card, work) pairs the user saw. A pair is skipped when
+ * its card is gone or its work is no longer a candidate scoring ≥ 0.9 (renamed, merged away).
+ */
+export async function confirmMatches(
+  db: Db,
+  pairs: { pendingId: string; workId: string }[],
+  now = new Date(),
+): Promise<number> {
   let confirmed = 0;
-  for (const id of pendingIds) {
+  for (const { pendingId, workId } of pairs) {
     const [pending] = await db
       .select()
       .from(pendingMatches)
-      .where(and(eq(pendingMatches.id, id), isNull(pendingMatches.resolvedAt)));
-    const best = pending?.candidates[0];
-    if (!best || best.score < HIGH_CONFIDENCE_SCORE) continue;
-    await resolvePendingMatch(db, id, { action: "link", workId: best.workId }, now);
-    confirmed++;
+      .where(and(eq(pendingMatches.id, pendingId), isNull(pendingMatches.resolvedAt)));
+    if (!pending) continue;
+    const candidates = await currentCandidates(db, pending);
+    if (!candidates.some((candidate) => candidate.workId === workId && candidate.score >= HIGH_CONFIDENCE_SCORE)) continue;
+    try {
+      await resolvePendingMatch(db, pendingId, { action: "link", workId }, now);
+      confirmed++;
+    } catch (error) {
+      if (!(error instanceof PendingMatchNotFoundError)) throw error; // resolved concurrently
+    }
   }
   return confirmed;
+}
+
+/**
+ * Closes the open card of a key that an event has just linked (SPEC §5.3 steps 3–4) and replays
+ * the events that waited on it, so no card stays behind that can no longer be resolved.
+ */
+export async function answerOpenMatch(db: Db, sourceId: string, externalKey: string, workId: string, now: Date) {
+  const [open] = await db
+    .select()
+    .from(pendingMatches)
+    .where(
+      and(eq(pendingMatches.sourceId, sourceId), eq(pendingMatches.externalKey, externalKey), isNull(pendingMatches.resolvedAt)),
+    );
+  if (!open) return;
+  await replayWaitingEvents(db, open, workId, now);
+  await markResolved(db, open.id, "linked", now);
 }
 
 function waitingEventsOf(pending: PendingMatch) {
@@ -97,13 +129,13 @@ async function replayWaitingEvents(db: Db, pending: PendingMatch, workId: string
   let applied = 0;
   for (const event of waiting) {
     // Reloaded per event: each replayed event sees the progress of the previous one.
-    const [work] = await db.select().from(works).where(eq(works.id, workId));
+    const work = await lockWork(db, workId);
     if (!work) throw new Error(`Work ${workId} not found`);
     const outcome = await applyProgress(
       db,
       work,
       {
-        position: storedPosition(event),
+        position: positionFromColumns(event),
         kind: event.kind,
         sourceId: pending.sourceId,
         url: event.url,
@@ -115,13 +147,6 @@ async function replayWaitingEvents(db: Db, pending: PendingMatch, workId: string
     if (outcome === "applied") applied++;
   }
   return applied;
-}
-
-function storedPosition(event: StoredEvent): Position {
-  if (event.chapter !== null) return { unit: "chapter", chapter: event.chapter };
-  if (event.episode !== null) return { unit: "episode", season: event.season, episode: event.episode };
-  if (event.percent !== null) return { unit: "percent", percent: event.percent };
-  return { unit: "none" };
 }
 
 async function markResolved(db: Db, id: string, resolution: "linked" | "new_work" | "ignored", now: Date) {

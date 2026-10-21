@@ -105,7 +105,7 @@ export default async function InboxPage() {
           </ul>
           <ActionForm action={confirmAllAction} submitLabel="Alle bestätigen">
             {confident.map((match) => (
-              <input key={match.id} type="hidden" name="pendingId" value={match.id} />
+              <input key={match.id} type="hidden" name="pair" value={`${match.id}:${match.candidates[0]?.workId}`} />
             ))}
           </ActionForm>
         </section>

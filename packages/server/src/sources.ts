@@ -1,6 +1,7 @@
 import { DEFAULT_THRESHOLDS, type DeviceConfig, type EnableSourceResponse, normalizeDomain, SiteRule } from "@rwt/core";
 import { type Db, sourceDomains, sources } from "@rwt/db";
 import { and, asc, eq, inArray, like } from "drizzle-orm";
+import { storedRuleFields } from "./rule-columns";
 
 type Source = typeof sources.$inferSelect;
 
@@ -108,11 +109,7 @@ export async function buildDeviceConfig(db: Db): Promise<DeviceConfig> {
     const candidate = {
       sourceKey: source.key,
       domains: domainRows.filter((row) => row.sourceId === source.id).map((row) => row.domain),
-      ...(source.ruleChapterPattern ? { chapterPattern: source.ruleChapterPattern } : {}),
-      ...(source.ruleSeriesPattern ? { seriesPattern: source.ruleSeriesPattern } : {}),
-      ...(source.ruleTitleSelector ? { titleSelector: source.ruleTitleSelector } : {}),
-      ...(source.ruleEndSelector ? { endSelector: source.ruleEndSelector } : {}),
-      ...(source.ruleNextUrlTemplate ? { nextUrlTemplate: source.ruleNextUrlTemplate } : {}),
+      ...storedRuleFields(source),
     };
     // Rules are validated when saved; re-checking here keeps one bad row from breaking every device.
     const rule = SiteRule.safeParse(candidate);

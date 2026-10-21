@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileRulePattern, SiteRule } from "../src/site-rule";
+import { compileRulePattern, parseRuleFields, SiteRule } from "../src/site-rule";
 
 const baseRule = { sourceKey: "site:asura", domains: ["asuracomic.net"] };
 
@@ -118,5 +118,27 @@ describe("compileRulePattern", () => {
 
   it("returns null for an invalid pattern instead of throwing", () => {
     expect(compileRulePattern("(unclosed")).toBeNull();
+  });
+});
+
+describe("parseRuleFields", () => {
+  it("drops blank fields and trims the others", () => {
+    expect(parseRuleFields({ chapterPattern: String.raw`  /c(\d+)  `, titleSelector: "   " })).toEqual({
+      ok: true,
+      rule: { sourceKey: "site:validation", domains: ["validation.example"], chapterPattern: String.raw`/c(\d+)` },
+    });
+  });
+
+  it("reports the first error per field", () => {
+    const result = parseRuleFields({ chapterPattern: "(unclosed", nextUrlTemplate: "{origin}/x" });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(Object.keys(result.errors).sort()).toEqual(["chapterPattern", "nextUrlTemplate"]);
+    expect(result.errors.chapterPattern).toBe("kein gültiger regulärer Ausdruck");
+  });
+
+  it("validates against the given site", () => {
+    const result = parseRuleFields({ endSelector: "a.next" }, { sourceKey: "site:asura", domains: ["asuracomic.net"] });
+    expect(result).toMatchObject({ ok: true, rule: { sourceKey: "site:asura", domains: ["asuracomic.net"] } });
   });
 });

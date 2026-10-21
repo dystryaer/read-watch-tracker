@@ -156,7 +156,8 @@ Der einzige Hauptbildschirm. Er beantwortet die Frage: *Wo stehe ich, und wie ko
 ### 4.4 „Weiterlesen“-Regeln
 
 1. Die Seitenregel der Quelle hat eine `next_url_template` (z. B. `{seriesUrl}/chapter/{next}`) → daraus wird die URL gebaut.
-2. Sonst greift die generische Regel: Kommt die Kapitelnummer im letzten Pfadsegment von `last_url` genau einmal vor (z. B. `…/chapter-216/`), wird sie durch `floor(n) + 1` ersetzt.
+2. Sonst greift die generische Regel: Kommt die Kapitelnummer im letzten Pfadsegment von `last_url` genau einmal vor (z. B. `…/chapter-216/`), wird sie durch `floor(n) + 1` ersetzt. Wurde der Stand von Hand geändert (Stand 217, `last_url` noch `…/chapter-216/`), wird die in `last_url` erkannte Kapitelnummer ersetzt; der Button öffnet also trotzdem Kapitel 218.
+   Eine `www.`-Adresse der aktuellen Domain gilt nicht als Umzug und bleibt unverändert.
 3. Sonst wird `last_url` geöffnet (das zuletzt gelesene Kapitel). Der Button heißt dann „Zuletzt gelesen ›“.
 4. **Domain umgezogen:** Wurde die Domain von `last_url` per Domain-Umzug (§7.2) ersetzt, wird beim Bauen der URL die aktuelle Domain der Quelle eingesetzt.
 5. Bei Streaming wird die Serienseite beim Anbieter geöffnet (Code-Adapter, `nextUrl`). Bei Titeln, die nur auf der Shield gesehen wurden, gibt es keinen Button.

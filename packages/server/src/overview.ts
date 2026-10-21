@@ -1,5 +1,5 @@
 import { type Db, pendingMatches, sourceDomains, sources, workLinks, works } from "@rwt/db";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 
 type WorkColumns = Pick<
   typeof works.$inferSelect,
@@ -56,7 +56,9 @@ export async function listOverview(db: Db): Promise<OverviewRow[]> {
       externalTitle: workLinks.externalTitle,
       seriesUrl: workLinks.seriesUrl,
     })
-    .from(workLinks);
+    .from(workLinks)
+    // Newest first: after a key change (§5.3 step 4) the new link carries the current URL scheme.
+    .orderBy(desc(workLinks.confirmedAt));
   const linksByWork = new Map<string, typeof links>();
   for (const link of links) {
     const list = linksByWork.get(link.workId);

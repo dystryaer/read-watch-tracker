@@ -1,4 +1,6 @@
+import { detectChapterFromUrl } from "./detect-url";
 import { parseHttpUrl } from "./safe-url";
+import { normalizeDomain } from "./services";
 import { isHostname } from "./site-rule";
 
 export interface NextUrlInput {
@@ -36,12 +38,19 @@ export function nextChapterUrl(input: NextUrlInput): NextUrl | null {
 
     const generic = last ? replaceChapterInLastSegment(last, input.chapter, next) : null;
     if (generic) return { kind: "next", href: generic };
+
+    // After a manual change the stored chapter differs from the one in the last URL (chapter-216
+    // while at 217): replace the URL's own chapter instead of reopening an older one.
+    const urlChapter = last ? detectChapterFromUrl(last, "")?.chapter : undefined;
+    const moved = last && urlChapter !== undefined ? replaceChapterInLastSegment(last, urlChapter, next) : null;
+    if (moved) return { kind: "next", href: moved };
   }
   return last ? { kind: "last", href: last.href } : null;
 }
 
 function moveToDomain(url: URL | null, domain: string | null | undefined): URL | null {
-  if (url === null || !domain || !isHostname(domain) || url.hostname === domain) return url;
+  // Stored domains have no "www."; www.example.org is still the current domain example.org.
+  if (url === null || !domain || !isHostname(domain) || normalizeDomain(url.hostname) === domain) return url;
   const moved = new URL(url.href);
   moved.hostname = domain;
   moved.port = ""; // the old domain's port says nothing about the new one

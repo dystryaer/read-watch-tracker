@@ -1,4 +1,4 @@
-import { type DbHandle, pendingMatches, works } from "@rwt/db";
+import { type DbHandle, pendingMatches, workLinks, works } from "@rwt/db";
 import { createTestDb, resetDb } from "@rwt/db/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -88,5 +88,33 @@ describe("countOpenPending", () => {
     ]);
 
     expect(await countOpenPending(handle.db)).toBe(2);
+  });
+});
+
+describe("listOverview – series URL", () => {
+  it("takes the series URL of the most recently confirmed link of the last source", async () => {
+    const source = await seedSource(handle.db, { key: "site:asura" });
+    const work = await seedWork(handle.db, { title: "Overgeared" });
+    await handle.db.update(works).set({ lastSourceId: source.id }).where(eq(works.id, work.id));
+    const newer = await seedLink(handle.db, {
+      workId: work.id,
+      sourceId: source.id,
+      externalKey: "overgeared-new",
+      externalTitle: "Overgeared",
+      seriesUrl: "https://asuracomic.net/series/overgeared-new",
+    });
+    const older = await seedLink(handle.db, {
+      workId: work.id,
+      sourceId: source.id,
+      externalKey: "overgeared",
+      externalTitle: "Overgeared",
+      seriesUrl: "https://asuracomic.net/series/overgeared",
+    });
+    await handle.db.update(workLinks).set({ confirmedAt: new Date("2026-10-01T00:00:00Z") }).where(eq(workLinks.id, older.id));
+    await handle.db.update(workLinks).set({ confirmedAt: new Date("2026-10-20T00:00:00Z") }).where(eq(workLinks.id, newer.id));
+
+    const [row] = await listOverview(handle.db);
+
+    expect(row?.seriesUrl).toBe("https://asuracomic.net/series/overgeared-new");
   });
 });
