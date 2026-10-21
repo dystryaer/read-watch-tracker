@@ -9,6 +9,7 @@ export {
   positionUnitFor,
   shouldAdvance,
 } from "./progress";
+export { latestChapterIn, looksLikeChallenge, MAX_SERIES_PAGE_LENGTH } from "./latest-chapter";
 export { nextChapterUrl, type NextUrl, type NextUrlInput, onCurrentDomain } from "./next-url";
 export { MAX_URL_LENGTH, parseHttpUrl, safeHref } from "./safe-url";
 export { normalizeSeriesKey } from "./series-key";
