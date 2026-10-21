@@ -13,7 +13,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T01 Workspace + `normalizeTitle`** · S
   Akz.: SPEC §5.3 Normalisierung; Randfälle (Apostrophe, Striche, Tausender, Tags, Unicode, CJK) · Prüfung: 59 Tests, Coverage 100 %
 
-- [ ] **T02 Event-Vertrag (zod) + JSON Schema** · S · Abh. T01
+- [x] **T02 Event-Vertrag (zod) + JSON Schema** · S · Abh. T01
   Akz.: `MediaType`, `Position`, `ProgressEvent`, `EventBatch` (1–100), `EventResult`; URLs nur http/https, ≤ 2048 Zeichen; Längenlimits für Titel/Schlüssel; `event.schema.json` generiert, Test prüft Aktualität · Dateien: `packages/core/src/event.ts`, `scripts/`, Test
 
 - [ ] **T03 Fortschrittsregeln** · S · Abh. T02
