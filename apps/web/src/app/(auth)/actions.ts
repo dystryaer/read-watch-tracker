@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAuth, hasOwnerAccount } from "@/lib/auth";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/auth-config";
+import { safeNextPath } from "@/lib/next-path";
 import { clientAddress, loginLimiterOverall, loginLimiterPerClient } from "@/lib/request";
 
 export type FormState = { error: string } | null;
@@ -35,7 +36,7 @@ export async function signInAction(_previous: FormState, formData: FormData): Pr
     if (isAPIError(error)) return { error: "E-Mail-Adresse oder Passwort ist falsch." };
     throw error;
   }
-  redirect("/");
+  redirect(safeNextPath(formData.get("next")));
 }
 
 export async function setupAction(_previous: FormState, formData: FormData): Promise<FormState> {

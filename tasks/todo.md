@@ -62,7 +62,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T16 Zuordnungs-Inbox** · M · Abh. T08, T13
   Akz.: SPEC §4.5: Karten, Kandidat vorausgewählt, neues Werk mit Typ, Ignorieren, Sammelbestätigung ≥ 0.9 mit Vorschau; Banner auf dem Core-Screen
 
-- [ ] **T17 Einstellungen: Geräte** · S · Abh. T09, T11
+- [x] **T17 Einstellungen: Geräte** · S · Abh. T09, T11
   Akz.: Code eingeben + Gerätenamen bestätigen, Liste mit „zuletzt gesehen“, Widerruf
 
 - [ ] **T18 Einstellungen: Seiten, Regeln, Umzug** · M · Abh. T04, T11

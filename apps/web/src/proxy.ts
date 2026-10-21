@@ -12,6 +12,8 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", policy);
+  // Lets the login send the user back to where they were (validated by safeNextPath).
+  requestHeaders.set("x-pathname", `${request.nextUrl.pathname}${request.nextUrl.search}`);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", policy);

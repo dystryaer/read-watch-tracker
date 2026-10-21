@@ -15,14 +15,19 @@ export function AuthForm({
   action,
   fields,
   submitLabel,
+  hidden = {},
 }: {
   action: (previous: FormState, formData: FormData) => Promise<FormState>;
   fields: Field[];
   submitLabel: string;
+  hidden?: Record<string, string>;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   return (
     <form action={formAction} className="space-y-4">
+      {Object.entries(hidden).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       {fields.map((field) => (
         <label key={field.name} className="block space-y-1">
           <span className="text-sm font-medium">{field.label}</span>

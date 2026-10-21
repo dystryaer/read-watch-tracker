@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { type Auth, createAuth, hasOwner } from "./auth-config";
 import { getDb } from "./db";
+import { safeNextPath } from "./next-path";
 
 declare global {
   var rwtAuth: Promise<Auth> | undefined;
@@ -40,6 +41,9 @@ export async function getSession() {
 /** Guard for every page and Server Action of the app (Server Actions are public POST endpoints). */
 export async function requireSession() {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session) {
+    const next = safeNextPath((await headers()).get("x-pathname"));
+    redirect(next === "/" ? "/login" : `/login?next=${encodeURIComponent(next)}`);
+  }
   return session;
 }
