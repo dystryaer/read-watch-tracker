@@ -38,21 +38,47 @@ export function isLibraryPage(url: URL): boolean {
   return service !== undefined && LIBRARY_PAGES[service](url);
 }
 
-const cardOf = (element: Element) => element.closest("li, article, [class*='item'], [class*='card']") ?? element.parentElement ?? element;
+const BOOK_LINKS = "a[href*='/book/']";
+const MAX_CARD_DEPTH = 6;
+
+/**
+ * A book's card: the largest ancestor of its link that holds no other book. Class names are not
+ * trusted – a list wrapper such as "library-items" would otherwise count as the card of every book.
+ */
+function cardOf(link: Element, bookId: string, bookIds: Map<Element, string>): Element {
+  let card: Element = link;
+  for (let depth = 0; depth < MAX_CARD_DEPTH; depth++) {
+    const parent = card.parentElement;
+    if (!parent || parent === link.ownerDocument.body) break;
+    // Also links that are no book here (another host): their card's text is not this book's.
+    const others = [...parent.querySelectorAll(BOOK_LINKS)].some((other) => bookIds.get(other) !== bookId);
+    if (others) break;
+    card = parent;
+  }
+  return card;
+}
+
+function bookLinks(doc: Document, base: URL): Map<Element, string> {
+  const ids = new Map<Element, string>();
+  for (const link of doc.querySelectorAll(BOOK_LINKS)) {
+    try {
+      const bookId = parseWebnovelBookId(new URL(link.getAttribute("href") ?? "", base).href);
+      if (bookId) ids.set(link, bookId);
+    } catch {
+      // Not a URL: not a book.
+    }
+  }
+  return ids;
+}
 
 /** Every book link with the chapter its card names; a book without a readable chapter has no position to send. */
 function webnovelEntries(doc: Document, base: URL): LibraryEntry[] {
   const entries = new Map<string, LibraryEntry>();
-  for (const link of doc.querySelectorAll("a[href*='/book/']")) {
-    let href: string;
-    try {
-      href = new URL(link.getAttribute("href") ?? "", base).href;
-    } catch {
-      continue;
-    }
-    const bookId = parseWebnovelBookId(href);
-    if (!bookId || entries.has(bookId)) continue;
-    const chapter = CHAPTER.exec(cardText(cardOf(link)))?.[1];
+  const bookIds = bookLinks(doc, base);
+  for (const [link, bookId] of bookIds) {
+    if (entries.has(bookId)) continue;
+    const href = new URL(link.getAttribute("href") ?? "", base).href;
+    const chapter = CHAPTER.exec(cardText(cardOf(link, bookId, bookIds)))?.[1];
     const title = text(link.querySelector("h1, h2, h3, h4") ?? link);
     if (!chapter || title === "") continue;
     entries.set(bookId, { externalKey: bookId, title, chapter: Number(chapter), seriesUrl: href });
@@ -68,7 +94,8 @@ function kindleEntries(doc: Document): LibraryEntry[] {
     if (!ASIN.test(asin) || entries.has(asin)) continue;
     const percent = PERCENT.exec(cardText(tile))?.[1];
     const title = text(tile.querySelector(".title, [id^='title'], h2, h3, p"));
-    if (percent === undefined || title === "") continue;
+    // 0 % is a purchase not started yet: it would only open an inbox card.
+    if (percent === undefined || Number(percent.replace(",", ".")) === 0 || title === "") continue;
     entries.set(asin, { externalKey: asin, title, percent: Math.min(100, Number(percent.replace(",", "."))), seriesUrl: null });
   }
   return [...entries.values()];

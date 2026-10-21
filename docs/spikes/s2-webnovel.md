@@ -15,7 +15,7 @@
 4. Seite speichern: Rechtsklick → **Speichern unter → Webseite, nur HTML**. Vorher prüfen, dass keine Kontodaten (E-Mail, Name) im Dokument stehen; ggf. die Stellen ersetzen.
 5. In den Entwicklertools (F12 → Netzwerk) nachsehen, ob die Liste per JSON-Request nachgeladen wird. Wenn ja: die Antwort ebenfalls speichern (ohne Cookies/Header).
 
-**Abgleich mit der Extension:** Der Adapter in `apps/extension/src/library/pages.ts` sucht Links auf `/book/<slug>_<id>` und in deren Karte „Chapter N“ bzw. „Kapitel N“. Die gespeicherte Seite ersetzt die erfundene Seite in `apps/extension/test/library-pages.test.ts`; passt der Adapter nicht, wird er gegen die echte Seite angepasst.
+**Abgleich mit der Extension:** Der Adapter in `apps/extension/src/library/pages.ts` sucht Links auf `/book/<slug>_<id>` und in deren Karte „Chapter N“ bzw. „Kapitel N“. Die gespeicherte Seite ersetzt die erfundene Seite in `apps/extension/test/library-pages.test.ts`; passt der Adapter nicht, wird er gegen die echte Seite angepasst. Die Karte eines Buchs ist der größte Bereich um seinen Link, der kein anderes Buch enthält. **Bitte prüfen:** Zeigt eine Karte außer dem Lesestand auch das neueste Kapitel (z. B. „Latest: Chapter 2950“) *vor* dem Lesestand? Dann nimmt der Adapter heute die falsche Zahl. Er muss dann gezielt das Lesestand-Label lesen, festgehalten mit einem Test an der echten Seite.
 
 ## 2. Teilen aus der App
 
