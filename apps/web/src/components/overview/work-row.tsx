@@ -23,24 +23,26 @@ export function WorkRow({ item, actions }: { item: OverviewItem; actions?: React
         )}
       </div>
 
-      <div className="col-span-2 flex min-w-0 items-center gap-2 text-sm text-zinc-600 sm:col-span-1 dark:text-zinc-400">
-        {item.source ? (
-          <>
-            <span
-              aria-hidden="true"
-              className="grid size-5 shrink-0 place-items-center rounded bg-zinc-200 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-            >
-              {item.source.initial}
-            </span>
-            <span className="truncate">{item.source.label}</span>
-          </>
-        ) : (
-          <span>– keine Seite</span>
-        )}
-      </div>
-
-      <div className="text-sm text-zinc-500 sm:text-left dark:text-zinc-400">
-        {item.lastActivity ? <time dateTime={item.lastActivity.iso}>{item.lastActivity.label}</time> : "Import"}
+      {/* One line on phones; `sm:contents` turns both parts into their own grid columns on wider screens. */}
+      <div className="col-span-2 flex min-w-0 items-center gap-3 text-sm text-zinc-600 sm:contents dark:text-zinc-400">
+        <div className="flex min-w-0 items-center gap-2">
+          {item.source ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="grid size-5 shrink-0 place-items-center rounded bg-zinc-200 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+              >
+                {item.source.initial}
+              </span>
+              <span className="truncate">{item.source.label}</span>
+            </>
+          ) : (
+            <span>– keine Seite</span>
+          )}
+        </div>
+        <div className="shrink-0 text-zinc-500 dark:text-zinc-400">
+          {item.lastActivity ? <time dateTime={item.lastActivity.iso}>{item.lastActivity.label}</time> : "Import"}
+        </div>
       </div>
 
       <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
