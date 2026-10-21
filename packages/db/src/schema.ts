@@ -211,3 +211,4 @@ export const pendingMatches = pgTable(
     index("pending_matches_key").on(table.sourceId, table.externalKey),
   ],
 );
+export * from "./auth-schema";

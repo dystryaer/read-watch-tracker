@@ -15,3 +15,4 @@ export {
   revokeDevice,
   startPairing,
 } from "./devices";
+export { hasOwner } from "./owner";

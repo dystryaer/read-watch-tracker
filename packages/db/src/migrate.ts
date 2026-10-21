@@ -1,12 +1,14 @@
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import type { DbHandle } from "./index";
 import type * as schema from "./schema";
 
-// Computed on demand: inside a bundler (Next.js) import.meta.url may not be a file URL.
+// Computed on demand and without the `new URL(…, import.meta.url)` pattern, which bundlers
+// (Turbopack) try to resolve as an asset. The web app passes its folder explicitly.
 export function defaultMigrationsFolder(): string {
-  return fileURLToPath(new URL("../migrations", import.meta.url));
+  return path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "migrations");
 }
 
 export async function migrateDb(handle: DbHandle, migrationsFolder = defaultMigrationsFolder()): Promise<void> {

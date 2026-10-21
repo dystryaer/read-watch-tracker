@@ -13,7 +13,7 @@
     "@rwt/core": "workspace:*",
     "@rwt/db": "workspace:*",
     "@rwt/server": "workspace:*",
-    "drizzle-orm": "^0.45.4",
+    "better-auth": "^1.7.11",
     "next": "^16.4.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

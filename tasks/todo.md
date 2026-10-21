@@ -42,7 +42,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T10 Next.js-Gerüst** · M · Abh. T06
   Akz.: `apps/web` mit App Router + Tailwind; DB-Singleton aus `DATABASE_URL`; `pnpm db:migrate`; Security-Header (CSP, nosniff, frame-ancestors, Referrer-Policy); `pnpm --filter @rwt/web build` grün
 
-- [ ] **T11 Auth (Better Auth, Single-User)** · M · Abh. T10
+- [x] **T11 Auth (Better Auth, Single-User)** · M · Abh. T10
   Akz.: Ersteinrichtung nur, solange kein Nutzer existiert; Login/Logout; alle Seiten und Server Actions geschützt · Prüfung: Integrationstest „zweite Registrierung abgelehnt“, E2E in T26
 
 - [ ] **T12 API v1** · M · Abh. T07, T09, T10
