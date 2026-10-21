@@ -21,20 +21,28 @@ export type MediaType = z.infer<typeof MediaType>;
 export const EventKind = z.enum(["read", "watched", "library_sync", "backfill"]);
 export type EventKind = z.infer<typeof EventKind>;
 
-export type EventOutcome = "applied" | "no_change" | "pending" | "ignored" | "rejected";
+export const EventOutcome = z.enum(["applied", "no_change", "pending", "ignored", "rejected"]);
+export type EventOutcome = z.infer<typeof EventOutcome>;
 
-const HttpUrl = z
+/**
+ * Single-line text from devices or forms: control characters (including NUL, which Postgres text
+ * columns reject) become spaces, whitespace is collapsed, the result is trimmed and length-capped.
+ */
+export function cleanText(maxLength: number) {
+  return z
+    .string()
+    .max(Math.max(MAX_RAW_TEXT_LENGTH, maxLength * 2))
+    .transform((value) => value.replace(/\p{Cc}+/gu, " ").replace(/\s+/g, " ").trim())
+    .pipe(z.string().min(1).max(maxLength));
+}
+
+const Text = cleanText(MAX_TEXT_LENGTH);
+
+export const HttpUrlSchema = z
   .string()
   .max(MAX_URL_LENGTH)
   .regex(/^https?:\/\//i)
   .refine((value) => parseHttpUrl(value) !== null, "must be an http(s) URL without credentials");
-
-// Control characters (including NUL, which Postgres text columns reject) become spaces.
-const Text = z
-  .string()
-  .max(MAX_RAW_TEXT_LENGTH)
-  .transform((value) => value.replace(/\p{Cc}+/gu, " ").replace(/\s+/g, " ").trim())
-  .pipe(z.string().min(1).max(MAX_TEXT_LENGTH));
 
 export const SourceKey = z.string().regex(/^[a-z0-9][a-z0-9:._-]{0,99}$/);
 
@@ -66,8 +74,8 @@ export const ProgressEvent = z.object({
     key: SourceKey,
     externalKey: Text,
     rawTitle: Text,
-    url: HttpUrl.optional(),
-    seriesUrl: HttpUrl.optional(),
+    url: HttpUrlSchema.optional(),
+    seriesUrl: HttpUrlSchema.optional(),
   }),
   position: Position,
   mediaTypeHint: MediaType.optional(),

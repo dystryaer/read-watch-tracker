@@ -13,3 +13,4 @@ export { MAX_URL_LENGTH, parseHttpUrl, safeHref } from "./safe-url";
 export { normalizeSeriesKey } from "./series-key";
 export { compileRulePattern, isHostname, MAX_PATTERN_LENGTH, SiteRule } from "./site-rule";
 export { type KnownService, knownService, normalizeDomain } from "./services";
+export * from "./api";

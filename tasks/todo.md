@@ -45,7 +45,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T11 Auth (Better Auth, Single-User)** · M · Abh. T10
   Akz.: Ersteinrichtung nur, solange kein Nutzer existiert; Login/Logout; alle Seiten und Server Actions geschützt · Prüfung: Integrationstest „zweite Registrierung abgelehnt“, E2E in T26
 
-- [ ] **T12 API v1** · M · Abh. T07, T09, T10
+- [x] **T12 API v1** · M · Abh. T07, T09, T10
   Akz.: `POST /events` (401/413/422-pro-Event/429), `GET /config` (ETag/304), `POST /pairing`, `POST /pairing/poll`, `POST /sources/enable` (neu, für Popup: neue Quelle oder Umzug); Body-Größenlimit · Prüfung: Route-Handler-Tests mit echten `Request`-Objekten
 
 ### Phase C – Web-UI

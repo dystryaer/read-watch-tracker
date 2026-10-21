@@ -16,3 +16,16 @@ export {
   startPairing,
 } from "./devices";
 export { hasOwner } from "./owner";
+export {
+  type ApiContext,
+  type ApiLimiters,
+  createApiLimiters,
+  handleConfig,
+  handleEnableSource,
+  handleEvents,
+  handlePairingPoll,
+  handlePairingStart,
+} from "./api/handlers";
+export { RateLimiter } from "./http/rate-limit";
+export { clientAddress } from "./http/request";
+export { buildDeviceConfig, enableSource, SourceConflictError, SourceNotFoundError } from "./sources";
