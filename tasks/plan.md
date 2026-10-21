@@ -31,6 +31,8 @@ Jeder Meilenstein liegt auf einem eigenen Branch. Die Branches bauen aufeinander
 | A10 | **Adapter für Streaming- und Bibliotheksseiten werden gegen synthetische Fixtures gebaut** und sind als „unverifiziert“ markiert, bis echte Seitenproben vorliegen (Spikes). | Diese Seiten erfordern deine Logins; ich rufe sie nicht auf |
 | A11 | Für **Manga-Seiten-Fixtures** gibt es nur synthetische Reader-Layouts, keine Kopien echter Scanlation-Seiten. Echte Fixtures kommen über `docs/testing/fixtures.md` von dir. | keine Inhalte urheberrechtlich fragwürdiger Seiten abrufen |
 | A12 | **Rate-Limit in-memory** (60/min pro Gerät). | Single-User; auf Vercel pro Instanz, dokumentiert |
+| A13 | **Statistik ohne eigene Tabelle:** Fortschritts-Deltas per SQL-Fensterfunktion (`lag` je Werk) aus `events`, Wochen/Monate in `Europe/Berlin` als reine Core-Funktion. | Event-Protokoll ist die Wahrheit; testbar ohne DB; keine Chart-Bibliothek (SPEC §4.8) |
+| A14 | **Neue Kapitel ohne DOM:** Der Service Worker liest `href`s per Regex aus dem HTML und prüft sie mit `detectChapterFromUrl`. Kein Offscreen-Dokument, keine neuen Berechtigungen, Planung (1×/Tag je Serie, 10 pro Stunde) in `chrome.storage.local`. | MV3-Service-Worker haben kein `DOMParser`; Offscreen wäre eine neue Berechtigung (SPEC §16 „erst fragen“) |
 
 ## Abhängigkeiten
 
@@ -54,7 +56,7 @@ Excel-Import ── server
 | **M1** Manga + Import | T01–T27 | Excel abgelöst, Manga in Brave automatisch getrackt |
 | **M2** Serien & Anime | T28–T35 | Streaming am Desktop und auf der Shield |
 | **M3** Light Novels & E-Books | T36–T41 | Bibliotheks-Sync, Schnell-Update-PWA, iOS-Kurzbefehl |
-| **M4** optional | T42–T44 | Statistiken, Hinweise auf neue Kapitel |
+| **M4** optional | T42–T44 | Statistiken (`/stats`), neue Kapitel erkennen (Extension, 1×/Tag), Badge „3 neu“ + Filter |
 
 ## Risiken
 
@@ -67,6 +69,7 @@ Excel-Import ── server
 | Better-Auth-/Next.js-API-Änderungen | Niedrig | Versionen beim Setup fixiert, Lockfile |
 | Kein Docker lokal → Portabilitätstest (Spec §17.11) nicht lokal prüfbar | Mittel | `docker-compose.yml` + Anleitung; der Test läuft auf einer Maschine mit Docker bzw. auf dem späteren Server |
 | Deployment (Neon, Vercel) braucht deine Accounts | – | Anleitung `docs/deploy.md`; Accounts und Secrets legst du an |
+| Serienseiten laden die Kapitelliste per JavaScript oder stecken hinter Bot-Schutz (M4) | Mittel | Dann kein Badge für diese Serie; überspringen, 7 Tage warten, nie umgehen (SPEC §7.11) |
 
 ## Offene Punkte (brauchen dich, blockieren aber nicht)
 

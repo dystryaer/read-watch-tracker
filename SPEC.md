@@ -99,7 +99,7 @@
 | **M1 (MVP)** | `core` → `backend` → `web` → `import` → `ext-reading` | Excel abgelöst, Manga werden automatisch getrackt |
 | **M2** | Spike S1 → `shield` ∥ `ext-streaming` | Serien und Anime automatisch |
 | **M3** | Spikes S2/S3 → `mobile-sync` | Light Novels und E-Books halbautomatisch |
-| **M4 (optional)** | Hinweise auf neue Kapitel, Statistiken | – |
+| **M4 (optional)** | Statistiken (§4.8) → neue Kapitel erkennen (§7.11) → Hinweis „neu“ (§4.2) | Wochen-/Monatsbilanz; ich sehe, wo neue Kapitel warten |
 
 ---
 
@@ -143,6 +143,7 @@ Der einzige Hauptbildschirm. Er beantwortet die Frage: *Wo stehe ich, und wie ko
 | **Quelle** | Buchstaben-Badge + Domain bzw. Dienstname der *zuletzt genutzten* Quelle. Favicons werden bewusst nicht geladen, damit keine externen Requests entstehen. `– keine Seite` bei importierten Titeln ohne Sichtung. |
 | **[−][+]** | Inline-Stepper für Kapitel und Folgen. Speichert entprellt (500 ms) als manuelle Änderung. |
 | **Weiterlesen ›** | Öffnet das nächste Kapitel in einem neuen Tab (Regeln in §4.4). Fehlt, wenn keine URL bekannt ist. |
+| **„3 neu“** (M4) | Badge neben dem Stand, wenn das neueste Kapitel der Serie (§7.11) über dem gelesenen liegt: `floor(latest) − floor(chapter)`. Ein Filter `Neue Kapitel` zeigt nur solche Werke. Ohne bekannten Stand kein Badge. |
 | **Titel anklicken** | Öffnet die Detailseite (§4.3). Eine eigene Seite statt eines Drawers: direkt verlinkbar, per Formular auch ohne JavaScript bedienbar. |
 
 ### 4.3 Detailseite (`/works/[id]`)
@@ -192,6 +193,15 @@ Pro offener Zuordnung erscheint eine Karte:
 - [ ] Das Banner verschwindet, sobald die Inbox leer ist.
 - [ ] Alle Bedienelemente funktionieren per Tastatur. Die Kontraste erfüllen WCAG AA.
 
+### 4.8 Statistiken (`/stats`, M4)
+
+Eine eigene Seite, erreichbar über die Navigation. Sie beantwortet: *Wie viel habe ich gelesen und geschaut?*
+
+- **Pro Woche** (die letzten 12 Wochen, Montag bis Sonntag) und **pro Monat** (die letzten 12 Monate): Kapitel und Folgen.
+- **Gezählt wird der Fortschritt**, nicht die Zahl der Events: Für jedes übernommene Event (`outcome = applied`, auch manuelle Änderungen) zählt der Abstand zum vorigen übernommenen Event desselben Werks, also `max(0, floor(neu) − floor(vorher))`. Ein Bibliotheks-Sync von Kap. 1200 auf 1204 zählt 4. Zurückkorrigieren zählt 0. Das erste Event eines Werks zählt 1, damit ein importierter Stand (Kap. 1204 ohne Vorgeschichte) nicht als 1204 gelesene Kapitel erscheint. Folgen werden innerhalb derselben Staffel genauso gezählt; ein Staffelwechsel zählt 1. E-Book-Prozente fließen nicht ein.
+- Grundlage ist das Event-Protokoll (append-only); es gibt keine eigene Statistik-Tabelle. Zeitzone für Wochen und Monate: `Europe/Berlin`.
+- Darstellung als Tabelle mit CSS-Balken, **ohne Chart-Bibliothek**. Die Zahlen stehen als Text in der Tabelle, die Balken sind nur Beiwerk (`aria-hidden`).
+
 ---
 
 ## 5. Datenmodell
@@ -225,6 +235,8 @@ outcome     = applied | no_change | pending | ignored | rejected
 | `last_source_id` | uuid FK → sources null | |
 | `last_url` | text null | Grundlage für „Weiterlesen“ |
 | `last_progress_at` | timestamptz null | Sortierung „Zuletzt aktiv“ |
+| `latest_chapter` | numeric(7,2) null | M4: neuestes Kapitel der Serie laut ihrer Serienseite (§7.11) |
+| `latest_chapter_at` | timestamptz null | M4: wann `latest_chapter` zuletzt gemeldet wurde |
 | `notes` | text null | |
 | `created_at`, `updated_at` | timestamptz | |
 
@@ -366,6 +378,9 @@ Basis-Pfad `/api/v1`. Alle Bodies sind JSON und werden mit zod validiert (Schema
 | `POST /pairing/poll` | – (`pollSecret`) | `{ status: pending \| approved \| expired, deviceToken? }`. Das Token wird genau einmal ausgeliefert. |
 | `POST /share` | Geräte-Token (`phone`) | Für den iOS-Kurzbefehl: `{ url?, text? }` → Server erkennt Quelle und Werk → `{ shareId, title?, unit?, current?, suggested?, needsMatch }` |
 | `POST /share/confirm` | Geräte-Token (`phone`) | `{ shareId, chapter? \| percent? }` (Zahl auch als Text mit Dezimalkomma) → der Server erzeugt das Event (inkl. UUID, weil Kurzbefehle keine erzeugen können) → `{ outcome, title, message }`. `message` ist die fertige Mitteilung für den Kurzbefehl. Ein Teilen gilt 15 min, einmal und nur für das Gerät, das es gestartet hat. Fehler der beiden Share-Endpunkte tragen ebenfalls ein `message` (z. B. bei widerrufenem Token; ein zweites Bestätigen antwortet `409 share_used`). Gefragt wird in der Einheit des verknüpften Werks, sonst in der der App. Ein `phone`-Token gilt nur für diese beiden Endpunkte. Der Titel eines unbekannten Buchs kommt aus einem Titel in Anführungszeichen, dem Slug des Links oder dem Text drumherum; ohne Titel bleibt der einer wartenden Karte. |
+
+| `GET /series-watch` | Geräte-Token (`extension`) | M4: Serien, deren Serienseite die Extension auf neue Kapitel prüfen darf (§7.11): Werke im Status `reading` mit Kapitel-Stand, verknüpft mit einer freigeschalteten Website-Quelle, deren `series_url` bekannt ist. Die URL steht schon auf der aktuellen Domain der Quelle. Höchstens 500 Einträge `{ sourceKey, externalKey, seriesUrl, chapter }`. |
+| `POST /latest-chapters` | Geräte-Token (`extension`) | M4: `{ items: [{ sourceKey, externalKey, latestChapter }] }` (1–100). Der Server setzt `latest_chapter` und `latest_chapter_at` am verknüpften Werk. Unbekannte Serien werden ignoriert. Antwort `{ updated }`. |
 
 Interne Aktionen der Web-UI (Kopplung bestätigen, Zuordnung auflösen, Stand ändern, Werk zusammenführen, Gerät widerrufen, Seitenregeln bearbeiten, Domain-Umzug) laufen als Server Actions mit Session-Auth.
 
@@ -556,6 +571,14 @@ Outbox: 0 · zuletzt synchronisiert vor 1 min
 - [ ] 20 offline gelesene Kapitel werden nach der Wiederverbindung vollständig und ohne Duplikate übertragen.
 - [ ] Ein erneutes Lesen von Kapitel 100 bei Stand 150 ändert nichts.
 - [ ] Der Backfill fordert `history` erst beim Klick an und wertet nur freigeschaltete Origins aus.
+
+### 7.11 Neue Kapitel erkennen (M4)
+
+- Die Extension holt die Liste von `GET /series-watch` höchstens alle 6 Stunden und prüft jede Serienseite **höchstens einmal pro Tag**. Das geschieht nur, solange der Browser läuft (Alarm im Service Worker). Pro Durchlauf, also stündlich, prüft sie höchstens 10 Serien, nacheinander und mit mindestens 3 s Abstand. Eine eigene Option schaltet die Prüfung ab; voreingestellt ist sie an.
+- **Nur freigeschaltete Seiten:** Geprüft wird nur, wofür die Extension bereits die Host-Berechtigung hat. Es kommen keine neuen Berechtigungen hinzu, und keine Seite bekommt Requests, die ich nicht freigeschaltet habe.
+- **Kein Umgehen von Bot-Schutz:** Der Abruf ist ein schlichter `GET` ohne Cookies (`credentials: "omit"`), ohne geänderte Header und ohne JavaScript-Ausführung. Bei einem Status außer 200, bei einer Weiterleitung auf eine andere Domain, bei Nicht-HTML, bei mehr als 2 MB oder bei einer erkennbaren Challenge-Seite (Cloudflare, Captcha) wird die Serie übersprungen und erst nach 7 Tagen wieder versucht.
+- **Auswertung ohne DOM:** Aus dem HTML werden die `href`s gelesen, gegen die Serien-URL aufgelöst und mit `detectChapterFromUrl` samt Seitenregel geprüft. Das höchste Kapitel, dessen Serienschlüssel zum `externalKey` passt, ist das neueste. Seiten, die ihre Kapitelliste erst per JavaScript laden, liefern nichts; das wird hingenommen.
+- Die Ergebnisse gehen gesammelt an `POST /latest-chapters`. Sie ändern nie den Lesestand, nur `latest_chapter`.
 
 ---
 
@@ -896,7 +919,7 @@ export function comparePositions(a: Position, b: Position): number {
 
 ## 18. Nicht-Ziele (explizit)
 
-- **Statistiken und Dashboards** (Lesezeit, Kapitel pro Monat, Jahresrückblick). Frühestens M4.
+- **Statistiken über §4.8 hinaus** (Lesezeit, Jahresrückblick, Diagramm-Bibliotheken).
 - **Mehrbenutzerbetrieb**, Teilen, Social-Funktionen, öffentliche Profile.
 - **Sync mit AniList, MyAnimeList, Trakt, Goodreads** o. Ä.
 - **Firefox, Safari und andere Nicht-Chromium-Browser.** Unterstützt wird nur Brave bzw. Chromium.
@@ -905,7 +928,7 @@ export function comparePositions(a: Position, b: Position): number {
 - **Feste Lesezeit** als Kriterium für „Kapitel gelesen“.
 - **Vollautomatisches Tracking von Kindle und WebNovel.** Halbautomatisch ist ausdrücklich ausreichend.
 - **Import bestehender Serien- und Anime-Historie.** Kommt später als eigene Erweiterung.
-- **Hinweise auf neue Kapitel** und die Prüfung, ob das nächste Kapitel existiert. Nicht im MVP, frühestens M4.
+- **Benachrichtigungen über neue Kapitel** (Push, E-Mail) und Prüfungen öfter als einmal am Tag oder ohne laufenden Browser. Das Badge aus §4.2 reicht.
 - **Inhalte lesen, hosten oder herunterladen.** Der Tracker speichert nur Metadaten und Fortschritt.
 - **Empfehlungen** und Entdecken neuer Titel.
 - **YouTube, Musik, Podcasts** und andere Medien außerhalb der genannten Typen.

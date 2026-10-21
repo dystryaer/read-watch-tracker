@@ -167,14 +167,19 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 
 ## M4 – optional (`feat/m4-extras`)
 
-- [ ] **T42 Statistiken** · S
-  Akz.: Kapitel/Folgen pro Woche und Monat aus `events`; ohne Chart-Bibliothek
+- [ ] **T42 Statistiken** · M
+  - T42a core: `progressDeltas` + `bucketProgress` (Woche Mo–So, Monat, `Europe/Berlin`), TDD
+  - T42b server: `progressStats(db, now)` über `lag()` je Werk; web: `/stats` (Tabelle + CSS-Balken), Navigation, E2E
+  Akz.: Kapitel/Folgen pro Woche (12) und Monat (12) aus `events`; Fortschritt statt Event-Zahl; erstes Event zählt 1; ohne Chart-Bibliothek (SPEC §4.8)
 
-- [ ] **T43 Neue Kapitel erkennen** · M
-  Akz.: Extension prüft Serienseiten freigeschalteter Domains höchstens 1× pro Tag, nur bei laufendem Browser; kein Umgehen von Bot-Schutz; `latest_chapter` am Werk
+- [ ] **T43 Neue Kapitel erkennen** · L → in Scheiben
+  - T43a db+server: `works.latest_chapter`, `latest_chapter_at` (Migration 0006); `seriesToWatch(db)`, `recordLatestChapters(db, items)`; `GET /series-watch`, `POST /latest-chapters` (nur `extension`)
+  - T43b core: `latestChapterIn(html, seriesUrl, externalKey, rule?)` und `looksLikeChallenge(html)`, TDD
+  - T43c extension: Planung (Alarm stündlich, 1×/Tag je Serie, ≤ 10 pro Lauf, 3 s Abstand, 7 Tage Pause nach Fehler), Abruf ohne Cookies mit Grenzen, Meldung an den Server, Option „Neue Kapitel prüfen“; E2E mit Fixture-Serienseite
+  Akz.: nur freigeschaltete Seiten, nur bei laufendem Browser, kein Umgehen von Bot-Schutz; `latest_chapter` am Werk (SPEC §7.11)
 
 - [ ] **T44 Hinweis „neue Kapitel“** · S · Abh. T43
-  Akz.: Badge „3 neu“ in der Liste, Filter „Neue Kapitel“
+  Akz.: Badge „3 neu“ in der Liste, Filter „Neue Kapitel“, Detailseite nennt das neueste Kapitel (SPEC §4.2)
 
 ### Abnahme M4
 - [ ] volle Testsuite · [ ] Code-Review · [ ] Security-Review · [ ] Befunde behoben
