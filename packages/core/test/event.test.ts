@@ -76,6 +76,12 @@ describe("ProgressEvent", () => {
       expect(parsed.source.rawTitle).toBe("Over geared");
     });
 
+    it("removes bidi controls that could reorder how a title is displayed", () => {
+      const spoof = [0x202e, 0x2066, 0x2069, 0x200f].map((code) => String.fromCharCode(code));
+      const parsed = ProgressEvent.parse(withSource({ rawTitle: `Dark${spoof[0]}desrever ${spoof[1]}x${spoof[2]}${spoof[3]}` }));
+      expect(parsed.source.rawTitle).toBe("Darkdesrever x");
+    });
+
     it("rejects a title that is empty after trimming", () => {
       expect(ProgressEvent.safeParse(withSource({ rawTitle: " \n\t " })).success).toBe(false);
     });

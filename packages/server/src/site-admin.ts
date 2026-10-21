@@ -1,4 +1,4 @@
-import { isHostname, normalizeDomain, parseRuleFields, type RuleFields } from "@rwt/core";
+import { isHostname, isServiceHost, normalizeDomain, parseRuleFields, type RuleFields } from "@rwt/core";
 import { type Db, events, sourceDomains, sources, workLinks } from "@rwt/db";
 import { and, asc, count, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { ruleColumns, storedRuleFields } from "./rule-columns";
@@ -118,6 +118,7 @@ export async function addSiteDomain(
 ): Promise<void> {
   const domain = normalizeDomain(rawDomain.trim());
   if (!isHostname(domain)) throw new SiteDomainError("Bitte nur den Host-Namen angeben, z. B. asurascans.com");
+  if (isServiceHost(domain)) throw new SiteDomainError("Diese Domain gehört zu einem Streaming-Dienst oder einer App");
 
   await db.transaction(async (tx) => {
     const [owner] = await tx.select().from(sourceDomains).where(eq(sourceDomains.domain, domain));

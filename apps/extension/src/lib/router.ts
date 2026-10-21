@@ -1,6 +1,7 @@
 import {
   DEFAULT_THRESHOLDS,
   type DeviceConfig,
+  isServiceUrl,
   knownService,
   normalizeDomain,
   parseHttpUrl,
@@ -8,8 +9,8 @@ import {
   type SiteRule,
   streamingSeriesKey,
 } from "@rwt/core";
-import { latestPerSeries } from "../streaming/history";
-import { serviceForUrl } from "../streaming/services";
+import { type HistoryEntry, isHistoryPage, latestPerSeries } from "../streaming/history";
+import { serviceForUrl, type StreamingServiceKey } from "../streaming/services";
 import { deterministicEventId } from "./event-id";
 import type { ApiClient } from "./api-client";
 import { backfillEventId } from "./backfill";
@@ -33,7 +34,7 @@ export interface RouterDeps {
   extensionId: string;
   store: Store;
   outbox: Pick<Outbox, "enqueue" | "enqueueMany" | "flush" | "state">;
-  recent: Pick<RecentReads, "claim">;
+  recent: Pick<RecentReads, "claim" | "claimMany">;
   tabStates: TabStates;
   streamStates: StreamStates;
   api: Pick<ApiClient, "enableSource" | "ignoreSeries">;
@@ -46,7 +47,8 @@ export interface RouterDeps {
 interface SenderLike {
   id?: string;
   url?: string;
-  tab?: { id?: number };
+  /** The tab's page; set by the browser where the extension may see it. */
+  tab?: { id?: number; url?: string };
   frameId?: number;
 }
 
@@ -92,73 +94,112 @@ export function createRouter(deps: RouterDeps) {
     return "queued";
   }
 
-  /** Queues one "watched" event, at most once per series and episode (or movie) in 12 hours. */
+  /**
+   * Queues one "watched" event, at most once per series and episode (or movie) in 12 hours. The
+   * event is built first, so a detection that cannot become an event never uses up the dedupe.
+   */
   async function countWatched({ service, url, detection }: StreamState): Promise<"queued" | "duplicate" | "none"> {
     if (!detection) return "none";
-    const externalKey = streamingSeriesKey(detection.seriesTitle) || detection.seriesTitle;
+    const externalKey = streamingSeriesKey(detection.seriesTitle);
     const episode = detection.kind === "episode" && detection.episode !== null ? detection.episode : null;
-    if (!(await deps.recent.claim(`${service}|${externalKey}|${detection.season ?? ""}|${episode ?? "movie"}`, now()))) {
-      return "duplicate";
-    }
-    const event = ProgressEvent.parse({
+    const seriesUrl = detection.seriesUrl && isServiceUrl(service, detection.seriesUrl) ? detection.seriesUrl : null;
+    const event = ProgressEvent.safeParse({
       id: crypto.randomUUID(),
       occurredAt: new Date(now()).toISOString(),
       kind: "watched",
-      source: { key: service, externalKey, rawTitle: detection.seriesTitle, url },
+      source: { key: service, externalKey, rawTitle: detection.seriesTitle, url, ...(seriesUrl ? { seriesUrl } : {}) },
       position: episode === null ? { unit: "none" } : { unit: "episode", season: detection.season, episode },
       ...(episode === null ? { mediaTypeHint: "movie" } : {}),
     });
-    await deps.outbox.enqueue(event);
+    if (!event.success) return "none";
+    if (!(await deps.recent.claim(`${service}|${externalKey}|${detection.season ?? ""}|${episode ?? "movie"}`, now()))) {
+      return "duplicate";
+    }
+    await deps.outbox.enqueue(event.data);
     void deps.outbox.flush();
     return "queued";
+  }
+
+  /** library_sync events for a history page: the furthest episode per series, never sent twice in 12 hours. */
+  async function syncLibrary(service: StreamingServiceKey, entries: HistoryEntry[]): Promise<number> {
+    const events: ProgressEvent[] = [];
+    for (const { seriesTitle, season, episode, seriesUrl } of latestPerSeries(entries)) {
+      const externalKey = streamingSeriesKey(seriesTitle);
+      const event = ProgressEvent.safeParse({
+        // The same history entry always gets the same id, however often the page is opened.
+        id: await deterministicEventId(["library", service, externalKey, season ?? "", episode]),
+        occurredAt: new Date(now()).toISOString(),
+        kind: "library_sync",
+        source: {
+          key: service,
+          externalKey,
+          rawTitle: seriesTitle,
+          ...(seriesUrl && isServiceUrl(service, seriesUrl) ? { seriesUrl } : {}),
+        },
+        position: { unit: "episode", season, episode },
+      });
+      if (event.success) events.push(event.data);
+    }
+    const fresh = await deps.recent.claimMany(events.map((event) => `library|${event.id}`), now());
+    const unsent = events.filter((event) => fresh.has(`library|${event.id}`));
+    if (unsent.length > 0) {
+      await deps.outbox.enqueueMany(unsent);
+      void deps.outbox.flush();
+    }
+    return unsent.length;
   }
 
   async function handleContent(message: ContentMessage, tabId: number, sender: SenderLike) {
     const senderUrl = sender.url;
     const current = await config();
     // Streaming messages are accepted from the fixed service domains only, judged by the frame
-    // the browser says sent them – not by what the script reports.
+    // the browser says sent them – not by what the script reports. Only frame 0 is the page itself.
     const service = senderUrl ? serviceForUrl(senderUrl) : undefined;
+    const topFrame = sender.frameId === 0;
+    const onPage = topFrame && service !== undefined && serviceForUrl(message.url)?.key === service.key;
     switch (message.type) {
-      case "stream:hello":
-        return service ? { ok: true, watchedPercent: current?.thresholds.watchedPercent ?? DEFAULT_THRESHOLDS.watchedPercent } : { ok: false };
+      case "stream:hello": {
+        if (!service) return { ok: false };
+        // A page (re)load starts over: nothing an earlier page showed can be counted for it.
+        if (onPage) await deps.streamStates.set(tabId, { service: service.key, url: message.url, detection: null });
+        return { ok: true, watchedPercent: current?.thresholds.watchedPercent ?? DEFAULT_THRESHOLDS.watchedPercent };
+      }
 
       case "stream:detected": {
-        // Titles come from the page itself; frames (players, ads) only report progress.
-        const topFrame = sender.frameId === undefined || sender.frameId === 0;
-        if (!service || !topFrame || serviceForUrl(message.url)?.key !== service.key) return { ok: false };
-        await deps.streamStates.set(tabId, { service: service.key, url: message.url, detection: message.detection });
+        if (!onPage || !service) return { ok: false };
+        const stored = await deps.streamStates.get(tabId);
+        // A title overlay that fades out must not erase what this very page showed before.
+        const keep = message.detection === null && stored?.service === service.key && stored.url === message.url;
+        if (!keep) await deps.streamStates.set(tabId, { service: service.key, url: message.url, detection: message.detection });
         return { ok: true };
       }
 
       case "stream:watched": {
-        const state = await deps.streamStates.get(tabId);
-        if (!service || state?.service !== service.key || !state.detection) return { ok: false };
-        return (await countWatched(state)) === "duplicate" ? { ok: true, duplicate: true } : { ok: true };
+        if (!service) return { ok: false };
+        const stored = await deps.streamStates.get(tabId);
+        const storedHere = (url: string | undefined) => (stored?.service === service.key && stored.url === url ? stored.detection : null);
+        let state: StreamState | null = null;
+        if (onPage) {
+          // The page itself says what it shows right now; the stored detection may be seconds old.
+          const detection = message.detection ?? storedHere(message.url);
+          if (detection) state = { service: service.key, url: message.url, detection };
+        } else if (!topFrame) {
+          // A player frame: the tab's page must still be this service's page the title was read on.
+          const pageUrl = sender.tab?.url;
+          const detection = pageUrl && serviceForUrl(pageUrl)?.key === service.key ? storedHere(pageUrl) : null;
+          if (pageUrl && detection) state = { service: service.key, url: pageUrl, detection };
+        }
+        if (!state) return { ok: false };
+        if (onPage) await deps.streamStates.set(tabId, state);
+        const outcome = await countWatched(state);
+        if (outcome === "none") return { ok: false };
+        return outcome === "duplicate" ? { ok: true, duplicate: true } : { ok: true };
       }
 
       case "stream:library": {
         // A history page (SPEC §7.6) is read by the page itself, never by a frame inside it.
-        const topFrame = sender.frameId === undefined || sender.frameId === 0;
-        if (!service || !topFrame || serviceForUrl(message.url)?.key !== service.key) return { ok: false };
-        const events = await Promise.all(
-          latestPerSeries(message.entries).map(async ({ seriesTitle, season, episode }) => {
-            const externalKey = streamingSeriesKey(seriesTitle) || seriesTitle;
-            return ProgressEvent.parse({
-              // The same history entry always gets the same id, however often the page is opened.
-              id: await deterministicEventId(["library", service.key, externalKey, season ?? "", episode]),
-              occurredAt: new Date(now()).toISOString(),
-              kind: "library_sync",
-              source: { key: service.key, externalKey, rawTitle: seriesTitle },
-              position: { unit: "episode", season, episode },
-            });
-          }),
-        );
-        if (events.length > 0) {
-          await deps.outbox.enqueueMany(events);
-          void deps.outbox.flush();
-        }
-        return { ok: true, queued: events.length };
+        if (!onPage || !service || !senderUrl || !isHistoryPage(new URL(senderUrl))) return { ok: false };
+        return { ok: true, queued: await syncLibrary(service.key, message.entries) };
       }
 
       case "reader:hello":
@@ -211,6 +252,7 @@ export function createRouter(deps: RouterDeps) {
     return {
       ok: true,
       paired: settings.apiUrl !== null && settings.deviceToken !== null,
+      watchedPercent: current?.thresholds.watchedPercent ?? DEFAULT_THRESHOLDS.watchedPercent,
       apiUrl: settings.apiUrl,
       page: url
         ? {

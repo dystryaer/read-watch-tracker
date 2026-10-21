@@ -15,7 +15,9 @@ function MatchCard({ match }: { match: OpenMatch }) {
   const best = match.candidates[0];
   return (
     <li className="rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
-      <h2 className="font-medium break-words">„{match.rawTitle}“</h2>
+      <h2 className="font-medium break-words">
+        „<bdi>{match.rawTitle}</bdi>“
+      </h2>
       <p className="mt-0.5 mb-3 text-sm text-zinc-600 dark:text-zinc-400">
         auf {match.sourceName}
         {match.lastPosition ? ` · zuletzt ${positionText(match.lastPosition)}` : ""} · {match.eventCount}{" "}
@@ -98,8 +100,9 @@ export default async function InboxPage() {
           <ul className="my-3 space-y-1 text-sm">
             {confident.map((match) => (
               <li key={match.id} className="break-words">
-                „{match.rawTitle}“ ({match.sourceName}) <span aria-hidden="true">→</span>
-                <span className="sr-only">wird zugeordnet zu</span> {match.candidates[0]?.title}
+                {/* Titles come from other sites: isolated, so no title can reorder the arrow or its neighbour. */}
+                „<bdi>{match.rawTitle}</bdi>“ ({match.sourceName}) <span aria-hidden="true">→</span>
+                <span className="sr-only">wird zugeordnet zu</span> <bdi>{match.candidates[0]?.title}</bdi>
               </li>
             ))}
           </ul>

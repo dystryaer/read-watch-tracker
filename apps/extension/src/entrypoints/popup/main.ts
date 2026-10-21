@@ -45,7 +45,7 @@ async function show(notice?: HTMLElement) {
   if (!page) {
     sections.push(h("p", { class: "muted" }, "Auf dieser Seite gibt es nichts zu tracken."));
   } else if (page.service) {
-    sections.push(streamingSection(page.service.name, page.stream));
+    sections.push(streamingSection(page.service.name, page.stream, status.watchedPercent));
   } else if (page.site && page.permission) {
     sections.push(...enabledSite(tabId, status, page));
   } else {
@@ -63,7 +63,7 @@ async function show(notice?: HTMLElement) {
 }
 
 // Streaming services are built in (SPEC §7.5): nothing to enable, only what is being recognized.
-function streamingSection(serviceName: string, stream: NonNullable<PopupStatus["page"]>["stream"]): HTMLElement {
+function streamingSection(serviceName: string, stream: NonNullable<PopupStatus["page"]>["stream"], watchedPercent: number): HTMLElement {
   const what = !stream
     ? "Noch keine Folge erkannt. Erkannt wird im Player."
     : stream.kind === "movie"
@@ -73,7 +73,7 @@ function streamingSection(serviceName: string, stream: NonNullable<PopupStatus["
     "div",
     {},
     h("p", {}, what),
-    h("p", { class: "muted" }, `${serviceName}: wird automatisch gezählt, sobald 85 % gesehen sind.`),
+    h("p", { class: "muted" }, `${serviceName}: wird automatisch gezählt, sobald ${watchedPercent} % gesehen sind.`),
   );
 }
 

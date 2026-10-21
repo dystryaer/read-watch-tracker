@@ -147,16 +147,19 @@ async function urlsOnSource(db: Db, source: Source, input: ProgressEvent["source
  */
 function externalKeyFor(source: Source, sent: string): string {
   if (source.kind !== "streaming") return sent;
-  return streamingSeriesKey(sent) || sent;
+  return streamingSeriesKey(sent);
 }
 
 function clampToNow(occurredAt: Date, now: Date): Date {
   return occurredAt.getTime() > now.getTime() + FUTURE_TOLERANCE_MS ? now : occurredAt;
 }
 
-/** The URL's domain wins over the key: after a domain move the client's key may be stale. */
+/**
+ * Websites: the URL's domain wins over the key, since after a domain move the client's key may be
+ * stale. Services and apps have fixed keys, so their events never land on a website source.
+ */
 async function resolveSource(db: Db, input: ProgressEvent["source"]): Promise<Source> {
-  const hostname = parseHttpUrl(input.url)?.hostname;
+  const hostname = knownService(input.key) ? undefined : parseHttpUrl(input.url)?.hostname;
   if (hostname) {
     const [byDomain] = await db
       .select({ source: sources })

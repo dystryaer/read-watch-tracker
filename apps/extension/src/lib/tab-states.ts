@@ -1,5 +1,6 @@
 import { HttpUrlSchema, SourceKey } from "@rwt/core";
 import { z } from "zod";
+import { STREAMING_SERVICE_KEYS } from "../streaming/services";
 import { Detection, StreamDetection } from "./messages";
 import type { Store } from "./storage";
 
@@ -28,7 +29,7 @@ export function createTabStates(store: Store) {
 export type TabStates = ReturnType<typeof createTabStates>;
 
 export const StreamState = z.object({
-  service: z.enum(["netflix", "primevideo", "disneyplus", "crunchyroll"]),
+  service: z.enum(STREAMING_SERVICE_KEYS),
   url: HttpUrlSchema,
   detection: StreamDetection.nullable(),
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isServiceUrl, knownService, normalizeDomain } from "../src/services";
+import { isServiceHost, isServiceUrl, knownService, normalizeDomain, serviceKeyForUrl } from "../src/services";
 
 describe("knownService", () => {
   it("describes the streaming services and apps from the spec", () => {
@@ -56,8 +56,31 @@ describe("isServiceUrl", () => {
     ["crunchyroll", "https://evilcrunchyroll.com/watch"],
     ["netflix", "https://www.crunchyroll.com/watch/1"],
     ["netflix", "javascript:alert(1)"],
+    ["netflix", "http://www.netflix.com/watch/1"],
+    ["netflix", "https://evil.netflix.com/watch/1"],
+    ["primevideo", "https://www.amazon.de/dp/B0ABC"],
+    ["primevideo", "https://smile.amazon.de/gp/video/detail/B0ABC"],
     ["site:asura", "https://asuracomic.net/x"],
   ])("refuses %s with %s", (key, url) => {
     expect(isServiceUrl(key, url)).toBe(false);
+  });
+});
+
+describe("serviceKeyForUrl", () => {
+  it("finds the service of a URL by https, exact host and the host's path prefix", () => {
+    expect(serviceKeyForUrl("https://www.amazon.de/gp/video/detail/B0ABC")).toBe("primevideo");
+    expect(serviceKeyForUrl("https://static.crunchyroll.com/vilos/player.html")).toBe("crunchyroll");
+    expect(serviceKeyForUrl("https://www.amazon.de/dp/B0ABC")).toBeUndefined();
+    expect(serviceKeyForUrl("https://asuracomic.net/x")).toBeUndefined();
+  });
+});
+
+describe("isServiceHost", () => {
+  it("knows the hosts that belong to a service and cannot become a website source", () => {
+    expect(isServiceHost("www.netflix.com")).toBe(true);
+    expect(isServiceHost("amazon.de")).toBe(true);
+    expect(isServiceHost("read.amazon.com")).toBe(true);
+    expect(isServiceHost("asuracomic.net")).toBe(false);
+    expect(isServiceHost("netflix.com.evil.example")).toBe(false);
   });
 });

@@ -45,6 +45,7 @@ describe("detectStream – adapters", () => {
       seriesTitle: "Dark",
       season: 2,
       episode: 5,
+      seriesUrl: null,
     });
   });
 
@@ -55,6 +56,7 @@ describe("detectStream – adapters", () => {
       seriesTitle: "Glass Onion",
       season: null,
       episode: null,
+      seriesUrl: null,
     });
   });
 
@@ -67,6 +69,8 @@ describe("detectStream – adapters", () => {
       seriesTitle: "The Boys",
       season: 2,
       episode: 5,
+      // The player opens on the title's detail page, which is the series page to come back to.
+      seriesUrl: "https://www.amazon.de/gp/video/detail/B0ABC/",
     });
   });
 
@@ -89,7 +93,13 @@ describe("detectStream – adapters", () => {
       seriesTitle: "Frieren: Beyond Journey’s End",
       season: null,
       episode: 5,
+      seriesUrl: "https://www.crunchyroll.com/series/G1/frieren",
     });
+  });
+
+  it("drops a series link that leads away from the service", () => {
+    const doc = page('<a data-t="show-title-link" href="https://evil.example/frieren"><h4>Frieren</h4></a><h1 class="title">E5</h1>');
+    expect(detectStream(doc, new URL("https://www.crunchyroll.com/watch/GXYZ/x"))?.seriesUrl).toBeNull();
   });
 
   it("detects nothing outside the player pages", () => {
@@ -114,7 +124,7 @@ describe("detectFromMediaMetadata", () => {
     [{ title: "Phantoms of the Dead", artist: "Episode 5", album: "Frieren" }, { seriesTitle: "Frieren", season: null, episode: 5 }],
     [{ title: "Frieren S1 E5", artist: "", album: "" }, { seriesTitle: "Frieren", season: 1, episode: 5 }],
   ])("reads %j", (metadata, expected) => {
-    expect(detectFromMediaMetadata(metadata)).toEqual({ kind: "episode", ...expected });
+    expect(detectFromMediaMetadata(metadata)).toEqual({ kind: "episode", seriesUrl: null, ...expected });
   });
 
   it.each([[{ title: "Some Song", artist: "Some Band", album: "Album" }], [{ title: "S1 E5", artist: "", album: "" }], [null]])(

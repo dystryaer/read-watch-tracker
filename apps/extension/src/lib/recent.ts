@@ -12,18 +12,20 @@ export class RecentReads {
   constructor(private readonly store: Store) {}
 
   /** True if `key` was not sent in the last 12 hours; records it as sent. */
-  claim(key: string, now = Date.now()): Promise<boolean> {
+  async claim(key: string, now = Date.now()): Promise<boolean> {
+    return (await this.claimMany([key], now)).has(key);
+  }
+
+  /** The keys not sent in the last 12 hours, all recorded as sent with one storage write. */
+  claimMany(keys: string[], now = Date.now()): Promise<Set<string>> {
     const run = this.chain.then(async () => {
       const recent = Object.fromEntries(
         Object.entries(await this.store.read(KEY, Recent, {})).filter(([, at]) => now - at < WINDOW_MS),
       );
-      if (recent[key] !== undefined) {
-        await this.store.write(KEY, recent);
-        return false;
-      }
-      recent[key] = now;
+      const fresh = new Set(keys.filter((key) => recent[key] === undefined));
+      for (const key of fresh) recent[key] = now;
       await this.store.write(KEY, recent);
-      return true;
+      return fresh;
     });
     this.chain = run.catch(() => undefined);
     return run;

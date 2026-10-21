@@ -1,4 +1,4 @@
-import { MAX_TEXT_LENGTH, normalizeDomain, parseEpisode, parseHttpUrl } from "@rwt/core";
+import { MAX_TEXT_LENGTH, parseEpisode, parseHttpUrl, serviceKeyForUrl } from "@rwt/core";
 
 /** What is playing on a streaming page (SPEC §7.5); `episode` is null only for a movie. */
 export interface StreamDetection {
@@ -6,19 +6,20 @@ export interface StreamDetection {
   seriesTitle: string;
   season: number | null;
   episode: number | null;
+  /** The series page on the service, for "Öffnen" in the web app (SPEC §4.4 rule 5). */
+  seriesUrl: string | null;
 }
 
-export type StreamingServiceKey = "netflix" | "primevideo" | "disneyplus" | "crunchyroll";
+export const STREAMING_SERVICE_KEYS = ["netflix", "primevideo", "disneyplus", "crunchyroll"] as const;
+export type StreamingServiceKey = (typeof STREAMING_SERVICE_KEYS)[number];
 
 interface StreamingService {
   key: StreamingServiceKey;
-  /** Exact host names (without "www."); a required path prefix limits shared hosts such as amazon.de. */
-  hosts: Record<string, string>;
   isPlayerPage(url: URL): boolean;
-  detect(doc: Document): StreamDetection | null;
+  detect(doc: Document, url: URL): StreamDetection | null;
 }
 
-/** Manifest match patterns of the streaming content script (SPEC §7.2: fixed service domains). */
+/** Manifest match patterns of the streaming content script (SPEC §7.2), the same hosts as core's service table. */
 export const STREAMING_MATCHES = [
   "https://www.netflix.com/*",
   "https://www.primevideo.com/*",
@@ -29,84 +30,100 @@ export const STREAMING_MATCHES = [
   "https://static.crunchyroll.com/*",
 ];
 
+// Where an episode label starts inside a combined title such as "Frieren S1 E5".
+const LABEL_START = /(?<![\p{L}\d])(?:s\d|season|staffel|episode|folge|ep\.?\s*\d|e\d|\d{1,3}x\d)/iu;
+
+/** The text before the episode label: "Frieren S1 E5" → "Frieren", "Dark: Staffel 2: Folge 5" → "Dark". */
+export function textBeforeLabel(text: string): string {
+  return text.split(LABEL_START)[0]?.replace(/[\s\-–—:|·,]+$/u, "") ?? "";
+}
+
 function text(element: Element | null | undefined): string {
   return (element?.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_LENGTH);
+}
+
+/** An absolute link on the given service's own pages, or null (a page could link anywhere). */
+export function serviceLink(raw: string | null | undefined, base: string, key: StreamingServiceKey): string | null {
+  if (!raw) return null;
+  let href: string;
+  try {
+    href = new URL(raw, base).href;
+  } catch {
+    return null;
+  }
+  return parseHttpUrl(href) && serviceKeyForUrl(href) === key ? href : null;
 }
 
 /**
  * The first label that names an episode decides. Without any label the title is a movie, but only
  * where the service shows no label for movies: an unreadable label means "don't know", not "movie".
  */
-function fromLabels(seriesTitle: string, labels: string[], movieWithoutLabel: boolean): StreamDetection | null {
+function fromLabels(
+  seriesTitle: string,
+  labels: string[],
+  movieWithoutLabel: boolean,
+  seriesUrl: string | null,
+): StreamDetection | null {
   if (seriesTitle === "") return null;
   for (const label of labels) {
     const episode = parseEpisode(label);
-    if (episode) return { kind: "episode", seriesTitle, ...episode };
+    if (episode) return { kind: "episode", seriesTitle, ...episode, seriesUrl };
   }
   const noLabel = labels.every((label) => label === "");
-  return movieWithoutLabel && noLabel ? { kind: "movie", seriesTitle, season: null, episode: null } : null;
+  return movieWithoutLabel && noLabel ? { kind: "movie", seriesTitle, season: null, episode: null, seriesUrl } : null;
 }
 
 // Adapters for synthetic layouts (A10): unverified until samples of the real pages replace the fixtures.
 const SERVICES: StreamingService[] = [
   {
     key: "netflix",
-    hosts: { "netflix.com": "/" },
     isPlayerPage: (url) => url.pathname.startsWith("/watch/"),
     detect(doc) {
       const container = doc.querySelector('[data-uia="video-title"]');
       if (!container) return null;
       const heading = container.querySelector("h4");
-      if (!heading) return fromLabels(text(container), [], true);
-      return fromLabels(text(heading), [...container.querySelectorAll("span")].map(text), false);
+      if (!heading) return fromLabels(text(container), [], true, null);
+      return fromLabels(text(heading), [...container.querySelectorAll("span")].map(text), false, null);
     },
   },
   {
     key: "primevideo",
-    hosts: { "primevideo.com": "/", "amazon.de": "/gp/video/" },
     isPlayerPage: (url) => url.pathname.includes("/detail/"),
-    detect(doc) {
+    detect(doc, url) {
       const title = text(doc.querySelector(".atvwebplayersdk-title-text"));
-      return fromLabels(title, [text(doc.querySelector(".atvwebplayersdk-subtitle-text"))], true);
+      const subtitle = text(doc.querySelector(".atvwebplayersdk-subtitle-text"));
+      // The player opens on the title's detail page, which is also the page to come back to.
+      return fromLabels(title, [subtitle], true, serviceLink(`${url.origin}${url.pathname}`, url.href, "primevideo"));
     },
   },
   {
     key: "disneyplus",
-    hosts: { "disneyplus.com": "/" },
     isPlayerPage: (url) => url.pathname.startsWith("/video/") || url.pathname.startsWith("/play/"),
     detect(doc) {
-      return fromLabels(text(doc.querySelector(".title-field")), [text(doc.querySelector(".subtitle-field"))], true);
+      return fromLabels(text(doc.querySelector(".title-field")), [text(doc.querySelector(".subtitle-field"))], true, null);
     },
   },
   {
     key: "crunchyroll",
-    hosts: { "crunchyroll.com": "/", "static.crunchyroll.com": "/" },
     isPlayerPage: (url) => url.hostname === "www.crunchyroll.com" && url.pathname.startsWith("/watch/"),
-    detect(doc) {
-      return fromLabels(text(doc.querySelector('[data-t="show-title-link"]')), [text(doc.querySelector("h1.title"))], false);
+    detect(doc, url) {
+      const show = doc.querySelector('[data-t="show-title-link"]');
+      return fromLabels(text(show), [text(doc.querySelector("h1.title"))], false, serviceLink(show?.getAttribute("href"), url.href, "crunchyroll"));
     },
   },
 ];
 
-/** The streaming service a URL belongs to: https, exact host, and the host's path prefix. */
+/** The streaming service a URL belongs to (core's table: https, exact host, path prefix). */
 export function serviceForUrl(raw: string | URL): StreamingService | undefined {
-  const url = parseHttpUrl(typeof raw === "string" ? raw : raw.href);
-  if (!url || url.protocol !== "https:") return undefined;
-  const host = normalizeDomain(url.hostname);
-  return SERVICES.find((service) => {
-    const prefix = service.hosts[host];
-    return Object.hasOwn(service.hosts, host) && prefix !== undefined && url.pathname.startsWith(prefix);
-  });
+  const key = serviceKeyForUrl(typeof raw === "string" ? raw : raw.href);
+  return SERVICES.find((service) => service.key === key);
 }
 
 /** Detection from the service's own page layout; null outside its player pages. */
 export function detectStream(doc: Document, url: URL): StreamDetection | null {
   const service = serviceForUrl(url);
-  return service?.isPlayerPage(url) ? service.detect(doc) : null;
+  return service?.isPlayerPage(url) ? service.detect(doc, url) : null;
 }
-
-// Where an episode label starts inside a combined title such as "Frieren S1 E5".
-export const LABEL_START = /(?<![\p{L}\d])(?:s\d|season|staffel|episode|folge|ep\.?\s*\d|e\d|\d{1,3}x\d)/iu;
 
 /**
  * Detection from `navigator.mediaSession.metadata`, which players fill in different ways: the
@@ -126,9 +143,8 @@ export function detectFromMediaMetadata(
     if (!episode) continue;
     const album = fields[2] ?? "";
     const others = fields.filter((other, otherIndex) => otherIndex !== index && other !== "" && !parseEpisode(other));
-    const before = field.split(LABEL_START)[0]?.replace(/[\s\-–—:|·,]+$/u, "") ?? "";
-    const seriesTitle = (index !== 2 && album !== "" && !parseEpisode(album) ? album : others[0]) ?? before;
-    return seriesTitle === "" ? null : { kind: "episode", seriesTitle, ...episode };
+    const seriesTitle = (index !== 2 && album !== "" && !parseEpisode(album) ? album : others[0]) ?? textBeforeLabel(field);
+    return seriesTitle === "" ? null : { kind: "episode", seriesTitle, ...episode, seriesUrl: null };
   }
   return null;
 }

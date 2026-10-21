@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PostEventsResult } from "../src/lib/api-client";
-import { MAX_BACKOFF_MS, Outbox, OUTBOX_LIMIT } from "../src/lib/outbox";
+import { MAX_BACKOFF_MS, MAX_REQUEST_BYTES, Outbox, OUTBOX_LIMIT } from "../src/lib/outbox";
 import { createStore } from "../src/lib/storage";
 import { event, fakeStorage } from "./fakes";
 
@@ -64,6 +64,19 @@ describe("Outbox", () => {
     await outbox.flush();
 
     expect(post.mock.calls.map(([batch]) => batch.length)).toEqual([100, 50]);
+  });
+
+  it("keeps a request below the server's body limit, sending large events in smaller batches", async () => {
+    const post = vi.fn(acceptAll);
+    const { outbox } = setup(post);
+    const long = `https://asuracomic.net/${"x".repeat(1990)}`;
+    await outbox.enqueueMany(Array.from({ length: 100 }, (_, i) => event(i, { source: { ...event(i).source, url: long, seriesUrl: long } })));
+
+    const result = await outbox.flush();
+
+    expect(result).toEqual({ sent: 100, remaining: 0 });
+    for (const [batch] of post.mock.calls) expect(JSON.stringify({ events: batch }).length).toBeLessThan(MAX_REQUEST_BYTES);
+    expect(post.mock.calls.length).toBeGreaterThan(1);
   });
 
   it("backs off exponentially on errors, up to 30 minutes", async () => {

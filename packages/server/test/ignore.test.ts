@@ -69,3 +69,19 @@ describe("ignoreSeries", () => {
     ).rejects.toThrow(SourceNotFoundError);
   });
 });
+
+describe("ignoreSeries – streaming", () => {
+  it("ignores a streaming series under the key the server files it by", async () => {
+    await seedSource(handle.db, { key: "crunchyroll", kind: "streaming" });
+    await ignoreSeries(handle.db, { sourceKey: "crunchyroll", externalKey: "Frieren (German Dub)", rawTitle: "Frieren (German Dub)" }, NOW);
+
+    const watched = chapterEvent({
+      kind: "watched",
+      source: { key: "crunchyroll", externalKey: "Frieren", rawTitle: "Frieren", url: undefined },
+      position: { unit: "episode", season: 1, episode: 5 },
+    });
+    const [result] = await ingestEvents(handle.db, null, [watched], NOW);
+
+    expect(result?.outcome).toBe("ignored");
+  });
+});

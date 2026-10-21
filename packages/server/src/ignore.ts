@@ -1,3 +1,4 @@
+import { streamingSeriesKey } from "@rwt/core";
 import { type Db, events, pendingMatches, sources, workLinks } from "@rwt/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { SourceNotFoundError } from "./sources";
@@ -14,14 +15,16 @@ export async function ignoreSeries(
   await db.transaction(async (tx) => {
     const [source] = await tx.select().from(sources).where(eq(sources.key, input.sourceKey));
     if (!source) throw new SourceNotFoundError();
+    // The same key the ingest files streaming events by (SPEC §5.2).
+    const externalKey = source.kind === "streaming" ? streamingSeriesKey(input.externalKey) : input.externalKey;
     const sameKey = (table: typeof workLinks | typeof pendingMatches) =>
-      and(eq(table.sourceId, source.id), eq(table.externalKey, input.externalKey));
+      and(eq(table.sourceId, source.id), eq(table.externalKey, externalKey));
 
     await tx.delete(workLinks).where(sameKey(workLinks));
     await tx
       .update(events)
       .set({ outcome: "ignored" })
-      .where(and(eq(events.sourceId, source.id), eq(events.externalKey, input.externalKey), eq(events.outcome, "pending")));
+      .where(and(eq(events.sourceId, source.id), eq(events.externalKey, externalKey), eq(events.outcome, "pending")));
 
     const [ignored] = await tx
       .select({ id: pendingMatches.id })
@@ -37,7 +40,7 @@ export async function ignoreSeries(
     if (resolved.length === 0) {
       await tx.insert(pendingMatches).values({
         sourceId: source.id,
-        externalKey: input.externalKey,
+        externalKey,
         rawTitle: input.rawTitle,
         firstSeenAt: now,
         lastSeenAt: now,

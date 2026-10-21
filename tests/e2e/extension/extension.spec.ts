@@ -176,6 +176,41 @@ test("an episode watched to the end on Netflix reaches the tracker as one event"
   await context.unroute("https://www.netflix.com/**");
 });
 
+test("a Crunchyroll episode playing in the player frame is counted with the page's title and series link", async () => {
+  const clip = await recordClip();
+  await context.route("https://www.crunchyroll.com/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><head><title>Frieren</title></head><body>
+<a data-t="show-title-link" href="/series/G1/frieren"><h4>Frieren</h4></a><h1 class="title">E5 - Phantoms of the Dead</h1>
+<iframe src="https://static.crunchyroll.com/vilos/player.html" width="320" height="180"></iframe></body></html>`,
+    }),
+  );
+  await context.route("https://static.crunchyroll.com/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith(".webm")) return route.fulfill({ status: 200, contentType: "video/webm", body: clip });
+    return route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><body><video src="/vilos/clip.webm" autoplay muted></video></body></html>`,
+    });
+  });
+
+  const page = await context.newPage();
+  await page.goto("https://www.crunchyroll.com/watch/GXYZ/phantoms");
+
+  const watched = () => api.events.filter((event) => event.source.key === "crunchyroll" && event.kind === "watched");
+  await expect.poll(() => watched().length, { timeout: 15_000 }).toBe(1);
+  expect(watched()[0]).toMatchObject({
+    source: { externalKey: "frieren", seriesUrl: "https://www.crunchyroll.com/series/G1/frieren" },
+    position: { unit: "episode", season: null, episode: 5 },
+  });
+  await page.close();
+  await context.unroute("https://www.crunchyroll.com/**");
+  await context.unroute("https://static.crunchyroll.com/**");
+});
+
 test("opening the Crunchyroll history sends the latest episode per series, and only once", async () => {
   await context.route("https://www.crunchyroll.com/**", (route) =>
     route.fulfill({

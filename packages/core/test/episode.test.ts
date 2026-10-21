@@ -22,6 +22,16 @@ describe("streamingSeriesKey", () => {
     expect(streamingSeriesKey(title)).toBe(key);
   });
 
+  it("stays within the text limit even when Unicode normalization expands the title", () => {
+    // U+FDFA becomes 18 characters under NFKC.
+    const expanding = String.fromCharCode(0xfdfa).repeat(300);
+    expect(streamingSeriesKey(expanding).length).toBeLessThanOrEqual(300);
+  });
+
+  it("never returns an empty key: a title of punctuation only keeps its text", () => {
+    expect(streamingSeriesKey("  !!!  ")).toBe("!!!");
+  });
+
   it("is idempotent", () => {
     for (const { title } of fixtures.streamingKey) {
       expect(streamingSeriesKey(streamingSeriesKey(title))).toBe(streamingSeriesKey(title));

@@ -24,6 +24,7 @@ export const StreamDetection = z
     seriesTitle: cleanText(MAX_TEXT_LENGTH),
     season: z.number().int().min(1).max(999).nullable(),
     episode: z.number().int().min(1).max(99999).nullable(),
+    seriesUrl: HttpUrlSchema.nullable(),
   })
   .refine((detection) => (detection.kind === "movie") === (detection.episode === null), "an episode needs a number, a movie none");
 export type StreamDetection = z.infer<typeof StreamDetection>;
@@ -35,7 +36,8 @@ export const ContentMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("reader:chapter-read"), url: HttpUrlSchema, detection: Detection, signal: ReadSignal }),
   z.object({ type: z.literal("stream:hello"), url: HttpUrlSchema }),
   z.object({ type: z.literal("stream:detected"), url: HttpUrlSchema, detection: StreamDetection.nullable() }),
-  z.object({ type: z.literal("stream:watched"), url: HttpUrlSchema }),
+  // The page sends what it shows at that moment; a player frame cannot know it and sends none.
+  z.object({ type: z.literal("stream:watched"), url: HttpUrlSchema, detection: StreamDetection.nullable().optional() }),
   z.object({
     type: z.literal("stream:library"),
     url: HttpUrlSchema,
@@ -45,6 +47,7 @@ export const ContentMessage = z.discriminatedUnion("type", [
           seriesTitle: cleanText(MAX_TEXT_LENGTH),
           season: z.number().int().min(1).max(999).nullable(),
           episode: z.number().int().min(1).max(99999),
+          seriesUrl: HttpUrlSchema.nullable(),
         }),
       )
       .max(500),
@@ -96,6 +99,7 @@ export function classifySender(sender: SenderLike, extensionId: string): SenderK
 export const PopupStatus = z.object({
   ok: z.literal(true),
   paired: z.boolean(),
+  watchedPercent: z.number().min(1).max(100),
   apiUrl: HttpUrlSchema.nullable(),
   page: z
     .object({

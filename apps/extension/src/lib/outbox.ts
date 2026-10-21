@@ -7,6 +7,8 @@ export const OUTBOX_LIMIT = 5000;
 export const MAX_BACKOFF_MS = 30 * 60_000;
 const FIRST_BACKOFF_MS = 30_000;
 const BATCH_SIZE = 100;
+/** Below the server's 512 KB body limit, so a batch of long URLs never gets stuck on a 413. */
+export const MAX_REQUEST_BYTES = 400_000;
 const KEY = "outbox";
 
 export interface OutboxState {
@@ -29,6 +31,18 @@ const StoredOutbox = z.object({
 });
 
 const EMPTY: z.infer<typeof StoredOutbox> = { events: [], attempts: 0, nextAttemptAt: null, lastSyncAt: null, lastError: null, dropped: 0 };
+
+/** Up to 100 events, as many as fit below MAX_REQUEST_BYTES – at least one. */
+function nextBatch(events: ProgressEvent[]): ProgressEvent[] {
+  let bytes = 0;
+  let count = 0;
+  for (const event of events.slice(0, BATCH_SIZE)) {
+    bytes += new TextEncoder().encode(JSON.stringify(event)).length + 1;
+    if (count > 0 && bytes > MAX_REQUEST_BYTES - 64) break;
+    count++;
+  }
+  return events.slice(0, Math.max(count, 1));
+}
 
 export const backoffMs = (attempts: number) => Math.min(FIRST_BACKOFF_MS * 2 ** (attempts - 1), MAX_BACKOFF_MS);
 
@@ -85,7 +99,7 @@ export class Outbox {
 
       let sent = 0;
       while (state.events.length > 0) {
-        const batch = state.events.slice(0, BATCH_SIZE);
+        const batch = nextBatch(state.events);
         const result = await this.api.postEvents(batch);
         if (!result.ok) {
           state.lastError = result.message;

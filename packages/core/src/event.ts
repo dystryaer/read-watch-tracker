@@ -28,11 +28,15 @@ export type EventOutcome = z.infer<typeof EventOutcome>;
  * Single-line text from devices or forms: control characters (including NUL, which Postgres text
  * columns reject) become spaces, whitespace is collapsed, the result is trimmed and length-capped.
  */
+// Bidi controls reorder the rest of a line when displayed ("Dark" + RLO + "…"): titles from
+// devices could otherwise spoof what the inbox shows next to them.
+const BIDI_CONTROLS = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu;
+
 export function cleanText(maxLength: number) {
   return z
     .string()
     .max(Math.max(MAX_RAW_TEXT_LENGTH, maxLength * 2))
-    .transform((value) => value.replace(/\p{Cc}+/gu, " ").replace(/\s+/g, " ").trim())
+    .transform((value) => value.replace(BIDI_CONTROLS, "").replace(/\p{Cc}+/gu, " ").replace(/\s+/g, " ").trim())
     .pipe(z.string().min(1).max(maxLength));
 }
 

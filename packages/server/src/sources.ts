@@ -1,4 +1,4 @@
-import { DEFAULT_THRESHOLDS, type DeviceConfig, type EnableSourceResponse, normalizeDomain, SiteRule } from "@rwt/core";
+import { DEFAULT_THRESHOLDS, type DeviceConfig, type EnableSourceResponse, isServiceHost, normalizeDomain, SiteRule } from "@rwt/core";
 import { type Db, sourceDomains, sources } from "@rwt/db";
 import { and, asc, eq, inArray, like } from "drizzle-orm";
 import { storedRuleFields } from "./rule-columns";
@@ -19,6 +19,14 @@ export class SourceConflictError extends Error {
   }
 }
 
+/** Streaming services and apps keep their own fixed sources; their domains never become websites. */
+export class ServiceDomainError extends Error {
+  constructor() {
+    super("Domain belongs to a streaming service or app");
+    this.name = "ServiceDomainError";
+  }
+}
+
 /**
  * "Diese Seite tracken" from the extension popup (SPEC §7.2): a new source, an existing one for a
  * known domain, or a domain move that keeps all links of the existing source.
@@ -28,6 +36,8 @@ export async function enableSource(
   input: { origin: string; name?: string; moveFromSourceKey?: string },
 ): Promise<EnableSourceResponse> {
   const domain = normalizeDomain(new URL(input.origin).hostname);
+  // Otherwise a website source would capture the service's events (resolved by domain first).
+  if (isServiceHost(domain)) throw new ServiceDomainError();
   return db.transaction(async (tx) => {
     const [owner] = await tx
       .select({ source: sources })

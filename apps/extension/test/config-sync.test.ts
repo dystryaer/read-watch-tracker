@@ -75,6 +75,16 @@ describe("RecentReads", () => {
     expect(await recent.claim("site:asura|overgeared|345", 12 * hour + 1)).toBe(true);
   });
 
+  it("claims many keys with one storage write and reports which were new", async () => {
+    const area = fakeStorage();
+    const recent = new RecentReads(createStore(area));
+    await recent.claim("a", 0);
+    const writes = vi.spyOn(area, "set");
+
+    expect(await recent.claimMany(["a", "b", "c", "b"], 1)).toEqual(new Set(["b", "c"]));
+    expect(writes).toHaveBeenCalledTimes(1);
+  });
+
   it("forgets entries older than 12 hours so storage stays small", async () => {
     const area = fakeStorage();
     const recent = new RecentReads(createStore(area));

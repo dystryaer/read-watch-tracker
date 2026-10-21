@@ -313,6 +313,20 @@ describe("ingestEvents – sources", () => {
     expect(stored.find((event) => event.id === foreign.id)?.url).toBeNull();
   });
 
+  it("files a service event under the service even where a website source holds the domain", async () => {
+    await seedSource(handle.db, { key: "site:amazon-de" }, ["amazon.de"]);
+    const watched = chapterEvent({
+      kind: "watched",
+      source: { key: "primevideo", externalKey: "The Boys", rawTitle: "The Boys", url: "https://www.amazon.de/gp/video/detail/B0ABC" },
+      position: { unit: "episode", season: 2, episode: 5 },
+    });
+
+    await ingestEvents(handle.db, null, [watched], NOW);
+
+    const [card] = await handle.db.select({ source: sources.key, externalKey: pendingMatches.externalKey }).from(pendingMatches).innerJoin(sources, eq(sources.id, pendingMatches.sourceId));
+    expect(card).toEqual({ source: "primevideo", externalKey: "the boys" });
+  });
+
   it("files a streaming series under one key, whether the desktop or the Shield sent it", async () => {
     const watched = (externalKey: string, rawTitle: string, episode: number) =>
       chapterEvent({

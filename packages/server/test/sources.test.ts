@@ -2,7 +2,7 @@ import { type DbHandle, sourceDomains, sources } from "@rwt/db";
 import { createTestDb, resetDb } from "@rwt/db/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { buildDeviceConfig, enableSource, SourceConflictError, SourceNotFoundError } from "../src/sources";
+import { buildDeviceConfig, enableSource, ServiceDomainError, SourceConflictError, SourceNotFoundError } from "../src/sources";
 import { seedSource } from "./helpers";
 
 let handle: DbHandle;
@@ -52,6 +52,21 @@ describe("enableSource", () => {
     expect(result).toMatchObject({ sourceKey: "site:asura", domains: ["asuracomic.net", "asurascans.com"] });
     const domains = await domainsOf(existing.id);
     expect(domains.find((d) => d.isCurrent)?.domain).toBe("asurascans.com");
+  });
+
+  it.each([["https://www.netflix.com/"], ["https://www.amazon.de/"], ["https://read.amazon.com/"]])(
+    "refuses to turn the service domain %s into a website source",
+    async (origin) => {
+      await expect(enableSource(handle.db, { origin })).rejects.toThrow(ServiceDomainError);
+      expect(await handle.db.select().from(sources)).toHaveLength(0);
+    },
+  );
+
+  it("refuses to move a website source onto a service domain", async () => {
+    await seedSource(handle.db, { key: "site:asura" }, ["asuracomic.net"]);
+    await expect(enableSource(handle.db, { origin: "https://www.netflix.com/", moveFromSourceKey: "site:asura" })).rejects.toThrow(
+      ServiceDomainError,
+    );
   });
 
   it("refuses to move to an unknown source", async () => {

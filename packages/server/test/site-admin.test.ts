@@ -129,6 +129,11 @@ describe("addSiteDomain", () => {
     expect(domains.find((d) => d.isCurrent)?.domain).toBe("asurascans.com");
   });
 
+  it("refuses a streaming service's domain", async () => {
+    const source = await seedSource(handle.db, { key: "site:asura" });
+    await expect(addSiteDomain(handle.db, source.id, "www.crunchyroll.com", { makeCurrent: true })).rejects.toThrow(SiteDomainError);
+  });
+
   it("refuses an invalid host name", async () => {
     const source = await seedSource(handle.db, { key: "site:asura" });
     await expect(addSiteDomain(handle.db, source.id, "https://x.example/path", { makeCurrent: true })).rejects.toThrow(

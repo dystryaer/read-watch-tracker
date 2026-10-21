@@ -13,7 +13,7 @@ import { RateLimiter } from "../http/rate-limit";
 import { bearerToken, clientAddress, errorResponse, jsonResponse, type Parsed, readJsonBody } from "../http/request";
 import { ignoreSeries } from "../ignore";
 import { ingestEvents } from "../ingest";
-import { buildDeviceConfig, enableSource, SourceConflictError, SourceNotFoundError } from "../sources";
+import { buildDeviceConfig, enableSource, ServiceDomainError, SourceConflictError, SourceNotFoundError } from "../sources";
 
 const MINUTE = 60_000;
 // 100 events of at most ~3 KB each, with headroom.
@@ -137,6 +137,7 @@ export async function handleEnableSource(request: Request, context: ApiContext):
   } catch (error) {
     if (error instanceof SourceNotFoundError) return errorResponse("source_not_found", 404);
     if (error instanceof SourceConflictError) return errorResponse("domain_taken", 409);
+    if (error instanceof ServiceDomainError) return errorResponse("service_domain", 409);
     throw error;
   }
 }

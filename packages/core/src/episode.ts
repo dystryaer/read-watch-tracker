@@ -1,3 +1,4 @@
+import { MAX_TEXT_LENGTH } from "./event";
 import { normalizeTitle } from "./normalize";
 
 export interface EpisodeInfo {
@@ -59,5 +60,8 @@ export function streamingSeriesKey(title: string): string {
     if (stripped === current || stripped.trim() === "") break;
     current = stripped;
   }
-  return normalizeTitle(current);
+  // A title of punctuation only normalizes to nothing; it keeps its own text as key then.
+  const key = normalizeTitle(current) || current.replace(/\s+/g, " ").trim();
+  // Normalization can expand a title (NFKC turns U+FDFA into 18 characters): bounded again here.
+  return key.length <= MAX_TEXT_LENGTH ? key : key.slice(0, MAX_TEXT_LENGTH).trimEnd();
 }
