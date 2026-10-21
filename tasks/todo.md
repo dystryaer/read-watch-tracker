@@ -19,7 +19,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T03 Fortschrittsregeln** · S · Abh. T02
   Akz.: `comparePositions`, `shouldAdvance` (unbekannt → übernehmen; nur vorwärts; fehlende Staffel = aktuelle), `positionUnitFor(mediaType)`; Einheiten-Mismatch wirft · Dateien: `progress.ts` + Test
 
-- [ ] **T04 Serienschlüssel + URL-Erkennung + Seitenregeln** · M · Abh. T01
+- [x] **T04 Serienschlüssel + URL-Erkennung + Seitenregeln** · M · Abh. T01
   Akz.: `normalizeSeriesKey` (Hash-Suffix weg); `SiteRule`-Schema (Pattern ≤ 200, Regex muss kompilieren); `detectChapterFromUrl(url, title, rule?)` generisch + mit Regel; Titelbereinigung („Chapter N“, Seitenname); URL > 2048 → keine Erkennung · Dateien: `series-key.ts`, `site-rule.ts`, `detect-url.ts` + Tests
 
 - [ ] **T05 „Weiterlesen“-URL + `safeHref`** · S · Abh. T04

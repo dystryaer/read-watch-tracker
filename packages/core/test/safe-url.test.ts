@@ -26,6 +26,10 @@ describe("parseHttpUrl", () => {
     expect(parseHttpUrl(value)).toBeNull();
   });
 
+  it("rejects an http prefix that is not a parseable URL", () => {
+    expect(parseHttpUrl("http://")).toBeNull();
+  });
+
   it("rejects URLs longer than 2048 characters", () => {
     const longUrl = `https://example.org/${"a".repeat(2048)}`;
     expect(parseHttpUrl(longUrl)).toBeNull();

@@ -146,6 +146,14 @@ describe("parseEventBatch", () => {
     expect(result.ok && result.items[0]).toMatchObject({ ok: false, id: null, index: 0 });
   });
 
+  it("rejects non-object events with a null id", () => {
+    const result = parseEventBatch({ events: [null, "x"] });
+    expect(result.ok && result.items).toMatchObject([
+      { ok: false, id: null, index: 0 },
+      { ok: false, id: null, index: 1 },
+    ]);
+  });
+
   it("gives a short reason for a rejected event", () => {
     const result = parseEventBatch({ events: [{ ...validEvent, kind: "nope" }] });
     expect(result.ok && !result.items[0]?.ok && result.items[0]?.reason).toMatch(/kind/);
