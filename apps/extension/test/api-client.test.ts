@@ -108,3 +108,29 @@ describe("redirects", () => {
     for (const init of inits) expect(init.redirect).toBe("error");
   });
 });
+
+describe("new chapter endpoints (M4)", () => {
+  const solo = { sourceKey: "site:asura", externalKey: "solo-leveling", seriesUrl: "https://asuracomic.net/series/solo-leveling", chapter: 200 };
+
+  it("reads the series watch list with the token and validates it", async () => {
+    const fetchFn = respond({ series: [solo] });
+    expect(await createApiClient(fetchFn).getSeriesWatch(API, TOKEN)).toEqual({ ok: true, value: { series: [solo] } });
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`${API}/api/v1/series-watch`);
+    expect((init.headers as Record<string, string>).authorization).toBe(`Bearer ${TOKEN}`);
+  });
+
+  it("does not accept a watch list with a script URL", async () => {
+    const result = await createApiClient(respond({ series: [{ ...solo, seriesUrl: "javascript:alert(1)" }] })).getSeriesWatch(API, TOKEN);
+    expect(result).toMatchObject({ ok: false, kind: "retry" });
+  });
+
+  it("posts the latest chapters", async () => {
+    const fetchFn = respond({ updated: 1 });
+    const items = [{ sourceKey: "site:asura", externalKey: "solo-leveling", latestChapter: 203 }];
+    expect(await createApiClient(fetchFn).postLatestChapters(API, TOKEN, items)).toEqual({ ok: true, value: { updated: 1 } });
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`${API}/api/v1/latest-chapters`);
+    expect(JSON.parse(String(init.body))).toEqual({ items });
+  });
+});

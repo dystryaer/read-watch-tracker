@@ -3,9 +3,11 @@ import {
   EnableSourceResponse,
   type EventResult,
   EventResultsResponse,
+  LatestChaptersResponse,
   PairingPollResponse,
   PairingStartResponse,
   type ProgressEvent,
+  SeriesWatchResponse,
 } from "@rwt/core";
 import { z } from "zod";
 
@@ -118,6 +120,12 @@ export function createApiClient(fetchFn: Fetch) {
 
     ignoreSeries: (apiUrl: string, token: string, body: { sourceKey: string; externalKey: string; rawTitle: string }) =>
       call(`${apiUrl}/api/v1/ignore`, json(body, token), z.object({ ok: z.literal(true) })),
+
+    getSeriesWatch: (apiUrl: string, token: string) =>
+      call(`${apiUrl}/api/v1/series-watch`, { headers: { authorization: `Bearer ${token}` } }, SeriesWatchResponse),
+
+    postLatestChapters: (apiUrl: string, token: string, items: { sourceKey: string; externalKey: string; latestChapter: number }[]) =>
+      call(`${apiUrl}/api/v1/latest-chapters`, json({ items }, token), LatestChaptersResponse),
   };
 }
 

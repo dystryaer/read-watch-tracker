@@ -24,3 +24,5 @@ dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
 dt { color: var(--muted); }
 dd { margin: 0; }
 h2 { font-size: 1.1rem; margin-top: 2rem; }
+label.check { display: flex; align-items: center; gap: 0.5rem; }
+label.check input { width: 1.1rem; height: 1.1rem; accent-color: var(--accent); }

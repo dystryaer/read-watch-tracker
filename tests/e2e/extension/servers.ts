@@ -12,6 +12,9 @@ export interface FakeApi {
   requests: RecordedRequest[];
   events: { id: string; source: { key: string; externalKey: string; url?: string }; position: { chapter?: number }; kind: string }[];
   eventsMode: "ok" | "unavailable";
+  /** M4: what GET /series-watch answers, and what POST /latest-chapters received. */
+  seriesWatch: { sourceKey: string; externalKey: string; seriesUrl: string; chapter: number }[];
+  latestChapters: { sourceKey: string; externalKey: string; latestChapter: number }[];
   close(): Promise<void>;
 }
 
@@ -33,6 +36,8 @@ export async function startFakeApi(siteDomain: string): Promise<FakeApi> {
     requests: [],
     events: [],
     eventsMode: "ok",
+    seriesWatch: [],
+    latestChapters: [],
     close: async () => {},
   };
   const config = { sites: [{ sourceKey: "site:fixture", domains: [siteDomain] }], thresholds: { scrollDepthPercent: 60, watchedPercent: 85 } };
@@ -54,6 +59,12 @@ export async function startFakeApi(siteDomain: string): Promise<FakeApi> {
       const fresh = events.filter((event) => !api.events.some((known) => known.id === event.id));
       api.events.push(...fresh);
       return response.end(JSON.stringify({ results: events.map((event, index) => ({ id: event.id, index, outcome: "pending" })) }));
+    }
+    if (request.method === "GET" && path === "/api/v1/series-watch") return response.end(JSON.stringify({ series: api.seriesWatch }));
+    if (request.method === "POST" && path === "/api/v1/latest-chapters") {
+      const items = (body as { items: FakeApi["latestChapters"] }).items;
+      api.latestChapters.push(...items);
+      return response.end(JSON.stringify({ updated: items.length }));
     }
     response.writeHead(404).end("{}");
   });
@@ -81,10 +92,33 @@ function pagedChapterPage(series: string, chapter: number): string {
 <a class="next" href="/about">Nächstes Kapitel</a></body></html>`;
 }
 
-/** A manga site with long-strip (/manga/) and paged (/paged/) chapter pages, reachable as localhost and 127.0.0.1. */
-export async function startFixtureSite(): Promise<{ port: number; close(): Promise<void> }> {
+function seriesPage(series: string, latest: number): string {
+  const links = Array.from({ length: 5 }, (_, index) => latest - index)
+    .map((chapter) => `<li><a href="/manga/${series}/chapter-${chapter}">Chapter ${chapter}</a></li>`)
+    .join("");
+  return `<!doctype html><html><head><title>${series} - Fixture Reader</title></head><body><ul class="chapters">${links}</ul></body></html>`;
+}
+
+export interface FixtureSite {
+  port: number;
+  /** Requests for series pages (M4), with the cookie header they carried. */
+  seriesRequests: { path: string; cookie: string | undefined }[];
+  close(): Promise<void>;
+}
+
+/**
+ * A manga site with long-strip (/manga/) and paged (/paged/) chapter pages and series pages
+ * (/manga/<series>, newest chapter 205), reachable as localhost and 127.0.0.1.
+ */
+export async function startFixtureSite(): Promise<FixtureSite> {
+  const seriesRequests: FixtureSite["seriesRequests"] = [];
   const server = createServer((request, response) => {
     if (request.url === "/about") return response.writeHead(200, { "content-type": "text/html" }).end("<p>About</p>");
+    const seriesOnly = /^\/manga\/([a-z-]+)$/.exec(request.url ?? "");
+    if (seriesOnly?.[1]) {
+      seriesRequests.push({ path: request.url ?? "", cookie: request.headers.cookie });
+      return response.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(seriesPage(seriesOnly[1], 205));
+    }
     const paged = /^\/paged\/([a-z-]+)\/chapter-(\d+)$/.exec(request.url ?? "");
     if (paged?.[1] && paged[2]) {
       const title = paged[1].split("-").map((word) => word[0]?.toUpperCase() + word.slice(1)).join(" ");
@@ -97,5 +131,5 @@ export async function startFixtureSite(): Promise<{ port: number; close(): Promi
     response.end(chapterPage(series, Number(match[2])));
   });
   const port = await listen(server, "0.0.0.0");
-  return { port, close: () => new Promise((resolve) => server.close(() => resolve())) };
+  return { port, seriesRequests, close: () => new Promise((resolve) => server.close(() => resolve())) };
 }

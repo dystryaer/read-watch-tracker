@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import { createApiClient } from "@/lib/api-client";
 import { collectBackfill } from "@/lib/backfill";
+import { loadNewChapterChecks, saveNewChapterChecks } from "@/lib/new-chapters";
 import { h, render } from "@/lib/dom";
 import { readOutboxSummary } from "@/lib/outbox";
 import { pollPairing, repeatUntilDone, startPairing } from "@/lib/pairing";
@@ -130,7 +131,25 @@ async function showPaired(settings: Settings) {
       ...(outbox.dropped > 0 ? [h("dt", {}, "Verworfen (Speicher voll)"), h("dd", { class: "error" }, String(outbox.dropped))] : []),
     ),
     h("div", { class: "actions" }, syncButton, unpairButton),
+    await newChaptersSection(),
     backfillSection(settings),
+  );
+}
+
+async function newChaptersSection(): Promise<HTMLElement> {
+  const checkbox = h("input", { type: "checkbox", name: "new-chapters" });
+  checkbox.checked = await loadNewChapterChecks(store);
+  checkbox.addEventListener("change", () => void saveNewChapterChecks(store, checkbox.checked));
+  return h(
+    "section",
+    {},
+    h("h2", {}, "Neue Kapitel"),
+    h("label", { class: "check" }, checkbox, "Serienseiten auf neue Kapitel prüfen"),
+    h(
+      "p",
+      { class: "muted" },
+      "Ruft die Serienseiten deiner freigeschalteten Seiten höchstens einmal am Tag ab, nur solange Brave läuft – ohne Cookies und ohne Bot-Schutz zu umgehen. Im Tracker erscheint dann „3 neu“.",
+    ),
   );
 }
 

@@ -263,6 +263,18 @@ test("opening the WebNovel library sends the chapter of every listed book", asyn
   await context.unroute("https://www.webnovel.com/**");
 });
 
+test("new chapters: an enabled series page is checked without cookies and its newest chapter reported", async () => {
+  api.seriesWatch = [{ sourceKey: "site:fixture", externalKey: "solo-leveling", seriesUrl: `http://localhost:${site.port}/manga/solo-leveling`, chapter: 200 }];
+  // A cookie of the site must not travel with the check (SPEC §7.11).
+  await context.addCookies([{ name: "session", value: "secret", domain: "localhost", path: "/" }]);
+
+  // The hourly alarm, fired now.
+  await worker.evaluate(() => chrome.alarms.create("new-chapters", { when: Date.now() + 100 }));
+
+  await expect.poll(() => api.latestChapters, { timeout: 15_000 }).toContainEqual({ sourceKey: "site:fixture", externalKey: "solo-leveling", latestChapter: 205 });
+  expect(site.seriesRequests).toEqual([{ path: "/manga/solo-leveling", cookie: undefined }]);
+});
+
 test("events read while the tracker is unreachable are delivered later, once", async () => {
   api.eventsMode = "unavailable";
   const page = await context.newPage();

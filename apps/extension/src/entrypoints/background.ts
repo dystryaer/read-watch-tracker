@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
 import { createApiClient } from "@/lib/api-client";
+import { checkNewChapters } from "@/lib/new-chapters";
 import { syncConfig } from "@/lib/config-sync";
 import { Outbox } from "@/lib/outbox";
 import { RecentReads } from "@/lib/recent";
@@ -67,11 +68,34 @@ export default defineBackground(() => {
   });
   browser.runtime.onInstalled.addListener(() => void sync());
   browser.runtime.onStartup.addListener(() => void sync());
+  // New chapters (SPEC §7.11): hourly while the browser runs; each series at most once a day.
+  let checkingChapters = false;
+  const checkChapters = async () => {
+    if (checkingChapters) return;
+    checkingChapters = true;
+    try {
+      await checkNewChapters({
+        store,
+        api,
+        // A plain GET without cookies or extra headers; nothing that would get past a bot check.
+        fetchPage: (url) => fetch(url, { credentials: "omit", cache: "no-store", referrerPolicy: "no-referrer" }),
+        permissions: { contains: (request) => browser.permissions.contains(request) },
+        now: Date.now,
+        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        onUnauthorized: () => void onUnauthorized(),
+      });
+    } finally {
+      checkingChapters = false;
+    }
+  };
+
   void browser.alarms.create("flush", { periodInMinutes: 1 });
   void browser.alarms.create("config", { periodInMinutes: 15 });
+  void browser.alarms.create("new-chapters", { delayInMinutes: 5, periodInMinutes: 60 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "flush") void outbox.flush();
     if (alarm.name === "config") void sync();
+    if (alarm.name === "new-chapters") void checkChapters();
   });
   // New or removed credentials (pairing in the options page, revocation): resync and send.
   browser.storage.onChanged.addListener((changes, area) => {
