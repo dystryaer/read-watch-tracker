@@ -76,7 +76,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T20 WXT-Gerüst + Nachrichtenverträge** · S · Abh. T02
   Akz.: MV3-Manifest (optional host permissions, storage, alarms, scripting, optional history); typisierte, zod-validierte Messages; Build grün
 
-- [ ] **T21 Storage + Outbox** · M · Abh. T20
+- [x] **T21 Storage + Outbox** · M · Abh. T20
   Akz.: alles aus `chrome.storage` wird validiert (beschädigt → verwerfen + Warnung); Outbox mit UUID, Flush, Backoff bis 30 min, 401 → entkoppelt, Limit 5 000 · Prüfung: Unit-Tests mit Fake-Storage/-Fetch
 
 - [ ] **T22 Kopplung + Config-Sync in der Extension** · S · Abh. T21, T12
