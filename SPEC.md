@@ -143,9 +143,9 @@ Der einzige Hauptbildschirm. Er beantwortet die Frage: *Wo stehe ich, und wie ko
 | **Quelle** | Buchstaben-Badge + Domain bzw. Dienstname der *zuletzt genutzten* Quelle. Favicons werden bewusst nicht geladen, damit keine externen Requests entstehen. `– keine Seite` bei importierten Titeln ohne Sichtung. |
 | **[−][+]** | Inline-Stepper für Kapitel und Folgen. Speichert entprellt (500 ms) als manuelle Änderung. |
 | **Weiterlesen ›** | Öffnet das nächste Kapitel in einem neuen Tab (Regeln in §4.4). Fehlt, wenn keine URL bekannt ist. |
-| **Zeile anklicken** | Öffnet die Detailansicht (§4.3). |
+| **Titel anklicken** | Öffnet die Detailseite (§4.3). Eine eigene Seite statt eines Drawers: direkt verlinkbar, per Formular auch ohne JavaScript bedienbar. |
 
-### 4.3 Detailansicht (Drawer)
+### 4.3 Detailseite (`/works/[id]`)
 
 - Titel umbenennen, Typ ändern, Status setzen
 - Stand manuell setzen (auch rückwärts)

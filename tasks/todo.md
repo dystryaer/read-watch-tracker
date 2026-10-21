@@ -56,7 +56,7 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T14 Stepper + Status** · S · Abh. T13
   Akz.: −/+ entprellt 500 ms als `manual`-Event; Status setzen; Validierung serverseitig · Prüfung: Integrationstest der Actions
 
-- [ ] **T15 Detailansicht + Zusammenführen** · M · Abh. T14
+- [x] **T15 Detailansicht + Zusammenführen** · M · Abh. T14
   Akz.: umbenennen, Typ, Stand (auch rückwärts), Links lösen, letzte 50 Events, Merge (Links + Events übertragen, höherer Stand gewinnt) · Prüfung: Integrationstests
 
 - [ ] **T16 Zuordnungs-Inbox** · M · Abh. T08, T13

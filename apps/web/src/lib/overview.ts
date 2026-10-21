@@ -33,7 +33,7 @@ export interface OverviewItem {
   lastProgressAt: number | null;
 }
 
-const TYPE_LABELS: Record<MediaType, string> = {
+export const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
   manga: "Manga",
   manhwa: "Manhwa",
   manhua: "Manhua",
@@ -117,7 +117,7 @@ export function toOverviewItem(row: OverviewRow, now: Date): OverviewItem {
     id: row.id,
     title: row.title,
     type: row.type,
-    typeLabel: TYPE_LABELS[row.type],
+    typeLabel: MEDIA_TYPE_LABELS[row.type],
     status: row.status,
     positionLabel: label,
     positionUnknown: unknown,
