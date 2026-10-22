@@ -58,6 +58,7 @@ export function updateLink(row: OverviewRow): NextUrl | null {
  */
 export function toUpdateItem(row: OverviewRow, now: Date): UpdateItem | null {
   if (positionUnitFor(row.type) !== "chapter" || row.chapter === null) return null;
+  // The badge's rule from the list; countWorksWithNewChapters counts the same in SQL.
   const newChapters = newChapterCount(row.chapter, row.latestChapter) ?? 0;
   if (newChapters === 0 && (row.status !== "reading" || !COMIC_TYPES.includes(row.type))) return null;
   const overview = toOverviewItem(row, now);
