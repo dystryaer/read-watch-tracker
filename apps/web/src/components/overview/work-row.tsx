@@ -1,22 +1,34 @@
 import type { ReactNode } from "react";
+import { CoverThumb } from "@/components/cover-thumb";
 import type { OverviewItem } from "@/lib/overview";
 import { PositionStepper } from "./position-stepper";
 
-/** One work in the core screen list (SPEC §4.1): title, position, source, activity, continue link. */
+/** One work in the core screen list (SPEC §4.1): picture, title, position, source, activity, continue link. */
 export function WorkRow({ item, actions }: { item: OverviewItem; actions?: ReactNode }) {
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-zinc-200 py-3 sm:grid-cols-[minmax(0,1fr)_10rem_11rem_7rem_9rem] dark:border-zinc-800">
+    <li className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 px-3 py-3 transition-colors hover:bg-zinc-50 sm:grid-cols-[2.5rem_minmax(0,1fr)_10rem_11rem_6.5rem_9rem] sm:px-4 dark:hover:bg-zinc-800/40">
+      {/* The title link right next to it says the same; one tab stop per row is enough. */}
+      <a href={`/works/${item.id}`} tabIndex={-1} aria-hidden="true" className="row-span-3 self-start sm:row-span-1 sm:self-center">
+        <CoverThumb src={item.cover} title={item.title} />
+      </a>
+
       <div className="min-w-0">
-        <a href={`/works/${item.id}`} className="block truncate font-medium hover:underline">
+        {/* Two lines on phones, where the stepper leaves little room; one on wider screens. */}
+        <a
+          href={`/works/${item.id}`}
+          className="line-clamp-2 font-medium break-words hover:text-teal-800 hover:underline sm:line-clamp-1 dark:hover:text-teal-300"
+        >
           {item.title}
         </a>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">{item.typeLabel}</span>
-        {item.newChapters !== null ? (
-          <span className="ml-2 rounded bg-teal-100 px-1.5 py-0.5 text-xs font-medium text-teal-900 dark:bg-teal-900/40 dark:text-teal-100">
-            <span aria-hidden="true">{item.newChapters} neu</span>
-            <span className="sr-only">{item.newChapters === 1 ? "1 neues Kapitel" : `${item.newChapters} neue Kapitel`}</span>
-          </span>
-        ) : null}
+        <div className="mt-0.5 flex items-center gap-2">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">{item.typeLabel}</span>
+          {item.newChapters !== null ? (
+            <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-900 dark:bg-teal-900/50 dark:text-teal-100">
+              <span aria-hidden="true">{item.newChapters} neu</span>
+              <span className="sr-only">{item.newChapters === 1 ? "1 neues Kapitel" : `${item.newChapters} neue Kapitel`}</span>
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="text-right sm:text-left">
@@ -46,7 +58,7 @@ export function WorkRow({ item, actions }: { item: OverviewItem; actions?: React
               <span className="truncate">{item.source.label}</span>
             </>
           ) : (
-            <span>– keine Seite</span>
+            <span className="text-zinc-400 dark:text-zinc-500">– keine Seite</span>
           )}
         </div>
         <div className="shrink-0 text-zinc-500 dark:text-zinc-400">
@@ -61,7 +73,7 @@ export function WorkRow({ item, actions }: { item: OverviewItem; actions?: React
             href={item.continueLink.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-md bg-teal-700 px-3 py-1.5 text-sm font-medium whitespace-nowrap text-white hover:bg-teal-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+            className="rounded-md bg-teal-700 px-3 py-1.5 text-sm font-medium whitespace-nowrap text-white shadow-sm hover:bg-teal-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
           >
             {item.continueLink.label} <span aria-hidden="true">›</span>
           </a>

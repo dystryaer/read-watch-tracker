@@ -88,6 +88,7 @@ export function createRouter(deps: RouterDeps) {
         rawTitle: detection.title ?? detection.seriesKey,
         url,
         ...(detection.seriesUrl ? { seriesUrl: detection.seriesUrl } : {}),
+        ...(detection.coverUrl ? { coverUrl: detection.coverUrl } : {}),
       },
       position: { unit: "chapter", chapter: detection.chapter },
     });

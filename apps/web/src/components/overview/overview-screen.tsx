@@ -30,7 +30,7 @@ const SORTS: { value: SortOrder; label: string }[] = [
 ];
 
 const controlClass =
-  "rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900";
+  "rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm shadow-xs dark:border-zinc-700 dark:bg-zinc-900";
 
 export function OverviewScreen({
   items,
@@ -96,17 +96,21 @@ export function OverviewScreen({
           onChange={(event) => update({ query: event.target.value })}
           placeholder="Suche …"
           aria-label="Titel suchen"
-          className={`${controlClass} w-full py-2 text-base`}
+          className={`${controlClass} w-full rounded-lg px-3 py-2 text-base`}
         />
 
-        <div role="group" aria-label="Medientyp" className="flex flex-wrap gap-1">
+        <div
+          role="group"
+          aria-label="Medientyp"
+          className="inline-flex flex-wrap gap-1 rounded-lg bg-zinc-200/60 p-1 dark:bg-zinc-800/60"
+        >
           {TABS.map((tab) => (
             <button
               key={tab.value}
               type="button"
               aria-pressed={filter.tab === tab.value}
               onClick={() => update({ tab: tab.value })}
-              className="rounded-md px-2.5 py-1 text-sm hover:bg-zinc-100 aria-pressed:bg-zinc-900 aria-pressed:text-white dark:hover:bg-zinc-800 dark:aria-pressed:bg-zinc-100 dark:aria-pressed:text-zinc-900"
+              className="rounded-md px-3 py-1 text-sm text-zinc-600 hover:text-zinc-900 aria-pressed:bg-white aria-pressed:font-medium aria-pressed:text-zinc-900 aria-pressed:shadow-sm dark:text-zinc-400 dark:hover:text-zinc-100 dark:aria-pressed:bg-zinc-950 dark:aria-pressed:text-zinc-100"
             >
               {tab.label}
             </button>
@@ -179,11 +183,19 @@ export function OverviewScreen({
           Keine Titel passen zu diesem Filter.
         </p>
       ) : (
-        <ul aria-label="Titel" className="mt-4 border-t border-zinc-200 dark:border-zinc-800">
-          {visible.map((item) => (
-            <WorkRow key={item.id} item={item} />
-          ))}
-        </ul>
+        <>
+          <p className="mt-5 mb-2 text-sm text-zinc-500 dark:text-zinc-400">
+            {visible.length === items.length ? `${items.length} Titel` : `${visible.length} von ${items.length} Titeln`}
+          </p>
+          <ul
+            aria-label="Titel"
+            className="divide-y divide-zinc-200 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900"
+          >
+            {visible.map((item) => (
+              <WorkRow key={item.id} item={item} />
+            ))}
+          </ul>
+        </>
       )}
     </main>
   );

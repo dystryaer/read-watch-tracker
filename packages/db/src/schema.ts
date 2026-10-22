@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   index,
   integer,
   jsonb,
@@ -16,6 +17,14 @@ import {
 
 const timestamptz = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 const createdAt = () => timestamptz("created_at").notNull().defaultNow();
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => "bytea",
+  // node-postgres sends only Buffers as binary; PGlite takes them as well.
+  toDriver: (value) => Buffer.from(value),
+});
+
+/** The picture types a cover may have; the server sends `mime` as Content-Type, so never SVG. */
+export const COVER_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"] as const;
 
 export const mediaType = pgEnum("media_type", [
   "manga",
@@ -33,6 +42,7 @@ export const deviceKind = pgEnum("device_kind", ["extension", "shield", "phone"]
 export const eventKind = pgEnum("event_kind", ["read", "watched", "library_sync", "backfill", "manual"]);
 export const eventOutcome = pgEnum("event_outcome", ["applied", "no_change", "pending", "ignored", "rejected"]);
 export const pendingResolution = pgEnum("pending_resolution", ["linked", "new_work", "ignored"]);
+export const coverKind = pgEnum("cover_kind", ["site", "upload", "removed", "unusable"]);
 
 export const sources = pgTable("sources", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -112,6 +122,34 @@ export const works = pgTable(
   ],
 );
 
+/**
+ * One small picture per work, stored here so the browser never loads images from other hosts:
+ * the reading site's preview image (`site`) or one added by hand (`upload`). `removed` keeps a site
+ * picture from coming back; `unusable` remembers a site picture that failed or turned out to be the
+ * same for several series (a logo), so it is not downloaded again and again.
+ */
+export const workCovers = pgTable(
+  "work_covers",
+  {
+    workId: uuid("work_id")
+      .primaryKey()
+      .references(() => works.id, { onDelete: "cascade" }),
+    kind: coverKind("kind").notNull(),
+    mime: text("mime"),
+    image: bytea("image"),
+    sourceUrl: text("source_url"),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("work_covers_source_url").on(table.sourceUrl),
+    check(
+      "work_covers_image_matches_kind",
+      sql`(${table.kind} IN ('site', 'upload')) = (${table.image} IS NOT NULL AND ${table.mime} IS NOT NULL)`,
+    ),
+    check("work_covers_mime", sql.raw(`mime IS NULL OR mime IN (${COVER_MIME_TYPES.map((type) => `'${type}'`).join(", ")})`)),
+  ],
+);
+
 export const workLinks = pgTable(
   "work_links",
   {
@@ -126,6 +164,8 @@ export const workLinks = pgTable(
     externalTitle: text("external_title").notNull(),
     externalTitleNormalized: text("external_title_normalized").notNull(),
     seriesUrl: text("series_url"),
+    /** Preview image the reading page names (og:image); often on another host than the page. */
+    coverUrl: text("cover_url"),
     confirmedAt: timestamptz("confirmed_at").notNull().defaultNow(),
   },
   (table) => [
@@ -221,6 +261,7 @@ export const pendingMatches = pgTable(
     rawTitle: text("raw_title").notNull(),
     mediaTypeHint: mediaType("media_type_hint"),
     seriesUrl: text("series_url"),
+    coverUrl: text("cover_url"),
     candidates: jsonb("candidates").$type<MatchCandidate[]>().notNull().default([]),
     eventCount: integer("event_count").notNull().default(0),
     firstSeenAt: timestamptz("first_seen_at").notNull().defaultNow(),

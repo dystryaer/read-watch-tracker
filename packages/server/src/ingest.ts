@@ -23,6 +23,7 @@ type Source = typeof sources.$inferSelect;
 interface SourceUrls {
   url: string | null;
   seriesUrl: string | null;
+  coverUrl: string | null;
 }
 
 const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
@@ -72,7 +73,7 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
   let relinked = false;
   const ignored = !work && (await isIgnored(db, source.id, key));
   if (!work && !ignored) {
-    const recognized = await reRecognize(db, source.id, event, key, urls.seriesUrl);
+    const recognized = await reRecognize(db, source.id, event, key, urls);
     work = recognized?.work ?? null;
     relinked = recognized?.relinked ?? false;
   }
@@ -89,16 +90,21 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
       { position: event.position, kind: event.kind, sourceId: source.id, url: urls.url, occurredAt },
       now,
     );
-    if (outcome === "applied" && urls.seriesUrl) {
+    // The series URL follows progress; the picture belongs to the series, whichever chapter named it.
+    const linkUpdate = {
+      ...(outcome === "applied" && urls.seriesUrl ? { seriesUrl: urls.seriesUrl } : {}),
+      ...(urls.coverUrl ? { coverUrl: urls.coverUrl } : {}),
+    };
+    if (Object.keys(linkUpdate).length > 0) {
       await db
         .update(workLinks)
-        .set({ seriesUrl: urls.seriesUrl })
+        .set(linkUpdate)
         .where(and(eq(workLinks.sourceId, source.id), eq(workLinks.externalKey, key)));
     }
   } else if (ignored) {
     outcome = "ignored";
   } else {
-    await upsertPendingMatch(db, source.id, event, key, urls.seriesUrl, now);
+    await upsertPendingMatch(db, source.id, event, key, urls, now);
     outcome = "pending";
   }
 
@@ -129,12 +135,14 @@ async function ingestOne(db: Db, deviceId: string | null, event: ProgressEvent, 
 /**
  * Only URLs on the source's own domains are kept – a website's registered domains, a service's
  * fixed ones: a stolen device token must not be able to plant links to other hosts behind
- * "Weiterlesen" or "Öffnen".
+ * "Weiterlesen" or "Öffnen". The cover is the exception (image hosts differ from the site): it is
+ * never shown as a link, only downloaded by the server, https only and never from the home network.
  */
 async function urlsOnSource(db: Db, source: Source, input: ProgressEvent["source"]): Promise<SourceUrls> {
+  const coverUrl = parseHttpUrl(input.coverUrl)?.protocol === "https:" ? (input.coverUrl ?? null) : null;
   if (source.kind !== "website") {
     const onService = (value: string | undefined) => (value && isServiceUrl(source.key, value) ? value : null);
-    return { url: onService(input.url), seriesUrl: onService(input.seriesUrl) };
+    return { url: onService(input.url), seriesUrl: onService(input.seriesUrl), coverUrl };
   }
   const rows = await db.select({ domain: sourceDomains.domain }).from(sourceDomains).where(eq(sourceDomains.sourceId, source.id));
   const domains = new Set(rows.map((row) => row.domain));
@@ -142,7 +150,7 @@ async function urlsOnSource(db: Db, source: Source, input: ProgressEvent["source
     const host = parseHttpUrl(value)?.hostname;
     return value && host && domains.has(normalizeDomain(host)) ? value : null;
   };
-  return { url: onSource(input.url), seriesUrl: onSource(input.seriesUrl) };
+  return { url: onSource(input.url), seriesUrl: onSource(input.seriesUrl), coverUrl };
 }
 
 /**
@@ -212,7 +220,7 @@ async function reRecognize(
   sourceId: string,
   event: ProgressEvent,
   externalKey: string,
-  seriesUrl: string | null,
+  { seriesUrl, coverUrl }: SourceUrls,
 ): Promise<{ work: Work; relinked: boolean } | null> {
   const titleKey = normalizeTitle(event.source.rawTitle);
   if (titleKey === "" || event.position.unit === "none") return null;
@@ -241,6 +249,7 @@ async function reRecognize(
       externalTitle: event.source.rawTitle,
       externalTitleNormalized: titleKey,
       seriesUrl,
+      coverUrl,
     })
     .onConflictDoNothing()
     .returning({ id: workLinks.id });
@@ -267,7 +276,7 @@ async function upsertPendingMatch(
   sourceId: string,
   event: ProgressEvent,
   externalKey: string,
-  seriesUrl: string | null,
+  { seriesUrl, coverUrl }: SourceUrls,
   now: Date,
 ): Promise<void> {
   const candidates = await findCandidates(db, normalizeTitle(event.source.rawTitle), event.position.unit);
@@ -279,6 +288,7 @@ async function upsertPendingMatch(
       rawTitle: event.source.rawTitle,
       mediaTypeHint: event.mediaTypeHint ?? null,
       seriesUrl,
+      coverUrl,
       candidates,
       eventCount: 1,
       firstSeenAt: now,
@@ -297,6 +307,7 @@ async function upsertPendingMatch(
       eventCount: sql`${pendingMatches.eventCount} + 1`,
       lastSeenAt: now,
       ...(seriesUrl ? { seriesUrl } : {}),
+      ...(coverUrl ? { coverUrl } : {}),
       ...(event.mediaTypeHint ? { mediaTypeHint: event.mediaTypeHint } : {}),
     })
     .where(

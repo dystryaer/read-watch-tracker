@@ -11,6 +11,8 @@ export const Detection = z.object({
   seriesKey: z.string().min(1).max(MAX_TEXT_LENGTH),
   title: cleanText(MAX_TEXT_LENGTH).nullable(),
   seriesUrl: HttpUrlSchema.nullable(),
+  /** Preview image of the page (og:image); only a reader on the page itself can see it. */
+  coverUrl: HttpUrlSchema.nullable().optional(),
 });
 export type Detection = z.infer<typeof Detection>;
 

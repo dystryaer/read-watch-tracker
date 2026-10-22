@@ -1,4 +1,4 @@
-import { cleanChapterTitle, detectChapterFromUrl, MAX_TEXT_LENGTH, type SiteRule } from "@rwt/core";
+import { cleanChapterTitle, detectChapterFromUrl, MAX_TEXT_LENGTH, MAX_URL_LENGTH, type SiteRule } from "@rwt/core";
 import type { Detection } from "@/lib/messages";
 
 function query(doc: Document, selector: string): Element | null {
@@ -25,7 +25,27 @@ function titleFromPage(doc: Document, rule: SiteRule | undefined): string | null
   );
 }
 
-/** Chapter page detection in the browser: URL rules from core plus the page's title. */
+const COVER_META = ['meta[property="og:image:secure_url"]', 'meta[property="og:image"]', 'meta[name="twitter:image"]'];
+
+/**
+ * The page's preview image, which reading sites set to the series cover. Only https: the tracker
+ * downloads it and fetches nothing else.
+ */
+function coverFromPage(doc: Document, pageUrl: string): string | null {
+  for (const selector of COVER_META) {
+    const content = query(doc, selector)?.getAttribute("content")?.trim();
+    if (!content) continue;
+    try {
+      const cover = new URL(content, pageUrl);
+      return cover.protocol === "https:" && !cover.username && !cover.password && cover.href.length <= MAX_URL_LENGTH ? cover.href : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Chapter page detection in the browser: URL rules from core plus the page's title and cover. */
 export function detectChapter(doc: Document, url: string, rule?: SiteRule): Detection | null {
   const detection = detectChapterFromUrl(url, doc.title, rule);
   if (!detection) return null;
@@ -34,5 +54,6 @@ export function detectChapter(doc: Document, url: string, rule?: SiteRule): Dete
     seriesKey: detection.seriesKey,
     title: titleFromPage(doc, rule) ?? (detection.title ? detection.title.slice(0, MAX_TEXT_LENGTH) : null),
     seriesUrl: detection.seriesUrl,
+    coverUrl: coverFromPage(doc, url),
   };
 }

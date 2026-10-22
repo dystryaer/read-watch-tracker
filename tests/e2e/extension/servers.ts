@@ -78,7 +78,10 @@ function chapterPage(series: string, chapter: number): string {
   // A long-strip reader: tall images, so scrolling to the end is needed.
   const pixel = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
   const images = Array.from({ length: 12 }, () => `<img src="${pixel}" width="600" height="1200" alt="">`).join("\n");
-  return `<!doctype html><html><head><title>${series} Chapter ${chapter} - Fixture Reader</title></head>
+  const slug = series.toLowerCase().replaceAll(" ", "-");
+  // Like real reading sites: the cover as preview image, on another host than the pages.
+  return `<!doctype html><html><head><title>${series} Chapter ${chapter} - Fixture Reader</title>
+<meta property="og:image" content="https://covers.fixture.example/${slug}.webp"></head>
 <body style="margin:0"><h1>${series}</h1><div class="reader">${images}</div>
 <a class="next" href="/manga/${series.toLowerCase().replaceAll(" ", "-")}/chapter-${chapter + 1}">Next</a></body></html>`;
 }

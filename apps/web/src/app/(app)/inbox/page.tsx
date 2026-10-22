@@ -2,6 +2,7 @@ import { MediaType } from "@rwt/core";
 import { HIGH_CONFIDENCE_SCORE, listOpenMatches, type OpenMatch } from "@rwt/server";
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
+import { CoverThumb } from "@/components/cover-thumb";
 import { getAuthorizedDb } from "@/lib/dal";
 import { positionText } from "@/lib/format";
 import { MEDIA_TYPE_LABELS } from "@/lib/overview";
@@ -14,15 +15,21 @@ const scoreFormat = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, m
 function MatchCard({ match }: { match: OpenMatch }) {
   const best = match.candidates[0];
   return (
-    <li className="rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
-      <h2 className="font-medium break-words">
-        „<bdi>{match.rawTitle}</bdi>“
-      </h2>
-      <p className="mt-0.5 mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-        auf {match.sourceName}
-        {match.lastPosition ? ` · zuletzt ${positionText(match.lastPosition)}` : ""} · {match.eventCount}{" "}
-        {match.eventCount === 1 ? "Ereignis" : "Ereignisse"}
-      </p>
+    <li className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="mb-3 flex items-start gap-3">
+        {/* The site's picture is only downloaded once the series belongs to a work: until then a tile. */}
+        <CoverThumb src={null} title={match.rawTitle} />
+        <div className="min-w-0">
+          <h2 className="font-medium break-words">
+            „<bdi>{match.rawTitle}</bdi>“
+          </h2>
+          <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
+            auf {match.sourceName}
+            {match.lastPosition ? ` · zuletzt ${positionText(match.lastPosition)}` : ""} · {match.eventCount}{" "}
+            {match.eventCount === 1 ? "Ereignis" : "Ereignisse"}
+          </p>
+        </div>
+      </div>
 
       <ActionForm action={resolveMatchAction} submitLabel="Zuordnen">
         <input type="hidden" name="pendingId" value={match.id} />

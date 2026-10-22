@@ -51,3 +51,5 @@ export { addSiteDomain, getSite, getSiteId, listRecentSiteUrls, listSites, renam
 export { ignoreSeries } from "./ignore";
 export { confirmShare, ShareNotFoundError, ShareValueError, startShare } from "./share";
 export { progressStats } from "./stats";
+export { CoverImageError, type CoverImage, fillSiteCovers, getCoverImage, removeCover, resetCover, setCoverImage } from "./covers";
+export { downloadImage, MAX_COVER_BYTES } from "./http/image-download";

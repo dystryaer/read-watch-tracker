@@ -89,6 +89,8 @@ export const ProgressEvent = z.object({
     rawTitle: Text,
     url: HttpUrlSchema.optional(),
     seriesUrl: HttpUrlSchema.optional(),
+    /** The page's preview image (og:image), the work's cover on most reading sites. */
+    coverUrl: HttpUrlSchema.optional(),
   }),
   position: Position,
   mediaTypeHint: MediaType.optional(),

@@ -62,7 +62,12 @@ test("a chapter read to the end on an enabled site reaches the tracker", async (
   await expect.poll(() => eventsFor("solo-leveling").length, { timeout: 10_000 }).toBe(1);
   expect(eventsFor("solo-leveling")[0]).toMatchObject({
     kind: "read",
-    source: { key: "site:fixture", externalKey: "solo-leveling", url: chapterUrl("localhost", "solo-leveling", 200) },
+    source: {
+      key: "site:fixture",
+      externalKey: "solo-leveling",
+      url: chapterUrl("localhost", "solo-leveling", 200),
+      coverUrl: "https://covers.fixture.example/solo-leveling.webp",
+    },
     position: { unit: "chapter", chapter: 200 },
   });
   await page.close();

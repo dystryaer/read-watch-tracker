@@ -1,36 +1,53 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/(auth)/actions";
+import { NavLinks } from "@/components/nav-links";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
 import { requireSession } from "@/lib/auth";
+
+/** The app icon's open book, drawn with classes (the CSP allows no inline styles). */
+function BrandMark() {
+  return (
+    <span aria-hidden="true" className="grid size-8 place-items-center rounded-lg bg-teal-700 shadow-sm">
+      <span className="flex gap-0.5">
+        <span className="h-3.5 w-2.5 rounded-l-sm bg-white" />
+        <span className="h-3.5 w-2.5 rounded-r-sm bg-white" />
+      </span>
+    </span>
+  );
+}
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   await requireSession();
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-12">
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
-        <Link href="/" className="text-lg font-semibold">
-          Read-Watch-Tracker
-        </Link>
-        <nav aria-label="Hauptnavigation" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          <Link href="/quick" className="hover:underline">
-            Schnell-Update
+    <>
+      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/85 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/85">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+          <Link href="/" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+            <BrandMark />
+            Read-Watch-Tracker
           </Link>
-          <Link href="/stats" className="hover:underline">
-            Statistik
-          </Link>
-          <Link href="/settings" className="hover:underline">
-            Einstellungen
-          </Link>
-          <form action={signOutAction}>
-            <button type="submit" className="hover:underline">
-              Abmelden
-            </button>
-          </form>
-        </nav>
+          {/* One scrollable row on phones instead of two wrapped ones. */}
+          <nav
+            aria-label="Hauptnavigation"
+            className="-mx-2.5 flex w-[calc(100%+1.25rem)] items-center gap-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none] sm:w-auto"
+          >
+            <NavLinks />
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="rounded-md px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              >
+                Abmelden
+              </button>
+            </form>
+          </nav>
+        </div>
       </header>
-      <RefreshOnReturn />
-      {children}
-    </div>
+      <div className="mx-auto max-w-5xl px-4 pt-6 pb-12">
+        <RefreshOnReturn />
+        {children}
+      </div>
+    </>
   );
 }

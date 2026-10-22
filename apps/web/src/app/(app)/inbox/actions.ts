@@ -5,6 +5,7 @@ import { confirmMatches, PendingMatchNotFoundError, resolvePendingMatch } from "
 import { refresh } from "next/cache";
 import { z } from "zod";
 import type { FormState } from "@/components/action-form";
+import { fillCoversLater } from "@/lib/cover-fill";
 import { getAuthorizedDb } from "@/lib/dal";
 
 // Server Actions are public POST endpoints: everything from the form is validated here.
@@ -42,6 +43,8 @@ export async function resolveMatchAction(_previous: FormState, formData: FormDat
   const input = ResolveInput.safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: "Bitte einen Titel wählen oder „Neues Werk anlegen“." };
   const { pendingId, choice, type, title } = input.data;
+  // The card may have carried the site's picture; the new link brings it to the work.
+  fillCoversLater();
   return guarded(
     () =>
       resolvePendingMatch(
@@ -65,6 +68,7 @@ export async function confirmAllAction(_previous: FormState, formData: FormData)
   const input = ConfirmAllInput.safeParse(formData.getAll("pair"));
   if (!input.success) return { error: "Ungültige Eingabe." };
   const confirmed = await confirmMatches(db, input.data);
+  fillCoversLater();
   refresh();
   return { message: `${confirmed} Zuordnungen bestätigt.` };
 }

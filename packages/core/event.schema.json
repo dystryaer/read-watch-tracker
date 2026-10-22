@@ -45,6 +45,11 @@
           "type": "string",
           "maxLength": 2048,
           "pattern": "^https?:\\/\\/"
+        },
+        "coverUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https?:\\/\\/"
         }
       },
       "required": [

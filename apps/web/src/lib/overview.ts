@@ -1,5 +1,6 @@
 import { type MediaType, nextChapterUrl, normalizeTitle, positionUnitFor, safeHref } from "@rwt/core";
 import type { OverviewRow } from "@rwt/server";
+import { coverSrc } from "./cover";
 import type { StepperState } from "./stepper";
 
 export type Tab = "all" | "comics" | "novels" | "ebooks" | "video";
@@ -21,6 +22,8 @@ export interface OverviewItem {
   title: string;
   type: MediaType;
   typeLabel: string;
+  /** URL of the stored picture; null shows the title's tile. */
+  cover: string | null;
   status: OverviewRow["status"];
   positionLabel: string;
   positionUnknown: boolean;
@@ -124,6 +127,7 @@ export function toOverviewItem(row: OverviewRow, now: Date): OverviewItem {
     title: row.title,
     type: row.type,
     typeLabel: MEDIA_TYPE_LABELS[row.type],
+    cover: coverSrc(row.id, row.coverVersion),
     status: row.status,
     positionLabel: label,
     positionUnknown: unknown,

@@ -4,7 +4,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { ActionForm } from "@/components/action-form";
+import { CoverThumb } from "@/components/cover-thumb";
+import { CoverEditor } from "@/components/work-detail/cover-editor";
 import { HistoryTable } from "@/components/work-detail/history-table";
+import { coverSrc } from "@/lib/cover";
 import { getAuthorizedDb } from "@/lib/dal";
 import { positionText } from "@/lib/format";
 import { formatRelative, MEDIA_TYPE_LABELS } from "@/lib/overview";
@@ -38,15 +41,28 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
       <Link href="/" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
         <span aria-hidden="true">←</span> Übersicht
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold break-words">{work.title}</h1>
-      <p className="mt-1 mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-        {MEDIA_TYPE_LABELS[work.type]} · {STATUS_LABELS[work.status]} · {positionText(work)}
-      </p>
-      {unit === "chapter" && work.latestChapter !== null && work.latestChapterAt !== null && work.latestChapter >= Math.floor(work.chapter ?? 0) ? (
-        <p className="-mt-2 mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-          Neuestes Kapitel laut Serienseite: Kap. {work.latestChapter} (geprüft {formatRelative(work.latestChapterAt, new Date())})
-        </p>
-      ) : null}
+      <div className="mt-3 mb-6 flex items-start gap-5">
+        <CoverThumb src={coverSrc(work.id, detail.cover.version)} title={work.title} size="lg" />
+        <div className="min-w-0 pt-1">
+          <h1 className="text-2xl font-semibold tracking-tight break-words">{work.title}</h1>
+          <p className="mt-2 flex flex-wrap gap-2 text-sm">
+            <span className="rounded-full bg-zinc-200/70 px-2.5 py-0.5 dark:bg-zinc-800">{MEDIA_TYPE_LABELS[work.type]}</span>
+            <span className="rounded-full bg-zinc-200/70 px-2.5 py-0.5 dark:bg-zinc-800">{STATUS_LABELS[work.status]}</span>
+            <span className="rounded-full bg-teal-100 px-2.5 py-0.5 font-medium text-teal-900 tabular-nums dark:bg-teal-900/50 dark:text-teal-100">
+              {positionText(work)}
+            </span>
+          </p>
+          {unit === "chapter" && work.latestChapter !== null && work.latestChapterAt !== null && work.latestChapter >= Math.floor(work.chapter ?? 0) ? (
+            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+              Neuestes Kapitel laut Serienseite: Kap. {work.latestChapter} (geprüft {formatRelative(work.latestChapterAt, new Date())})
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <Section title="Bild">
+        <CoverEditor workId={work.id} hasCover={detail.cover.version !== null} siteAvailable={detail.cover.siteAvailable} />
+      </Section>
 
       <Section title="Titel und Typ">
         <ActionForm action={updateMetaAction} submitLabel="Speichern">

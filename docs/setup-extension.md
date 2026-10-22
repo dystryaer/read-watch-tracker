@@ -39,5 +39,5 @@ Optionen → **Verlauf der letzten 90 Tage durchsuchen**. Brave fragt nach Zugri
 ## Datenschutz
 
 - Keine festen Host-Berechtigungen: Zugriff gibt es nur auf freigeschaltete Seiten und deinen Tracker.
-- Gesendet werden nur Seitenname, Serie, Kapitel, URL und Zeitpunkt – nichts von anderen Seiten.
+- Gesendet werden nur Seitenname, Serie, Kapitel, URL, die Adresse des Vorschaubilds (Cover) und der Zeitpunkt – nichts von anderen Seiten. Das Cover lädt der Tracker einmal herunter und speichert es selbst; dein Browser lädt es danach nur noch vom Tracker.
 - Das Geräte-Token lässt sich im Tracker unter **Einstellungen → Gekoppelte Geräte** widerrufen; die Extension hört dann sofort auf zu tracken.

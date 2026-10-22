@@ -54,6 +54,7 @@ export async function resolvePendingMatch(
         externalTitle: pending.rawTitle,
         externalTitleNormalized: normalizeTitle(pending.rawTitle),
         seriesUrl: pending.seriesUrl,
+        coverUrl: pending.coverUrl,
       })
       // The key may have been linked meanwhile (e.g. by a concurrent event): the user's choice wins.
       .onConflictDoUpdate({ target: [workLinks.sourceId, workLinks.externalKey], set: { workId } });

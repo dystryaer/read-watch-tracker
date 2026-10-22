@@ -1,9 +1,16 @@
 "use server";
 
-import { cleanText, MAX_TEXT_LENGTH, MediaType, Position } from "@rwt/core";
+import { cleanText, MAX_TEXT_LENGTH, MAX_URL_LENGTH, MediaType, Position } from "@rwt/core";
 import {
+  CoverImageError,
+  downloadImage,
+  fillSiteCovers,
+  MAX_COVER_BYTES,
   MergeIncompatibleError,
   mergeWorks,
+  removeCover,
+  resetCover,
+  setCoverImage,
   setManualPosition,
   setWorkStatus,
   unlinkWork,
@@ -34,6 +41,18 @@ const PositionInput = z.object({
 const StatusInput = z.object({ workId: WorkId, status: z.enum(["reading", "completed", "dropped"]) });
 const UnlinkInput = z.object({ workId: WorkId, linkId: z.uuid() });
 const MergeInput = z.object({ workId: WorkId, intoId: WorkId, confirm: z.literal("on") });
+const CoverInput = z.object({ workId: WorkId });
+const CoverUrlInput = z.object({ workId: WorkId, url: z.string().trim().min(1).max(MAX_URL_LENGTH) });
+
+const COVER_ERRORS: Record<string, string> = {
+  invalid_url: "Bitte eine Bildadresse mit https:// angeben.",
+  blocked: "Diese Adresse ist nicht erlaubt: Bilder kommen nur von öffentlichen Servern.",
+  redirect: "Die Adresse leitet weiter. Bitte die Adresse des Bildes selbst nehmen (Rechtsklick → Bildadresse kopieren).",
+  status: "Der Server hat das Bild nicht herausgegeben.",
+  too_large: "Das Bild ist größer als 1 MB.",
+  not_image: "Das ist kein unterstütztes Bild (JPEG, PNG, WebP, GIF oder AVIF).",
+  network: "Der Server mit dem Bild war nicht erreichbar.",
+};
 
 const fields = (formData: FormData) => Object.fromEntries(formData.entries());
 const INVALID: FormState = { error: "Bitte die Eingaben prüfen." };
@@ -45,6 +64,7 @@ async function guarded(action: () => Promise<void>, message = "Gespeichert."): P
     if (error instanceof WorkNotFoundError) return { error: "Titel nicht gefunden." };
     if (error instanceof WorkPositionMismatchError) return { error: "Dieser Stand passt nicht zum Typ." };
     if (error instanceof MergeIncompatibleError) return { error: "Diese Titel lassen sich nicht zusammenführen." };
+    if (error instanceof CoverImageError) return { error: COVER_ERRORS[error.message] ?? COVER_ERRORS.not_image ?? "" };
     throw error;
   }
   refresh();
@@ -95,4 +115,43 @@ export async function mergeAction(_previous: FormState, formData: FormData): Pro
   const result = await guarded(() => mergeWorks(db, input.data.workId, input.data.intoId));
   if (result && "error" in result) return result;
   redirect(`/works/${input.data.intoId}`);
+}
+
+/** A picture from a file, the clipboard or drag and drop; the browser has made it small already. */
+export async function uploadCoverAction(_previous: FormState, formData: FormData): Promise<FormState> {
+  const db = await getAuthorizedDb();
+  const input = CoverInput.safeParse({ workId: formData.get("workId") });
+  const image = formData.get("image");
+  if (!input.success || !(image instanceof Blob) || image.size === 0) return { error: "Bitte ein Bild auswählen oder einfügen." };
+  if (image.size > MAX_COVER_BYTES) return { error: COVER_ERRORS.too_large ?? "" };
+  const bytes = new Uint8Array(await image.arrayBuffer());
+  return guarded(() => setCoverImage(db, input.data.workId, bytes), "Bild gespeichert.");
+}
+
+/** A picture from its address (e.g. "Bildadresse kopieren" on the reading site), downloaded once. */
+export async function coverFromUrlAction(_previous: FormState, formData: FormData): Promise<FormState> {
+  const db = await getAuthorizedDb();
+  const input = CoverUrlInput.safeParse(fields(formData));
+  if (!input.success) return { error: COVER_ERRORS.invalid_url ?? "" };
+  const result = await downloadImage(input.data.url);
+  if (!result.ok) return { error: COVER_ERRORS[result.reason] ?? "" };
+  return guarded(() => setCoverImage(db, input.data.workId, result.bytes, { sourceUrl: input.data.url }), "Bild gespeichert.");
+}
+
+export async function removeCoverAction(_previous: FormState, formData: FormData): Promise<FormState> {
+  const db = await getAuthorizedDb();
+  const input = CoverInput.safeParse(fields(formData));
+  if (!input.success) return INVALID;
+  return guarded(() => removeCover(db, input.data.workId), "Bild entfernt.");
+}
+
+/** Back to the picture the reading site names, e.g. after removing one added by hand. */
+export async function siteCoverAction(_previous: FormState, formData: FormData): Promise<FormState> {
+  const db = await getAuthorizedDb();
+  const input = CoverInput.safeParse(fields(formData));
+  if (!input.success) return INVALID;
+  await resetCover(db, input.data.workId);
+  const stored = await fillSiteCovers(db, downloadImage, { workId: input.data.workId });
+  refresh();
+  return stored > 0 ? { message: "Bild der Seite übernommen." } : { error: "Die Seite liefert gerade kein brauchbares Bild." };
 }

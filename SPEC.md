@@ -1,9 +1,10 @@
 # Spec: Read-Watch-Tracker
 
-> Status: **Freigegeben v0.3** · 2026-10-22
+> Status: **Freigegeben v0.4** · 2026-10-22
 > Grundlage: bestätigtes Intent-Statement aus dem Interview vom 2026-10-21
 > v0.2: Antworten auf die offenen Fragen eingearbeitet (iPhone, wechselnde Manga-Seiten, Netflix/Disney+, Kindle in %, Stack bestätigt, Kapitel-Regel ohne Zeitlimit)
 > v0.3: Datenbank und Web-App laufen lokal auf meinem Rechner statt bei Neon/Vercel (§2.3, §11, §17.11)
+> v0.4: Ein kleines Bild pro Werk – von der Lese-Seite oder selbst eingefügt, sonst eine Kachel (§4.2, §4.3, §5.1, §6.3, §7.3)
 
 ---
 
@@ -141,6 +142,7 @@ Der einzige Hauptbildschirm. Er beantwortet die Frage: *Wo stehe ich, und wie ko
 | **Sortierung** | `Zuletzt aktiv` (Standard; Titel ohne Aktivität stehen unten) · `Titel A–Z` |
 | **Suche** | Clientseitige Volltextsuche über Titel und Aliasse, normalisiert (Groß-/Kleinschreibung, Apostrophe, Satzzeichen egal). |
 | **Stand** | `Kap. 216`, `Kap. 105.5`, `S1 · F14`, `43 %`, oder `Kap. ?` (unbekannt, optisch hervorgehoben). |
+| **Bild** | Kleines Cover links in jeder Zeile. Es kommt vom Vorschaubild (`og:image`) der Lese-Seite, das die Extension mitschickt; der Server lädt es einmal herunter und speichert es in der Datenbank. Oder ich füge es auf der Detailseite selbst ein. Ohne Bild: farbige Kachel mit den Initialen des Titels. Der Browser lädt nie Bilder von fremden Servern. |
 | **Quelle** | Buchstaben-Badge + Domain bzw. Dienstname der *zuletzt genutzten* Quelle. Favicons werden bewusst nicht geladen, damit keine externen Requests entstehen. `– keine Seite` bei importierten Titeln ohne Sichtung. |
 | **[−][+]** | Inline-Stepper für Kapitel und Folgen. Speichert entprellt (500 ms) als manuelle Änderung. |
 | **Weiterlesen ›** | Öffnet das nächste Kapitel in einem neuen Tab (Regeln in §4.4). Fehlt, wenn keine URL bekannt ist. |
@@ -149,6 +151,7 @@ Der einzige Hauptbildschirm. Er beantwortet die Frage: *Wo stehe ich, und wie ko
 
 ### 4.3 Detailseite (`/works/[id]`)
 
+- **Bild:** großes Cover im Kopf. Ändern per Datei, Ziehen, Strg+V (Bild aus der Zwischenablage) oder Bildadresse; der Browser verkleinert Dateien vorher auf höchstens 300 × 450 px. „Bild entfernen“ zeigt wieder die Kachel und hält auch das Bild der Seite fern; „Bild der Seite verwenden“ holt es zurück.
 - Titel umbenennen, Typ ändern, Status setzen
 - Stand manuell setzen (auch rückwärts)
 - **Quellen-Links:** alle bestätigten Zuordnungen (Seite, externer Titel, Serien-URL), einzeln lösbar
@@ -280,8 +283,19 @@ Check-Constraint: Nur die zum `type` passenden Positionsspalten dürfen gesetzt 
 | `external_key` | text | stabiler Serienschlüssel auf der Quelle (§5.2) |
 | `external_title` | text | Titel, wie die Quelle ihn schreibt (auch Suchalias) |
 | `series_url` | text null | |
+| `cover_url` | text null | Vorschaubild der Lese-Seite (`og:image`), nur https; liegt oft auf einem anderen Host als die Seite |
 | `confirmed_at` | timestamptz | |
 | | | **unique (`source_id`, `external_key`)** |
+
+**`work_covers`**: ein kleines Bild pro Werk, in der Datenbank gespeichert
+
+| Spalte | Typ | Hinweis |
+|---|---|---|
+| `work_id` | uuid PK, FK → works | wird mit dem Werk gelöscht; beim Zusammenführen zieht das Bild mit, wenn das verbleibende Werk keins hat |
+| `kind` | `site` \| `upload` \| `removed` \| `unusable` | `site`: von der Lese-Seite, `upload`: selbst eingefügt (wird nie automatisch ersetzt), `removed`: bewusst ohne Bild, `unusable`: Download fehlgeschlagen oder Logo (gleiches Bild bei mehreren Serien); neuer Versuch nach 7 Tagen oder mit neuer Adresse |
+| `mime`, `image` | text, bytea null | nur bei `site`/`upload`; Typ aus den ersten Bytes (JPEG, PNG, WebP, GIF, AVIF; nie SVG), höchstens 1 MB |
+| `source_url` | text null | woher das Bild kam |
+| `updated_at` | timestamptz | Teil der Bild-URL (`/works/[id]/cover?v=…`), damit Browser das Bild ein Jahr cachen dürfen |
 
 **`events`**: append-only Protokoll aller Meldungen. Events werden nie gelöscht.
 
@@ -306,6 +320,7 @@ Check-Constraint: Nur die zum `type` passenden Positionsspalten dürfen gesetzt 
 | `source_id`, `external_key` | | unique, solange unerledigt |
 | `raw_title` | text | |
 | `media_type_hint` | media_type null | |
+| `series_url`, `cover_url` | text null | gehen bei der Bestätigung auf den neuen `work_links`-Eintrag über |
 | `candidates` | jsonb | `[{ "workId": "…", "score": 0.96 }]`, Top 3, Score ≥ 0.3 |
 | `event_count`, `first_seen_at`, `last_seen_at` | | |
 | `resolved_at` | timestamptz null | |
@@ -423,6 +438,7 @@ export const ProgressEvent = z.object({
     rawTitle: z.string().min(1),
     url: z.string().url().optional(),
     seriesUrl: z.string().url().optional(),
+    coverUrl: z.string().url().optional(),   // og:image der Seite (v0.4)
   }),
   position: Position,
   mediaTypeHint: MediaType.optional(),
@@ -496,6 +512,7 @@ Ein Feld der Seitenregel überschreibt jeweils nur den entsprechenden generische
 | Kapitelnummer | `chapterPattern` auf den Pfad | `/(?:chapter\|chap\|ch\|episode\|ep)[-_/ ]?(\d+(?:[.-]\d+)?)/i` auf den Pfad, Fallback auf `document.title` |
 | Serienschlüssel | `seriesPattern` auf den Pfad | Pfadsegment vor dem Kapitelsegment, ohne Hash-Suffix (§5.2) |
 | Titel | `titleSelector` | `og:title` → `h1` → `document.title`; „Chapter N“, Seitenname und Trenner werden entfernt |
+| Bild | – | `og:image:secure_url` → `og:image` → `twitter:image`, relativ zur Seite aufgelöst, nur https |
 
 - Liefert die Erkennung nichts, zeigt das Popup „Kein Kapitel erkannt – [Regel bearbeiten]“ und es wird nichts gesendet. Der Link öffnet die Seitenregel in der Web-App, vorbelegt mit der aktuellen URL als Testfall.
 - **Regel-Editor in der Web-App:** Felder wie oben, dazu ein Live-Test. Ich füge eine oder mehrere Beispiel-URLs ein, und der Editor zeigt, welche Kapitelnummer und welcher Serienschlüssel erkannt werden. Regex-Felder werden beim Speichern auf gültige Syntax geprüft.

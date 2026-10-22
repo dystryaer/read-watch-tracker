@@ -169,6 +169,40 @@ test("the stepper saves the chapter after quick clicks", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("a picture added on the detail page is stored small and shows up in the list", async ({ page, request }) => {
+  await login(page);
+  await page.goto("/");
+  await page.getByRole("link", { name: "Overgeared", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Overgeared" })).toBeVisible();
+
+  // A large picture as a phone or website would give it; the browser shrinks it before sending.
+  const png = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 900;
+    canvas.height = 1350;
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.fillStyle = "#0f766e";
+      context.fillRect(0, 0, 900, 1350);
+    }
+    return canvas.toDataURL("image/png").split(",")[1] ?? "";
+  });
+  await page.getByLabel("Datei auswählen").setInputFiles({ name: "cover.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
+  await expect(page.getByText("Bild gespeichert.")).toBeVisible();
+
+  const src = (await page.locator("main img").first().getAttribute("src")) ?? "";
+  expect(src).toMatch(/^\/works\/[0-9a-f-]+\/cover\?v=\d+$/);
+  const picture = await page.request.get(src);
+  expect(picture.headers()["content-type"]).toMatch(/^image\/(webp|jpeg)$/);
+  expect((await picture.body()).byteLength).toBeLessThan(30_000);
+  // Without a session there is no picture, only the way to the login.
+  expect((await request.get(src, { maxRedirects: 0 })).status()).toBe(307);
+
+  await page.goto("/");
+  const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Overgeared", exact: true }) });
+  await expect(row.locator("img")).toHaveAttribute("src", src);
+});
+
 test("an iPhone shortcut token is shown once and lets the shortcut save a shared book", async ({ page, request }) => {
   await login(page);
   await page.goto("/settings");

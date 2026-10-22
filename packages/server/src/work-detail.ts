@@ -1,6 +1,6 @@
 import { comparePositions, type MediaType, normalizeTitle, positionUnitFor } from "@rwt/core";
-import { type Db, devices, events, sources, workLinks, works } from "@rwt/db";
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { type Db, devices, events, sources, workCovers, workLinks, works } from "@rwt/db";
+import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { WorkNotFoundError } from "./manual";
 import { currentPosition, mediaTypesFor, positionColumns, type Work } from "./work-progress";
 
@@ -15,6 +15,14 @@ export class MergeIncompatibleError extends Error {
 
 export interface WorkDetail {
   work: Work;
+  cover: {
+    /** null: never had a picture (tile, until the site names one). */
+    kind: (typeof workCovers.$inferSelect)["kind"] | null;
+    /** Set when a picture is shown; part of its URL. */
+    version: number | null;
+    /** A reading page named a picture, so "Bild der Seite verwenden" can bring it (back). */
+    siteAvailable: boolean;
+  };
   links: {
     id: string;
     sourceName: string;
@@ -62,6 +70,16 @@ export async function getWorkDetail(db: Db, workId: string): Promise<WorkDetail 
     .where(eq(workLinks.workId, workId))
     .orderBy(sources.name);
 
+  const [cover] = await db
+    .select({ kind: workCovers.kind, updatedAt: workCovers.updatedAt })
+    .from(workCovers)
+    .where(eq(workCovers.workId, workId));
+  const [siteCover] = await db
+    .select({ id: workLinks.id })
+    .from(workLinks)
+    .where(and(eq(workLinks.workId, workId), isNotNull(workLinks.coverUrl)))
+    .limit(1);
+
   const history = await db
     .select({
       id: events.id,
@@ -85,7 +103,13 @@ export async function getWorkDetail(db: Db, workId: string): Promise<WorkDetail 
     .orderBy(desc(events.occurredAt))
     .limit(HISTORY_LIMIT);
 
-  return { work, links, events: history };
+  const shown = cover?.kind === "site" || cover?.kind === "upload";
+  return {
+    work,
+    cover: { kind: cover?.kind ?? null, version: shown ? cover.updatedAt.getTime() : null, siteAvailable: siteCover !== undefined },
+    links,
+    events: history,
+  };
 }
 
 /** Rename or retype a work; a type that counts progress differently clears the position. */
@@ -156,6 +180,15 @@ export async function mergeWorks(db: Db, fromId: string, intoId: string, now = n
         updatedAt: now,
       })
       .where(eq(works.id, intoId));
+    // The duplicate's picture moves over unless the remaining work has its own (or had it removed).
+    const [intoCover] = await tx.select({ kind: workCovers.kind }).from(workCovers).where(eq(workCovers.workId, intoId));
+    if (!intoCover || intoCover.kind === "unusable") {
+      await tx.delete(workCovers).where(eq(workCovers.workId, intoId));
+      await tx
+        .update(workCovers)
+        .set({ workId: intoId })
+        .where(and(eq(workCovers.workId, fromId), inArray(workCovers.kind, ["site", "upload"])));
+    }
     await tx.delete(works).where(eq(works.id, fromId));
   });
 }

@@ -21,6 +21,7 @@ function row(overrides: Partial<OverviewRow> = {}): OverviewRow {
     source: null,
     seriesUrl: null,
     aliases: [],
+    coverVersion: null,
     ...overrides,
   };
 }
@@ -32,6 +33,17 @@ const asura = {
   currentDomain: "asuracomic.net",
   nextUrlTemplate: null,
 };
+
+describe("toOverviewItem – picture", () => {
+  it("points to the stored picture, versioned so a new one is a new URL", () => {
+    const item = toOverviewItem(row({ id: "0b6c3c1e-7f43-4c5f-9a43-5d5fbb4f0c11", coverVersion: 1792600000000 }), NOW);
+    expect(item.cover).toBe("/works/0b6c3c1e-7f43-4c5f-9a43-5d5fbb4f0c11/cover?v=1792600000000");
+  });
+
+  it("has none without a stored picture (the row shows a tile)", () => {
+    expect(toOverviewItem(row(), NOW).cover).toBeNull();
+  });
+});
 
 describe("toOverviewItem – position", () => {
   it.each([

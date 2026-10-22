@@ -20,7 +20,7 @@ export default async function QuickUpdatePage() {
           Noch keine Light Novels oder E-Books.
         </p>
       ) : (
-        <QuickList items={items.map(({ id, title, typeLabel, stepper, percent }) => ({ id, title, typeLabel, stepper, percent }))} />
+        <QuickList items={items.map(({ id, title, typeLabel, cover, stepper, percent }) => ({ id, title, typeLabel, cover, stepper, percent }))} />
       )}
       <p className="mt-4 text-sm">
         <Link href="/" className="underline">

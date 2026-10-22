@@ -1,5 +1,5 @@
-import { type Db, pendingMatches, sourceDomains, sources, workLinks, works } from "@rwt/db";
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { type Db, pendingMatches, sourceDomains, sources, workCovers, workLinks, works } from "@rwt/db";
+import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
 
 type WorkColumns = Pick<
   typeof works.$inferSelect,
@@ -18,9 +18,11 @@ export interface OverviewRow extends WorkColumns {
   seriesUrl: string | null;
   /** Titles under which sources know the work; used by the search. */
   aliases: string[];
+  /** When the work's picture last changed (part of its URL, so browsers may cache it); null: tile. */
+  coverVersion: number | null;
 }
 
-/** Everything the core screen needs (SPEC §4), in three queries regardless of list size. */
+/** Everything the core screen needs (SPEC §4), in four queries regardless of list size. */
 export async function listOverview(db: Db): Promise<OverviewRow[]> {
   const rows = await db
     .select({
@@ -60,6 +62,12 @@ export async function listOverview(db: Db): Promise<OverviewRow[]> {
     .from(workLinks)
     // Newest first: after a key change (§5.3 step 4) the new link carries the current URL scheme.
     .orderBy(desc(workLinks.confirmedAt));
+  // Only the versions: the pictures themselves come one by one from /works/[id]/cover.
+  const covers = await db
+    .select({ workId: workCovers.workId, updatedAt: workCovers.updatedAt })
+    .from(workCovers)
+    .where(inArray(workCovers.kind, ["site", "upload"]));
+  const coverVersions = new Map(covers.map((cover) => [cover.workId, cover.updatedAt.getTime()]));
   const linksByWork = new Map<string, typeof links>();
   for (const link of links) {
     const list = linksByWork.get(link.workId);
@@ -75,6 +83,7 @@ export async function listOverview(db: Db): Promise<OverviewRow[]> {
       source: source ? { ...source, currentDomain } : null,
       seriesUrl: workLinksOf.find((link) => link.sourceId === lastSourceId && link.seriesUrl)?.seriesUrl ?? null,
       aliases: [...new Set(workLinksOf.map((link) => link.externalTitle))],
+      coverVersion: coverVersions.get(work.id) ?? null,
     };
   });
 }

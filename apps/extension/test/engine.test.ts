@@ -21,7 +21,33 @@ describe("detectChapter", () => {
       seriesKey: "solo-leveling",
       title: "Solo Leveling",
       seriesUrl: "https://reader.example/manga/solo-leveling",
+      coverUrl: null,
     });
+  });
+
+  it("takes the page's preview image as cover, also from another host", () => {
+    page('<meta property="og:image" content="https://cdn.example/thumbnails/Solo Leveling.webp">', "");
+    expect(detectChapter(document, URL_)?.coverUrl).toBe("https://cdn.example/thumbnails/Solo%20Leveling.webp");
+  });
+
+  it("prefers og:image:secure_url and resolves relative images against the page", () => {
+    page('<meta property="og:image" content="http://cdn.example/a.jpg"><meta property="og:image:secure_url" content="/covers/b.jpg">', "");
+    expect(detectChapter(document, URL_)?.coverUrl).toBe("https://reader.example/covers/b.jpg");
+  });
+
+  it("falls back to twitter:image", () => {
+    page('<meta name="twitter:image" content="https://cdn.example/c.png">', "");
+    expect(detectChapter(document, URL_)?.coverUrl).toBe("https://cdn.example/c.png");
+  });
+
+  it.each([
+    ["plain http", "http://cdn.example/a.jpg"],
+    ["a script link", "javascript:alert(1)"],
+    ["inline data", "data:image/png;base64,AAAA"],
+    ["an endless address", `https://cdn.example/${"a".repeat(3000)}.jpg`],
+  ])("ignores %s as cover", (_, content) => {
+    page(`<meta property="og:image" content="${content}">`, "");
+    expect(detectChapter(document, URL_)?.coverUrl).toBeNull();
   });
 
   it("prefers the rule's title selector", () => {

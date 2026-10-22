@@ -97,6 +97,13 @@ describe("router – reader script", () => {
     expect(outbox.flush).toHaveBeenCalled();
   });
 
+  it("passes the page's cover image on with the event", async () => {
+    const { route, queued } = await setup();
+    const coverUrl = "https://cdn.example/overgeared.webp";
+    await route({ type: "reader:chapter-read", url: chapterUrl, detection: { ...detection, coverUrl }, signal: "scroll" }, content());
+    expect(queued[0]?.source.coverUrl).toBe(coverUrl);
+  });
+
   it("uses the series key as title when the page had none", async () => {
     const { route, queued } = await setup();
     await route({ type: "reader:chapter-read", url: chapterUrl, detection: { ...detection, title: null }, signal: "end-visible" }, content());

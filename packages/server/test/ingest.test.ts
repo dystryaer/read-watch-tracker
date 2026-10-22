@@ -3,6 +3,7 @@ import { createTestDb, resetDb } from "@rwt/db/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ingestEvents } from "../src/ingest";
+import { resolvePendingMatch } from "../src/resolve";
 import { chapterEvent, seedLink, seedSource, seedWork } from "./helpers";
 
 let handle: DbHandle;
@@ -489,5 +490,39 @@ describe("ingestEvents – review fixes", () => {
 
     expect(result?.outcome).toBe("applied");
     expect((await workById(work.id))?.lastProgressAt).toEqual(recent);
+  });
+});
+
+describe("ingestEvents – cover pictures", () => {
+  const COVER = "https://cdn.example/thumbnails/overgeared.webp";
+
+  it("keeps the page's picture address on the link, also when a chapter is read again", async () => {
+    const { work } = await seedLinkedOvergeared({ chapter: 400 });
+
+    const [result] = await ingestEvents(handle.db, null, [chapterEvent({ chapter: 345, source: { coverUrl: COVER } })], NOW);
+
+    expect(result?.outcome).toBe("no_change");
+    const [link] = await handle.db.select().from(workLinks).where(eq(workLinks.workId, work.id));
+    expect(link?.coverUrl).toBe(COVER);
+  });
+
+  it("remembers it on the waiting card and hands it to the link on confirmation", async () => {
+    await seedSource(handle.db, { key: "site:asura" }, ["asuracomic.net"]);
+    await ingestEvents(handle.db, null, [chapterEvent({ source: { coverUrl: COVER } })], NOW);
+    const [pending] = await handle.db.select().from(pendingMatches);
+    if (!pending) throw new Error("no card");
+    expect(pending.coverUrl).toBe(COVER);
+
+    const { workId } = await resolvePendingMatch(handle.db, pending.id, { action: "new_work", type: "manhwa" }, NOW);
+
+    const [link] = await handle.db.select().from(workLinks).where(eq(workLinks.workId, workId ?? ""));
+    expect(link?.coverUrl).toBe(COVER);
+  });
+
+  it("ignores a picture address that is not https", async () => {
+    const { work } = await seedLinkedOvergeared();
+    await ingestEvents(handle.db, null, [chapterEvent({ source: { coverUrl: "http://cdn.example/a.jpg" } })], NOW);
+    const [link] = await handle.db.select().from(workLinks).where(eq(workLinks.workId, work.id));
+    expect(link?.coverUrl).toBeNull();
   });
 });
