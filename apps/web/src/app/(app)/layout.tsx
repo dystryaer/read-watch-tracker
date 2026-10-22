@@ -1,9 +1,10 @@
+import { countWorksWithNewChapters } from "@rwt/server";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/(auth)/actions";
 import { NavLinks } from "@/components/nav-links";
 import { RefreshOnReturn } from "@/components/refresh-on-return";
-import { requireSession } from "@/lib/auth";
+import { getAuthorizedDb } from "@/lib/dal";
 
 /** The app icon's open book, drawn with classes (the CSP allows no inline styles). */
 function BrandMark() {
@@ -18,7 +19,8 @@ function BrandMark() {
 }
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  await requireSession();
+  // The session check comes with the database; the count is one aggregate (SPEC §4.9).
+  const updates = await countWorksWithNewChapters(await getAuthorizedDb());
   return (
     <>
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/85 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/85">
@@ -32,7 +34,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             aria-label="Hauptnavigation"
             className="-mx-2.5 flex w-[calc(100%+1.25rem)] items-center gap-1 overflow-x-auto text-sm whitespace-nowrap [scrollbar-width:none] sm:w-auto"
           >
-            <NavLinks />
+            <NavLinks updates={updates} />
             <form action={signOutAction}>
               <button
                 type="submit"
