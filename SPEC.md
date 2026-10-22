@@ -29,6 +29,7 @@
 | U5 | Light Novels (WebNovel-App) und E-Books (Kindle) mit minimalem Aufwand aktualisieren | auch diese Quellen im selben Überblick sind |
 | U6 | meine Excel-Liste einmalig importieren | ich nicht bei null anfange |
 | U7 | fehlende Kapitelstände aus dem Brave-Verlauf rekonstruieren | möglichst viele „unbekannt“-Lücken verschwinden |
+| U8 | eine eigene Seite „Updates“ aus Covern, auf der Werke mit neuen Kapiteln markiert oben stehen und ein Klick aufs Cover das erste ungelesene Kapitel öffnet | ich sofort sehe und erreiche, wo es etwas Neues zu lesen gibt |
 
 ---
 
@@ -107,7 +108,7 @@
 
 ## 4. Core-Screen
 
-Der einzige Hauptbildschirm. Er beantwortet die Frage: *Wo stehe ich, und wie komme ich weiter?*
+Der Hauptbildschirm und die Startseite. Er beantwortet die Frage: *Wo stehe ich, und wie komme ich weiter?* Wo neue Kapitel warten, zeigt zusätzlich die eigene Seite „Updates“ (§4.9).
 
 ### 4.1 Layout (Desktop)
 
@@ -205,6 +206,20 @@ Eine eigene Seite, erreichbar über die Navigation. Sie beantwortet: *Wie viel h
 - **Gezählt wird der Fortschritt**, nicht die Zahl der Events: Für jedes übernommene Event (`outcome = applied`, auch manuelle Änderungen) zählt, wie weit es über den bisher höchsten Stand des Werks hinausgeht, also `max(0, floor(neu) − floor(bisher höchster))`. Ein Bibliotheks-Sync von Kap. 1200 auf 1204 zählt 4. Zurückkorrigieren, erneutes Lesen und die zweite Historie eines zusammengeführten Duplikats zählen 0. Das erste Event eines Werks zählt 1, damit ein importierter Stand (Kap. 1204 ohne Vorgeschichte) nicht als 1204 gelesene Kapitel erscheint. Folgen werden innerhalb derselben Staffel genauso gezählt; eine neue Staffel zählt 1, eine Korrektur auf eine frühere Staffel 0. E-Book-Prozente fließen nicht ein.
 - Grundlage ist das Event-Protokoll (append-only); es gibt keine eigene Statistik-Tabelle. Zeitzone für Wochen und Monate: `Europe/Berlin`.
 - Darstellung als Tabelle mit CSS-Balken, **ohne Chart-Bibliothek**. Die Zahlen stehen als Text in der Tabelle, die Balken sind nur Beiwerk (`aria-hidden`).
+
+### 4.9 Updates (`/updates`, U8)
+
+Eine eigene Seite mit eigenem Navigationseintrag „Updates“ (zwischen „Übersicht“ und „Schnell-Update“). Sie beantwortet: *Wo warten neue Kapitel?* Ausführlich in `docs/feature-updates/README.md`.
+
+- **Inhalt:** Manga, Manhwa und Manhua mit bekanntem Stand als Raster aus Covern (2:3; 3 Spalten bei 375 px, 6 im 1024-px-Container). Abgeschlossene und abgebrochene Werke sowie Light Novels erscheinen nur, wenn es bei ihnen neue Kapitel gibt. Werke mit `Kap. ?` erscheinen nie.
+- **Neu** heißt wie beim Badge (§4.2): `floor(latest_chapter) − floor(chapter) > 0`. Solche Werke stehen oben im Abschnitt „Neue Kapitel“, mit Ring und Badge „+N“ (Text, nicht nur Farbe); darunter alle übrigen („Ohne neue Kapitel“).
+- **Karte:** Titel immer sichtbar (höchstens 2 Zeilen), darunter der Stand („Kap. 344 von 348“), bei Light Novels und abgeschlossenen oder abgebrochenen Werken ein Hinweis darauf.
+- **Klick aufs Bild** (neuer Tab, `noopener noreferrer`): Gibt es neue Kapitel, das erste ungelesene (*n+1*), also dieselbe Adresse wie „Weiterlesen“ (§4.4). Gibt es keins, das neueste Kapitel, also das zuletzt gelesene (`last_url` auf der aktuellen Domain der Quelle). **Der Titel** führt zur Detailseite.
+- **Ohne bekannte Lese-Seite** (z. B. aus dem Excel-Import, nie in Brave gelesen): Das Werk erscheint ausgegraut, das Bild ist kein Link, darunter steht „keine Seite bekannt“. Der Titel führt weiter zur Detailseite.
+- **Reihenfolge:** `Zuletzt gelesen` (Standard; Werke ohne Aktivität unten) · `Meiste neue`. Dazu der Umschalter `Alle | Nur neue`. Beides clientseitig, ohne Server-Roundtrip.
+- **Kopfzeile:** Zahl der Werke mit neuen Kapiteln und der Kapitel zu lesen; „Serienseiten zuletzt geprüft vor …“ (jüngstes `latest_chapter_at`).
+- **Zähler in der Navigation:** „Updates 5“ = Zahl der **Werke** mit neuen Kapiteln, keine Zahl bei 0; für Screenreader „5 Werke mit neuen Kapiteln“. Eine Zählabfrage über `works` pro Seitenaufruf.
+- Bilder nur vom eigenen Server (`/works/[id]/cover`), lazy geladen und nicht verkleinert. Keine Migration, kein neuer Endpunkt; die Seite löst keine Prüfungen aus.
 
 ---
 
@@ -394,8 +409,8 @@ Basis-Pfad `/api/v1`. Alle Bodies sind JSON und werden mit zod validiert (Schema
 | `POST /pairing/poll` | – (`pollSecret`) | `{ status: pending \| approved \| expired, deviceToken? }`. Das Token wird genau einmal ausgeliefert. |
 | `POST /share` | Geräte-Token (`phone`) | Für den iOS-Kurzbefehl: `{ url?, text? }` → Server erkennt Quelle und Werk → `{ shareId, title?, unit?, current?, suggested?, needsMatch }` |
 | `POST /share/confirm` | Geräte-Token (`phone`) | `{ shareId, chapter? \| percent? }` (Zahl auch als Text mit Dezimalkomma) → der Server erzeugt das Event (inkl. UUID, weil Kurzbefehle keine erzeugen können) → `{ outcome, title, message }`. `message` ist die fertige Mitteilung für den Kurzbefehl. Ein Teilen gilt 15 min, einmal und nur für das Gerät, das es gestartet hat. Fehler der beiden Share-Endpunkte tragen ebenfalls ein `message` (z. B. bei widerrufenem Token; ein zweites Bestätigen antwortet `409 share_used`). Gefragt wird in der Einheit des verknüpften Werks, sonst in der der App. Ein `phone`-Token gilt nur für diese beiden Endpunkte. Der Titel eines unbekannten Buchs kommt aus einem Titel in Anführungszeichen, dem Slug des Links oder dem Text drumherum; ohne Titel bleibt der einer wartenden Karte. |
-| `GET /series-watch` | Geräte-Token (`extension`) | M4: Serien, deren Serienseite die Extension auf neue Kapitel prüfen darf (§7.11): Werke im Status `reading` mit Kapitel-Stand, verknüpft mit einer freigeschalteten Website-Quelle, deren `series_url` bekannt ist. Pro Werk genau eine Serienseite: die der zuletzt genutzten Quelle, sonst die zuletzt bestätigte. Die URL steht schon auf der aktuellen Domain der Quelle. Zuletzt gelesene Werke zuerst. Höchstens 500 Einträge `{ sourceKey, externalKey, seriesUrl, chapter }`. |
-| `POST /latest-chapters` | Geräte-Token (`extension`) | M4: `{ items: [{ sourceKey, externalKey, latestChapter }] }` (1–100). Der Server prüft jeden Eintrag einzeln und überspringt kaputte. Er setzt `latest_chapter` und `latest_chapter_at` nur an Werken, die `/series-watch` liefern würde (Status `reading`, freigeschaltete Website mit Serienseite). Unbekannte Serien werden ignoriert. Antwort `{ updated }`. Ein `extension`-Token kann damit die Liste der gelesenen Serien lesen. |
+| `GET /series-watch` | Geräte-Token (`extension`) | M4: Serien, deren Serienseite die Extension auf neue Kapitel prüfen darf (§7.11): Werke mit Kapitel-Stand (Status `reading`, `completed` oder `dropped`, §4.9), verknüpft mit einer freigeschalteten Website-Quelle, deren `series_url` bekannt ist. Pro Werk genau eine Serienseite: die der zuletzt genutzten Quelle, sonst die zuletzt bestätigte. Die URL steht schon auf der aktuellen Domain der Quelle. Werke im Status `reading` zuerst, dann die übrigen, jeweils zuletzt gelesene zuerst. Höchstens 500 Einträge `{ sourceKey, externalKey, seriesUrl, chapter }`. |
+| `POST /latest-chapters` | Geräte-Token (`extension`) | M4: `{ items: [{ sourceKey, externalKey, latestChapter }] }` (1–100). Der Server prüft jeden Eintrag einzeln und überspringt kaputte. Er setzt `latest_chapter` und `latest_chapter_at` nur an Werken, die `/series-watch` liefern würde (Kapitel-Stand bekannt, freigeschaltete Website mit Serienseite). Unbekannte Serien werden ignoriert. Antwort `{ updated }`. Ein `extension`-Token kann damit die Liste der gelesenen Serien lesen. |
 
 Interne Aktionen der Web-UI (Kopplung bestätigen, Zuordnung auflösen, Stand ändern, Werk zusammenführen, Gerät widerrufen, Seitenregeln bearbeiten, Domain-Umzug) laufen als Server Actions mit Session-Auth.
 
@@ -595,6 +610,7 @@ Outbox: 0 · zuletzt synchronisiert vor 1 min
 - **Nur freigeschaltete Seiten:** Geprüft wird nur, wofür die Extension bereits die Host-Berechtigung hat. Es kommen keine neuen Berechtigungen hinzu, und keine Seite bekommt Requests, die ich nicht freigeschaltet habe.
 - **Kein Umgehen von Bot-Schutz:** Der Abruf ist ein schlichter `GET` ohne Cookies (`credentials: "omit"`), ohne Referer, ohne geänderte Header und ohne JavaScript-Ausführung. Geprüft werden nur `https`-Seiten (`http` nur auf diesem Rechner). **Weiterleitungen werden nicht verfolgt** (`redirect: "manual"`): Sie könnten auf jeden Host zeigen, auch ins Heimnetz. Bei einem Status außer 200, bei einer Weiterleitung, bei Nicht-HTML, bei mehr als 2 MB oder bei einer erkennbaren Challenge-Seite (Cloudflare, Captcha) wird die Serie übersprungen und erst nach 7 Tagen wieder versucht.
 - **Auswertung ohne DOM:** Aus dem HTML werden die `href`s in Anführungszeichen gelesen (ohne `<base href>`; jeder Link einmal, nur Links mit Ziffer, höchstens 1 s Rechenzeit pro Seite), gegen die Serien-URL aufgelöst und mit `detectChapterFromUrl` samt Seitenregel geprüft. Das höchste Kapitel, dessen Serienschlüssel zum `externalKey` passt, ist das neueste. Seiten, die ihre Kapitelliste erst per JavaScript laden, liefern nichts; das wird hingenommen. Liegt das gefundene Kapitel unter meinem Stand (nur ein Teil der Liste, z. B. die ersten 50), wird nichts gemeldet.
+- **Auch abgeschlossene und abgebrochene Werke** werden geprüft, damit sie auf der Seite „Updates“ erscheinen, sobald ihre Serienseite neue Kapitel zeigt (§4.9). Sie stehen in der Liste nach den Werken im Status „Lese“; es gelten dieselben Grenzen (jede Serie höchstens einmal am Tag, höchstens 10 pro Stunde). Die Extension filtert nicht selbst nach Status. Für Light Novels gibt es noch keine eigene Quelle; sie bekommen ein neuestes Kapitel nur, wenn sie auf einer freigeschalteten Website mit Serienseite gelesen werden.
 - Die Ergebnisse gehen gesammelt an `POST /latest-chapters`. Sie ändern nie den Lesestand, nur `latest_chapter`. Nimmt der Tracker sie nicht an, merkt sich die Extension bis zu 100 Ergebnisse und schickt sie beim nächsten Lauf, ohne die Seiten erneut abzurufen.
 - **Robust gegen Abbrüche:** Eine Serie wird vor dem Abruf für einen Tag belegt; ein Abruf bricht nach 20 s ab. Wer offline ist, prüft nicht. Fällt die Verbindung mitten im Lauf weg, endet der Lauf, und die Serie bleibt ohne Wartezeit fällig. Eine Seite, die nicht antwortet, kommt am nächsten Tag wieder dran. Nie geprüfte Serien gehen vor; die 7-Tage-Pause gilt für die damals geprüfte URL, nach einem Domain-Umzug wird sofort neu geprüft.
 - Die Alarme werden nur angelegt, wenn sie fehlen: Der Service Worker startet bei jedem Aufwachen neu, ein erneutes Anlegen würde sie jedes Mal verschieben.

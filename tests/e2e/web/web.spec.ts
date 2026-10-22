@@ -324,6 +324,94 @@ test("the statistics count this week's chapters as text, with decorative bars", 
   await expect(page.getByRole("table", { name: "Pro Monat (letzte 12 Monate)" }).getByRole("row")).toHaveCount(13);
 });
 
+test("the updates page puts new chapters on top and opens the chapter to read in a new tab", async ({ page, request, baseURL }) => {
+  const auth = { authorization: `Bearer ${token}` };
+  // Nano Machine is read on the site with its series page; Arcane Sniper comes without any address.
+  const nano = chapterEvent("nano-machine", "Nano Machine", 332);
+  const sniper = chapterEvent("arcane-sniper", "Arcane Sniper", 95);
+  await postEvents(request, [
+    { ...nano, source: { ...nano.source, seriesUrl: "https://asuracomic.net/series/nano-machine" } },
+    { ...sniper, source: { ...sniper.source, url: undefined } },
+  ]);
+  await login(page);
+  await page.goto("/inbox");
+  for (const title of ["Nano Machine", "Arcane Sniper"]) {
+    const card = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: `„${title}“` }) });
+    await card.getByRole("radio", { name: /Neues Werk anlegen/ }).check();
+    await card.getByRole("button", { name: "Zuordnen" }).click();
+    await expect(page.getByRole("heading", { name: `„${title}“` })).toHaveCount(0);
+  }
+  const report = (latestChapter: number) =>
+    request.post("/api/v1/latest-chapters", { data: { items: [{ sourceKey: "site:asuracomic-net", externalKey: "nano-machine", latestChapter }] }, headers: auth });
+  expect(await (await report(332)).json()).toEqual({ updated: 1 });
+
+  const foreign: string[] = [];
+  page.on("request", (sent) => {
+    if (!sent.url().startsWith(`${baseURL}/`)) foreign.push(sent.url());
+  });
+  await page.goto("/");
+  // Overgeared has 3 new chapters (reported in the badge test above).
+  await page.getByRole("navigation").getByRole("link", { name: "Updates, 1 Werk mit neuen Kapiteln" }).click();
+  await expect(page.getByRole("heading", { name: "Updates", level: 1 })).toBeVisible();
+
+  const fresh = page.getByRole("list", { name: "Neue Kapitel", exact: true });
+  const overgeared = fresh.getByRole("link", { name: "Overgeared: Kapitel 349 lesen (3 neue Kapitel, öffnet neuen Tab)" });
+  await expect(overgeared).toHaveAttribute("href", "https://asuracomic.net/series/overgeared/chapter/349");
+  await expect(overgeared).toHaveAttribute("target", "_blank");
+  await expect(overgeared).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(fresh.getByText("+3")).toBeVisible();
+
+  const rest = page.getByRole("list", { name: "Ohne neue Kapitel" });
+  // Nothing new: the picture reopens the newest chapter, the one read last.
+  await expect(rest.getByRole("link", { name: "Nano Machine: zuletzt gelesenes Kapitel 332 öffnen (öffnet neuen Tab)" })).toHaveAttribute(
+    "href",
+    "https://asuracomic.net/series/nano-machine/chapter/332",
+  );
+  // No reading page known: shown greyed out with a hint, the picture is no link, the title is.
+  const noPage = rest.getByRole("listitem").filter({ hasText: "Arcane Sniper" });
+  await expect(noPage.getByText("keine Seite bekannt")).toBeVisible();
+  await expect(noPage.getByRole("link")).toHaveCount(1);
+  await expect(noPage.getByRole("link", { name: "Arcane Sniper, Details" })).toBeVisible();
+  // Light novels and e-books without news stay away.
+  await expect(page.getByText("Shadow Slave")).toHaveCount(0);
+  await expect(page.getByText("Project Hail Mary")).toHaveCount(0);
+
+  await page.getByRole("button", { name: /Nur neue/ }).click();
+  await expect(page.getByRole("list", { name: "Ohne neue Kapitel" })).toHaveCount(0);
+  await expect(page.getByText("Nano Machine")).toHaveCount(0);
+  expect(foreign).toEqual([]);
+
+  // A dropped work is checked further and comes up again once its page shows more.
+  await page.goto("/");
+  await page.getByRole("link", { name: "Nano Machine", exact: true }).click();
+  // The select sits in its label, so its name also carries the chosen status ("Status Lese").
+  await page.getByRole("combobox", { name: /^Status/ }).selectOption("dropped");
+  await page.getByRole("button", { name: "Status speichern" }).click();
+  await expect(page.getByText("Gespeichert.")).toBeVisible();
+  expect(await (await report(334)).json()).toEqual({ updated: 1 });
+
+  await page.goto("/updates");
+  await expect(page.getByRole("navigation").getByRole("link", { name: "Updates, 2 Werke mit neuen Kapiteln" })).toBeVisible();
+  const titles = () => page.getByRole("list", { name: "Neue Kapitel", exact: true }).getByRole("link", { name: /, Details$/ }).allTextContents();
+  // Last read first: Nano Machine was read after Overgeared.
+  expect(await titles()).toEqual(["Nano Machine", "Overgeared"]);
+  await expect(page.getByRole("list", { name: "Neue Kapitel", exact: true }).getByRole("listitem").filter({ hasText: "Nano Machine" }).getByText("Abgebrochen")).toBeVisible();
+  await page.getByLabel("Reihenfolge").selectOption("Meiste neue");
+  expect(await titles()).toEqual(["Overgeared", "Nano Machine"]);
+
+  await page.getByRole("link", { name: "Overgeared, Details" }).click();
+  await expect(page.getByRole("heading", { name: "Overgeared" })).toBeVisible();
+});
+
+test("the updates page fits a phone screen without horizontal scrolling", async ({ page }) => {
+  await login(page);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/updates");
+  await expect(page.getByRole("list", { name: "Neue Kapitel", exact: true }).getByRole("listitem")).toHaveCount(2);
+  const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
+  expect(widths.scroll).toBeLessThanOrEqual(widths.inner);
+});
+
 test("app pages reveal nothing without a session, even to crafted RSC requests", async ({ page, playwright, baseURL }) => {
   await login(page);
   await page.goto("/");
@@ -348,7 +436,7 @@ test("app pages reveal nothing without a session, even to crafted RSC requests",
     { RSC: "1", "Next-Router-Prefetch": "1", "Next-Router-Segment-Prefetch": "/_tree" },
     { RSC: "1", "Next-Router-Prefetch": "1", "Next-Router-Segment-Prefetch": "/(app)/settings/__PAGE__" },
   ];
-  for (const path of ["/", "/settings", "/inbox"]) {
+  for (const path of ["/", "/settings", "/inbox", "/updates"]) {
     for (const headers of variants) {
       const response = await anonymous.get(path, { headers, maxRedirects: 0 });
       const body = await response.text();

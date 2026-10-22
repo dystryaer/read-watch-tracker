@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Galerie – Klick-Mock</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    color-scheme: light dark;
+    --bg: #fafafa;
+    --header: rgba(255, 255, 255, 0.86);
+    --text: #18181b;
+    --muted: #52525b;
+    --subtle: #71717a;
+    --border: #e4e4e7;
+    --seg: rgba(228, 228, 231, 0.7);
+    --seg-on: #ffffff;
+    --field: #ffffff;
+    --field-border: #d4d4d8;
+    --accent: #0f766e;
+    --accent-strong: #115e59;
+    --accent-soft: #f0fdfa;
+    --ring: #0f766e;
+    --badge-bg: #0f766e;
+    --badge-text: #ffffff;
+    --unknown-bg: #fef3c7;
+    --unknown-text: #78350f;
+    --toast-bg: #18181b;
+    --toast-text: #fafafa;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.08);
+    --hairline: rgba(0, 0, 0, 0.06);
+    /* Tile tones, as in apps/web/src/components/cover-thumb.tsx (Tailwind 100/700) */
+    --t0-bg: #ffe4e6; --t0-fg: #be123c;
+    --t1-bg: #fef3c7; --t1-fg: #92400e;
+    --t2-bg: #ecfccb; --t2-fg: #3f6212;
+    --t3-bg: #d1fae5; --t3-fg: #047857;
+    --t4-bg: #cffafe; --t4-fg: #155e75;
+    --t5-bg: #e0f2fe; --t5-fg: #0369a1;
+    --t6-bg: #ede9fe; --t6-fg: #6d28d9;
+    --t7-bg: #fae8ff; --t7-fg: #a21caf;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #09090b;
+      --header: rgba(9, 9, 11, 0.86);
+      --text: #f4f4f5;
+      --muted: #a1a1aa;
+      --subtle: #a1a1aa;
+      --border: #27272a;
+      --seg: rgba(39, 39, 42, 0.7);
+      --seg-on: #09090b;
+      --field: #18181b;
+      --field-border: #3f3f46;
+      --accent: #5eead4;
+      --accent-strong: #99f6e4;
+      --accent-soft: #042f2e;
+      --ring: #2dd4bf;
+      --badge-bg: #5eead4;
+      --badge-text: #042f2e;
+      --unknown-bg: #451a03;
+      --unknown-text: #fde68a;
+      --toast-bg: #f4f4f5;
+      --toast-text: #18181b;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+      --hairline: rgba(255, 255, 255, 0.1);
+      /* Tailwind 950/300 */
+      --t0-bg: #4c0519; --t0-fg: #fda4af;
+      --t1-bg: #451a03; --t1-fg: #fcd34d;
+      --t2-bg: #1a2e05; --t2-fg: #bef264;
+      --t3-bg: #022c22; --t3-fg: #6ee7b7;
+      --t4-bg: #083344; --t4-fg: #67e8f9;
+      --t5-bg: #082f49; --t5-fg: #7dd3fc;
+      --t6-bg: #2e1065; --t6-fg: #c4b5fd;
+      --t7-bg: #4a044e; --t7-fg: #f0abfc;
+    }
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  .wrap { max-width: 1024px; margin: 0 auto; padding: 0 16px; }
+
+  /* App header (as in apps/web/src/app/(app)/layout.tsx) */
+  .app-header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--header);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .app-header .wrap {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px 16px; padding-top: 12px; padding-bottom: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; color: inherit; text-decoration: none; }
+  .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #0f766e; box-shadow: var(--shadow); }
+  .brand-mark span { display: flex; gap: 2px; }
+  .brand-mark i { display: block; width: 10px; height: 14px; background: #fff; }
+  .brand-mark i:first-child { border-radius: 2px 0 0 2px; }
+  .brand-mark i:last-child { border-radius: 0 2px 2px 0; }
+  .nav {
+    display: flex; align-items: center; gap: 4px; margin: 0 -10px;
+    width: calc(100% + 20px); overflow-x: auto; white-space: nowrap; font-size: 14px;
+    scrollbar-width: none;
+  }
+  @media (min-width: 640px) { .nav { width: auto; } }
+  .nav a { padding: 6px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; }
+  .nav a:hover { background: var(--seg); color: var(--text); }
+  .nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
+
+  /* Page head */
+  main.wrap { padding-top: 24px; padding-bottom: 48px; }
+  @media (max-width: 639px) { main.wrap { padding-top: 18px; } }
+  .head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+  h1 { margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: -0.02em; }
+  .summary { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+  .summary strong { color: var(--accent); font-weight: 650; }
+  .checked { margin: 2px 0 0; font-size: 13px; color: var(--subtle); }
+
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 14px; }
+  .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--seg); }
+  .seg button {
+    font: inherit; border: 0; background: transparent; color: var(--muted);
+    padding: 4px 12px; border-radius: 7px; cursor: pointer; min-height: 30px;
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] { background: var(--seg-on); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+  .seg .n { margin-left: 4px; font-variant-numeric: tabular-nums; color: var(--subtle); font-weight: 500; }
+  .seg button:focus-visible, select:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .sort { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  /* Phones: segment and select share one line; the label stays for screen readers. */
+  @media (max-width: 639px) {
+    .head { gap: 12px; }
+    .toolbar { flex-wrap: nowrap; justify-content: space-between; width: 100%; gap: 8px; }
+    .sort-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+    .seg button { padding: 4px 10px; }
+  }
+  select {
+    font: inherit; color: var(--text); background: var(--field);
+    border: 1px solid var(--field-border); border-radius: 6px; padding: 5px 8px; min-height: 32px;
+  }
+  .how { margin: 16px 0 0; font-size: 13px; color: var(--subtle); }
+
+  /* Sections */
+  section, details.unchecked { margin-top: 28px; }
+  h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px; font-size: 16px; line-height: 1.3; }
+  h2 .count {
+    font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+    padding: 1px 8px; border-radius: 999px; background: var(--seg); color: var(--muted);
+  }
+  #sec-new h2 .count { background: var(--badge-bg); color: var(--badge-text); }
+  details.unchecked summary { list-style: none; cursor: pointer; border-radius: 8px; }
+  details.unchecked summary::-webkit-details-marker { display: none; }
+  details.unchecked summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+  details.unchecked summary h2 { margin-bottom: 2px; }
+  details.unchecked summary h2::before {
+    content: ""; width: 8px; height: 8px; margin-right: 2px; align-self: center;
+    border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+    transform: rotate(-45deg); transition: transform 0.15s;
+  }
+  details.unchecked[open] summary h2::before { transform: rotate(45deg); }
+  .sum-hint { display: block; font-size: 13px; color: var(--subtle); padding-left: 18px; }
+  details.unchecked[open] .grid { margin-top: 14px; }
+
+  /* Grid: 3 columns on phones, 6 at the app's 1024 px container */
+  .grid {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 12px;
+  }
+  @media (min-width: 640px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px 16px; } }
+  @media (min-width: 768px) { .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+  @media (min-width: 1000px) { .grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 24px 20px; } }
+
+  .card { min-width: 0; }
+  .cover-link { position: relative; display: block; border-radius: 10px; color: inherit; text-decoration: none; }
+  .cover-link:focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
+  .cover {
+    position: relative; display: block; width: 100%; aspect-ratio: 2 / 3; overflow: hidden;
+    border-radius: 10px; box-shadow: var(--shadow), inset 0 0 0 1px var(--hairline);
+    transition: transform 0.15s ease;
+  }
+  .card.is-new .cover { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring), var(--shadow); }
+  @media (hover: hover) { .cover-link:hover .cover { transform: translateY(-2px); } }
+
+  /* Stand-in for a stored picture: gradient, a bust silhouette and a logo line */
+  .art {
+    background:
+      radial-gradient(ellipse 16% 10.7% at 50% 57%, rgba(0, 0, 0, 0.34) 0 98%, transparent 100%),
+      radial-gradient(ellipse 46% 26% at 50% 100%, rgba(0, 0, 0, 0.34) 0 98%, transparent 100%),
+      radial-gradient(120% 70% at 85% 0%, rgba(255, 255, 255, 0.38), transparent 55%),
+      linear-gradient(165deg, var(--a), var(--b));
+  }
+  .art::before {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.07) 0 2px, transparent 2px 13px);
+  }
+  .cover { container-type: inline-size; }
+  .art-logo {
+    position: absolute; left: 8%; right: 8%; top: 14%;
+    font-weight: 800; font-size: 8.6cqw; line-height: 1.08;
+    letter-spacing: 0.03em; text-transform: uppercase; color: #fff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55); overflow-wrap: break-word;
+  }
+
+  /* Tile for a work without a picture (initials, same tone every time) */
+  .tile { display: grid; place-items: center; user-select: none; }
+  .tile .ini { font-weight: 650; letter-spacing: 0.04em; font-size: 26cqw; }
+
+  .badge {
+    position: absolute; top: -7px; right: -7px; z-index: 2;
+    min-width: 30px; height: 26px; padding: 0 9px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--badge-bg); color: var(--badge-text);
+    font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 0 2px var(--bg), 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  .cta {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+    padding: 32px 9px 9px; border-radius: 0 0 10px 10px;
+    background: linear-gradient(to top, rgba(9, 9, 11, 0.88), rgba(9, 9, 11, 0));
+    color: #fff; font-size: 13px; font-weight: 650; line-height: 1.25;
+    opacity: 0; transform: translateY(4px); transition: opacity 0.15s ease, transform 0.15s ease;
+    pointer-events: none;
+  }
+  .cover-link:hover .cta, .cover-link:focus-visible .cta { opacity: 1; transform: none; }
+  @media (hover: none) { .cta { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .cover, .cta, details.unchecked summary h2::before { transition: none; } }
+
+  .title {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+    margin-top: 9px; min-height: 2.6em; font-size: 13px; line-height: 1.3; font-weight: 600;
+    color: var(--text); text-decoration: none; overflow-wrap: anywhere; border-radius: 3px;
+  }
+  .title:hover { color: var(--accent-strong); text-decoration: underline; }
+  .title:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .meta { margin: 2px 0 0; font-size: 12px; line-height: 1.35; color: var(--subtle); font-variant-numeric: tabular-nums; }
+  .unknown { display: inline-block; padding: 0 5px; border-radius: 4px; background: var(--unknown-bg); color: var(--unknown-text); font-weight: 600; }
+  .reason { display: block; font-size: 11.5px; color: var(--subtle); }
+
+  .empty { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+  .empty strong { display: block; color: var(--text); font-size: 15px; margin-bottom: 4px; }
+
+  .mock-note {
+    margin-top: 40px; padding: 10px 12px; border: 1px dashed var(--field-border); border-radius: 8px;
+    font-size: 12.5px; color: var(--subtle);
+  }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 20px; z-index: 20; transform: translate(-50%, 12px);
+    width: max-content; max-width: calc(100vw - 32px);
+    padding: 10px 14px; border-radius: 10px; background: var(--toast-bg); color: var(--toast-text);
+    font-size: 13px; line-height: 1.4; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    opacity: 0; transition: opacity 0.15s, transform 0.15s; pointer-events: none; overflow-wrap: anywhere;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast code { font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; opacity: 0.85; }
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="wrap">
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><span><i></i><i></i></span></span>Read-Watch-Tracker</a>
+    <nav class="nav" aria-label="Hauptnavigation">
+      <a href="#">Übersicht</a>
+      <a href="#" aria-current="page">Galerie</a>
+      <a href="#">Schnell-Update</a>
+      <a href="#">Statistik</a>
+      <a href="#">Einstellungen</a>
+      <a href="#">Abmelden</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="head">
+    <div>
+      <h1>Galerie</h1>
+      <p class="summary" id="summary"></p>
+      <p class="checked" title="Die Extension prüft jede Serienseite höchstens 1× am Tag, solange Brave läuft.">Serienseiten zuletzt geprüft vor 2 Std.</p>
+    </div>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Anzeige">
+        <button type="button" data-show="all" aria-pressed="true">Alle <span class="n" id="n-all"></span></button>
+        <button type="button" data-show="new" aria-pressed="false">Nur neue <span class="n" id="n-new"></span></button>
+      </div>
+      <label class="sort"><span class="sort-label">Reihenfolge</span>
+        <select id="sort">
+          <option value="recent">Zuletzt gelesen</option>
+          <option value="most">Meiste neue</option>
+          <option value="title">Titel A–Z</option>
+        </select>
+      </label>
+    </div>
+  </div>
+  <p class="how">Bild: weiterlesen im neuen Tab · Titel: Details</p>
+
+  <div id="sections"></div>
+
+  <p class="mock-note">Klick-Mock zu <code>docs/feature-cover-galerie/README.md</code> · Beispieldaten · Bilder sind Farbflächen,
+    Werke ohne Bild zeigen die Kachel mit Initialen · Klicks öffnen nichts, sie zeigen unten nur das Ziel.</p>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  // Example data. hoursAgo = last reading activity; latest = newest chapter on the series page (null: never reported).
+  // kind: "next" = chapter n+1 derivable, "last" = only the last read chapter, null = no chapter URL at all.
+  const WORKS = [
+    { id: "a1", title: "Overgeared", type: "Manhwa", chapter: 345, latest: 348, hoursAgo: 2, checked: "vor 3 Std.",
+      kind: "next", url: "https://asuracomic.net/series/overgeared/chapter/346", art: ["#1e3a8a", "#d97706"] },
+    { id: "a2", title: "Eleceed", type: "Manhwa", chapter: 421, latest: 423, hoursAgo: 26, checked: "vor 2 Std.",
+      kind: "next", url: "https://asuracomic.net/series/eleceed/chapter/422", art: ["#f59e0b", "#431407"] },
+    { id: "a3", title: "Swordmaster's Youngest Son", type: "Manhwa", chapter: 216, latest: 221, hoursAgo: 72, checked: "vor 5 Std.",
+      kind: "next", url: "https://asuracomic.net/series/swordmasters-youngest-son/chapter/217", art: ["#991b1b", "#0f172a"] },
+    { id: "a4", title: "Tales of Demons and Gods", type: "Manhua", chapter: 470.5, latest: 472, hoursAgo: 120, checked: "vor 9 Std.",
+      kind: "next", url: "https://demonicscans.org/title/tales-of-demons-and-gods/chapter/471", art: ["#5b21b6", "#0e7490"] },
+    { id: "a5", title: "One Piece", type: "Manga", chapter: 1130, latest: 1131, hoursAgo: 170, checked: "gestern",
+      kind: "next", url: "https://tcbonepiecechapters.com/one-piece-chapter-1131", art: ["#0284c7", "#b91c1c"] },
+
+    { id: "b1", title: "Nano Machine", type: "Manhwa", chapter: 332, latest: 332, hoursAgo: 5, checked: "vor 4 Std.",
+      kind: "next", url: "https://asuracomic.net/series/nano-machine/chapter/333", art: ["#064e3b", "#34d399"] },
+    { id: "b2", title: "Absolute Sword Sense", type: "Manhwa", chapter: 51, latest: 51, hoursAgo: 50, checked: "vor 6 Std.",
+      kind: "next", url: "https://asuracomic.net/series/absolute-sword-sense/chapter/52", art: ["#334155", "#7dd3fc"] },
+    { id: "b3", title: "Return of the Mount Hua Sect", type: "Manhwa", chapter: 142, latest: 142, hoursAgo: 100, checked: "vor 8 Std.",
+      kind: "next", url: "https://asuracomic.net/series/return-of-the-mount-hua-sect/chapter/143", art: ["#831843", "#f9a8d4"] },
+    { id: "b4", title: "The Greatest Estate Developer", type: "Manhwa", chapter: 186, latest: 186, hoursAgo: 150, checked: "gestern",
+      kind: "last", url: "https://flamecomics.xyz/series/2/7c41d09e", art: ["#3f6212", "#facc15"] },
+
+    { id: "c1", title: "Martial Peak", type: "Manhua", chapter: 3801, latest: null, hoursAgo: 300, reason: "noch nicht geprüft",
+      kind: "next", url: "https://demonicscans.org/title/martial-peak/chapter/3802", art: ["#b45309", "#450a0a"] },
+    { id: "c2", title: "Arcane Sniper", type: "Manhwa", chapter: 95, latest: null, hoursAgo: null, reason: "keine Serienseite",
+      kind: null, url: null, art: null },
+    { id: "c3", title: "Omniscient Reader's Viewpoint", type: "Manhwa", chapter: null, latest: null, hoursAgo: null, reason: "Stand unbekannt",
+      kind: null, url: null, art: null },
+    { id: "c4", title: "Ranker's Return", type: "Manhwa", chapter: null, latest: null, hoursAgo: null, reason: "Stand unbekannt",
+      kind: null, url: null, art: null },
+  ];
+
+  const state = { show: "all", sort: "recent" };
+
+  const newCount = (w) => (w.chapter === null || w.latest === null ? 0 : Math.max(0, Math.floor(w.latest) - Math.floor(w.chapter)));
+  const stateOf = (w) => (newCount(w) > 0 ? "new" : w.chapter !== null && w.latest !== null ? "current" : "unchecked");
+  const nextChapter = (w) => Math.floor(w.chapter) + 1;
+  const plural = (n, one, many) => (n === 1 ? one : many);
+
+  // As coverTile in apps/web/src/lib/cover.ts, but apostrophes are dropped first ("Ranker's Return" → "RR", not "RS").
+  function tile(title) {
+    const words = title.replace(/['’‘´`ʼ＇]/g, "").match(/[\p{L}\p{N}]+/gu) ?? [];
+    const initials = words.slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "?";
+    let hash = 0;
+    for (const ch of title) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+    return { initials, tone: hash % 8 };
+  }
+
+  const byTitle = (a, b) => a.title.localeCompare(b.title, "de", { sensitivity: "base" });
+  const byRecent = (a, b) => (a.hoursAgo ?? Infinity) - (b.hoursAgo ?? Infinity) || byTitle(a, b);
+  function sorted(list) {
+    if (state.sort === "title") return [...list].sort(byTitle);
+    if (state.sort === "most") return [...list].sort((a, b) => newCount(b) - newCount(a) || byRecent(a, b));
+    return [...list].sort(byRecent);
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  function card(w) {
+    const n = newCount(w);
+    const st = stateOf(w);
+    let label, cta;
+    if (w.kind === "next") {
+      label = `${w.title}: Kapitel ${nextChapter(w)} lesen` + (n ? ` (${n} ${plural(n, "neues Kapitel", "neue Kapitel")}, öffnet neuen Tab)` : " (öffnet neuen Tab)");
+      cta = `Kap. ${nextChapter(w)} lesen ↗`;
+    } else if (w.kind === "last") {
+      label = `${w.title}: zuletzt gelesenes Kapitel ${w.chapter} öffnen (öffnet neuen Tab)`;
+      cta = "Zuletzt gelesen ↗";
+    } else {
+      label = `${w.title}: Details öffnen (keine Kapitel-Adresse bekannt)`;
+      cta = "Details ›";
+    }
+    const tip = [w.type, w.hoursAgo === null ? "aus dem Import" : `zuletzt gelesen ${ago(w.hoursAgo)}`, w.checked ? `Serienseite geprüft ${w.checked}` : null]
+      .filter(Boolean).join(" · ");
+    let cover;
+    if (w.art) {
+      cover = `<span class="cover art" aria-hidden="true" style="--a:${w.art[0]};--b:${w.art[1]}"><span class="art-logo">${esc(w.title)}</span></span>`;
+    } else {
+      const t = tile(w.title);
+      cover = `<span class="cover tile" aria-hidden="true" style="background:var(--t${t.tone}-bg);color:var(--t${t.tone}-fg)"><span class="ini">${t.initials}</span></span>`;
+    }
+    const position = w.chapter === null
+      ? `<span class="unknown">Kap. ?</span><span class="sr-only"> (Stand unbekannt)</span>`
+      : `Kap. ${w.chapter}`;
+    const target = w.kind ? "_blank" : "_self";
+    return `<li class="card${st === "new" ? " is-new" : ""}">
+      <a class="cover-link" href="#" target="${target}" rel="noopener noreferrer" data-target="${esc(w.url ?? `/works/${w.id}`)}"
+         data-kind="${w.kind ?? "detail"}" aria-label="${esc(label)}" title="${esc(tip)}">
+        ${cover}
+        ${n ? `<span class="badge" aria-hidden="true">+${n}</span>` : ""}
+        <span class="cta" aria-hidden="true">${cta}</span>
+      </a>
+      <a class="title" href="#" data-target="/works/${w.id}" data-kind="detail">${esc(w.title)}<span class="sr-only">, Details</span></a>
+      <p class="meta">${position}${st === "unchecked" ? `<span class="reason">${w.reason}</span>` : ""}</p>
+    </li>`;
+  }
+
+  function ago(h) {
+    if (h < 24) return `vor ${h} Std.`;
+    if (h < 48) return "gestern";
+    const d = Math.round(h / 24);
+    return d < 7 ? `vor ${d} Tagen` : d < 14 ? "vor 1 Woche" : `vor ${Math.round(d / 7)} Wochen`;
+  }
+
+  function render() {
+    const groups = { new: [], current: [], unchecked: [] };
+    for (const w of WORKS) groups[stateOf(w)].push(w);
+    const total = groups.new.reduce((s, w) => s + newCount(w), 0);
+    document.getElementById("summary").innerHTML = groups.new.length
+      ? `<strong>${groups.new.length} ${plural(groups.new.length, "Werk", "Werke")} mit neuen Kapiteln</strong> · ${total} ${plural(total, "Kapitel", "Kapitel")} zu lesen`
+      : "Gerade nichts Neues";
+    document.getElementById("n-all").textContent = WORKS.length;
+    document.getElementById("n-new").textContent = groups.new.length;
+
+    const list = (items, label) => `<ul class="grid" aria-label="${label}">${sorted(items).map(card).join("")}</ul>`;
+    const wasOpen = document.querySelector("details.unchecked")?.open ?? false;
+    let html = `<section id="sec-new" aria-labelledby="h-new"><h2 id="h-new">Neue Kapitel <span class="count">${groups.new.length}</span></h2>`;
+    html += groups.new.length
+      ? list(groups.new, "Neue Kapitel")
+      : `<p class="empty"><strong>Gerade nichts Neues</strong>Die Extension prüft die Serienseiten einmal am Tag, solange Brave läuft.</p>`;
+    html += `</section>`;
+    if (state.show === "all") {
+      html += `<section aria-labelledby="h-cur"><h2 id="h-cur">Auf dem Stand <span class="count">${groups.current.length}</span></h2>${list(groups.current, "Auf dem Stand")}</section>`;
+      html += `<details class="unchecked"${wasOpen ? " open" : ""}><summary><h2>Nicht geprüft <span class="count">${groups.unchecked.length}</span></h2>
+        <span class="sum-hint">Stand unbekannt, keine Serienseite oder noch nicht geprüft – hier kann der Tracker nichts Neues erkennen.</span></summary>
+        ${list(groups.unchecked, "Nicht geprüft")}</details>`;
+    }
+    document.getElementById("sections").innerHTML = html;
+  }
+
+  let toastTimer;
+  function toast(html) {
+    const el = document.getElementById("toast");
+    el.innerHTML = html;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 4200);
+  }
+
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a[data-target]");
+    if (link) {
+      event.preventDefault();
+      const kind = link.dataset.kind;
+      const where = esc(link.dataset.target);
+      toast(kind === "detail"
+        ? `Öffnet die Detailseite im selben Tab: <code>${where}</code>`
+        : `Öffnet in neuem Tab (${kind === "next" ? "erstes ungelesenes Kapitel" : "zuletzt gelesenes Kapitel"}): <code>${where}</code>`);
+      return;
+    }
+    const seg = event.target.closest("button[data-show]");
+    if (seg) {
+      state.show = seg.dataset.show;
+      for (const b of document.querySelectorAll("button[data-show]")) b.setAttribute("aria-pressed", String(b === seg));
+      render();
+    }
+    if (event.target.closest(".app-header a")) event.preventDefault();
+  });
+  document.getElementById("sort").addEventListener("change", (event) => {
+    state.sort = event.target.value;
+    render();
+  });
+
+  render();
+</script>
+</body>
+</html>

@@ -148,7 +148,7 @@ export function toOverviewItem(row: OverviewRow, now: Date): OverviewItem {
   };
 }
 
-function newChapterCount(chapter: number | null, latest: number | null): number | null {
+export function newChapterCount(chapter: number | null, latest: number | null): number | null {
   if (chapter === null || latest === null) return null;
   const count = Math.floor(latest) - Math.floor(chapter);
   return count > 0 ? count : null;

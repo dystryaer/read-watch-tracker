@@ -199,3 +199,18 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T46 Bilder pro Werk + Feinschliff der Web-App** · M
   Akz.: Extension liest `og:image` (nur https) und sendet `source.coverUrl`; `work_links`/`pending_matches.cover_url`, Tabelle `work_covers` (Migration 0007); Server lädt Seitenbilder nach Events und Bestätigungen (geschützter Download, Logo-Erkennung, Fehler 7 Tage gemerkt); Detailseite: Datei, Ziehen, Strg+V, Bildadresse, entfernen, Bild der Seite; `/works/[id]/cover` nur mit Sitzung, versioniert und ein Jahr cachebar; Kacheln mit Initialen; Übersicht als Karte mit Bildern, Kopfzeile mit Marke und aktiver Navigation, Titel auf dem Handy zweizeilig; Bilder auch in Schnell-Update und Zuordnungen (Kachel)
   Geprüft: 1296 Unit/Integration-Tests, 30 E2E (neu: Upload, `og:image` im Event), Brave-Lauf mit demonicscans: Solo Leveling bekommt sein Cover nach dem Zuordnen
+
+---
+
+## Updates-Seite (`feat/updates-seite`)
+
+- [x] **T47 Seite „Updates“: wo neue Kapitel warten** · M · Abh. T43, T44, T46 · Entwurf und Entscheidungen: `docs/feature-updates/README.md`
+  - T47a SPEC: §4.9, U8, Satz in §4, §6.1, §7.11 (abgeschlossene und abgebrochene Werke)
+  - T47b server: `seriesToWatch`/`recordLatestChapters` auch für abgeschlossene und abgebrochene Werke, Lese-Werke zuerst; Integration (PGlite)
+  - T47c server: `countWorksWithNewChapters`, `lastSeriesCheck`; Integration (PGlite)
+  - T47d web: `lib/updates.ts` (Auswahl, Reihenfolge, Klickziel, Beschriftungen) und `lib/updates-page.ts` (Name, Pfad), TDD
+  - T47e web: `/updates` mit `UpdatesScreen`, `UpdateCard`, `UpdateCover` (2:3, lazy, nur eigener Server)
+  - T47f web: Navigationseintrag „Updates“ mit Zahl der Werke mit neuen Kapiteln
+  - T47g E2E: Klickziele, graue Karte ohne Lese-Seite, „Nur neue“, Reihenfolge, abgebrochenes Werk mit neuen Kapiteln, Zähler, nur eigener Origin, 375 px ohne Querscrollen; Screenshots hell/dunkel/Handy
+  Akz.: Manga/Manhwa/Manhua mit bekanntem Stand, neue Kapitel oben mit Ring und „+N“; abgeschlossen/abgebrochen/Light Novel nur mit neuen Kapiteln; nie `Kap. ?`; Bild öffnet *n+1* (wie „Weiterlesen“) bzw. ohne Neues das zuletzt gelesene Kapitel im neuen Tab, Titel → Detailseite; ohne Lese-Seite grau, kein Link, „keine Seite bekannt“; „Zuletzt gelesen“/„Meiste neue“, „Alle | Nur neue“; „Updates N“ in der Navigation (SPEC §4.9)
+  Offen: LCP/CLS mit 500 Werken messen; Brave-Lauf mit echter Extension für ein abgeschlossenes Werk
