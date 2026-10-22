@@ -1,5 +1,5 @@
 import { comparePositions, type MediaType, normalizeTitle, positionUnitFor } from "@rwt/core";
-import { type Db, devices, events, sources, workCovers, workLinks, works } from "@rwt/db";
+import { type Db, devices, events, sourceDomains, sources, workCovers, workLinks, works } from "@rwt/db";
 import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { WorkNotFoundError } from "./manual";
 import { currentPosition, mediaTypesFor, positionColumns, type Work } from "./work-progress";
@@ -32,6 +32,8 @@ export interface WorkDetail {
     seriesUrl: string | null;
     confirmedAt: Date;
   }[];
+  /** What the "Weiterlesen" button needs from the last used source (SPEC §4.4); null without one. */
+  lastSource: { nextUrlTemplate: string | null; currentDomain: string | null; seriesUrl: string | null } | null;
   events: {
     id: string;
     kind: (typeof events.$inferSelect)["kind"];
@@ -108,8 +110,27 @@ export async function getWorkDetail(db: Db, workId: string): Promise<WorkDetail 
     work,
     cover: { kind: cover?.kind ?? null, version: shown ? cover.updatedAt.getTime() : null, siteAvailable: siteCover !== undefined },
     links,
+    lastSource: work.lastSourceId ? await lastSourceOf(db, workId, work.lastSourceId) : null,
     events: history,
   };
+}
+
+/** Rule template, current domain and series page of the source last read on, as the overview has them. */
+async function lastSourceOf(db: Db, workId: string, sourceId: string): Promise<WorkDetail["lastSource"]> {
+  const [source] = await db
+    .select({ nextUrlTemplate: sources.ruleNextUrlTemplate, currentDomain: sourceDomains.domain })
+    .from(sources)
+    .leftJoin(sourceDomains, and(eq(sourceDomains.sourceId, sources.id), eq(sourceDomains.isCurrent, true)))
+    .where(eq(sources.id, sourceId));
+  if (!source) return null;
+  const [link] = await db
+    .select({ seriesUrl: workLinks.seriesUrl })
+    .from(workLinks)
+    .where(and(eq(workLinks.workId, workId), eq(workLinks.sourceId, sourceId), isNotNull(workLinks.seriesUrl)))
+    // Newest first, like the overview: after a key change the new link carries the current scheme.
+    .orderBy(desc(workLinks.confirmedAt))
+    .limit(1);
+  return { ...source, seriesUrl: link?.seriesUrl ?? null };
 }
 
 /** Rename or retype a work; a type that counts progress differently clears the position. */
