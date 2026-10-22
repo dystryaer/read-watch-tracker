@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vorschlag 4 · Was steht an?</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f6f6f7; --surface: #ffffff; --surface-2: #f4f4f5; --border: #e4e4e7; --border-strong: #d4d4d8;
+  --text: #18181b; --muted: #52525b; --faint: #71717a;
+  --accent: #0f766e; --accent-soft: #ccfbf1; --accent-soft-text: #134e4a; --accent-text: #115e59;
+  --warn: #d97706; --warn-soft: #fef3c7; --warn-text: #78350f; --warn-border: #fcd34d;
+  --track: #e4e4e7;
+  --shadow: 0 1px 2px rgb(0 0 0 / .05), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #09090b; --surface: #18181b; --surface-2: #27272a; --border: #27272a; --border-strong: #3f3f46;
+    --text: #f4f4f5; --muted: #a1a1aa; --faint: #a1a1aa;
+    --accent-soft: rgb(19 78 74 / .7); --accent-soft-text: #ccfbf1; --accent-text: #5eead4;
+    --warn: #fbbf24; --warn-soft: rgb(120 53 15 / .45); --warn-text: #fde68a; --warn-border: #92400e;
+    --track: #3f3f46;
+    --shadow: 0 1px 2px rgb(0 0 0 / .4);
+  }
+}
+.t-rose    { --c1:#ffe4e6; --c2:#fecdd3; --fg:#be123c; }
+.t-amber   { --c1:#fef3c7; --c2:#fde68a; --fg:#92400e; }
+.t-lime    { --c1:#ecfccb; --c2:#d9f99d; --fg:#3f6212; }
+.t-emerald { --c1:#d1fae5; --c2:#a7f3d0; --fg:#047857; }
+.t-cyan    { --c1:#cffafe; --c2:#a5f3fc; --fg:#155e75; }
+.t-sky     { --c1:#e0f2fe; --c2:#bae6fd; --fg:#0369a1; }
+.t-violet  { --c1:#ede9fe; --c2:#ddd6fe; --fg:#6d28d9; }
+.t-fuchsia { --c1:#fae8ff; --c2:#f5d0fe; --fg:#a21caf; }
+@media (prefers-color-scheme: dark) {
+  .t-rose    { --c1:#4c0519; --c2:#881337; --fg:#fda4af; }
+  .t-amber   { --c1:#451a03; --c2:#78350f; --fg:#fcd34d; }
+  .t-lime    { --c1:#1a2e05; --c2:#365314; --fg:#bef264; }
+  .t-emerald { --c1:#022c22; --c2:#064e3b; --fg:#6ee7b7; }
+  .t-cyan    { --c1:#083344; --c2:#164e63; --fg:#67e8f9; }
+  .t-sky     { --c1:#082f49; --c2:#0c4a6e; --fg:#7dd3fc; }
+  .t-violet  { --c1:#2e1065; --c2:#4c1d95; --fg:#c4b5fd; }
+  .t-fuchsia { --c1:#4a044e; --c2:#701a75; --fg:#f0abfc; }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 72rem; margin: 0 auto; padding: 0 16px; }
+.num { font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mocknote { background: repeating-linear-gradient(135deg, var(--surface-2) 0 10px, var(--bg) 10px 20px); border-bottom: 1px dashed var(--border-strong); font-size: 12px; color: var(--muted); text-align: center; padding: 4px 16px; }
+
+.top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+.top-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding-top: 12px; padding-bottom: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 18px; letter-spacing: -.01em; }
+.mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--accent); }
+.mark span { display: flex; gap: 2px; }
+.mark i { display: block; width: 10px; height: 14px; background: #fff; }
+.mark i:first-child { border-radius: 2px 0 0 2px; }
+.mark i:last-child { border-radius: 0 2px 2px 0; }
+.nav { display: flex; gap: 2px; font-size: 14px; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.nav a { padding: 6px 10px; border-radius: 6px; color: var(--muted); white-space: nowrap; }
+.nav a[aria-current] { background: var(--accent-soft); color: var(--accent-soft-text); font-weight: 500; }
+
+main.wrap { padding-top: 20px; padding-bottom: 48px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+.feed { min-width: 0; }
+
+/* Summary + filters */
+.hello { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.sum { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-size: 13px; box-shadow: var(--shadow); white-space: nowrap; }
+.sum b { font-weight: 700; }
+.sum .d { width: 8px; height: 8px; border-radius: 99px; background: var(--accent); }
+.sum .d.w { background: var(--warn); }
+.sum .d.g { background: var(--faint); }
+.sum.inbox { border-color: var(--warn-border); background: var(--warn-soft); color: var(--warn-text); font-weight: 600; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.search { flex: 1 1 220px; min-width: 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface); }
+.select { padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface); }
+
+/* Sections */
+.sec { margin-bottom: 22px; }
+.sec-h { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
+.sec-h h2 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+.sec-h .n { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-soft-text); }
+.sec-h .n.w { background: var(--warn-soft); color: var(--warn-text); }
+.sec-h .n.g { background: var(--surface-2); color: var(--muted); }
+.sec-h p { margin: 0 0 0 auto; font-size: 12px; color: var(--faint); white-space: nowrap; }
+
+.card { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 4px 14px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+.card + .card { margin-top: 8px; }
+.card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+.cv { grid-row: span 2; align-self: start; display: grid; place-items: center; width: 52px; aspect-ratio: 2 / 3; border-radius: 6px; background: radial-gradient(120% 80% at 20% 10%, var(--c1), var(--c2)); color: var(--fg); font-weight: 700; font-size: 15px; outline: 1px solid rgb(0 0 0 / .06); outline-offset: -1px; }
+.hd { min-width: 0; }
+.hd a { font-weight: 650; font-size: 16px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hd span { font-size: 13px; color: var(--muted); }
+.act { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.btn { display: inline-flex; align-items: center; padding: 7px 12px; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; font-size: 14px; white-space: nowrap; box-shadow: var(--shadow); }
+.ghost { display: inline-flex; align-items: center; padding: 6px 11px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 14px; white-space: nowrap; }
+.icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 18px; font-weight: 600; padding: 0; }
+.ex { grid-column: 2 / 4; min-width: 0; }
+.chaps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.chaps .rd { color: var(--faint); }
+.chaps .c { padding: 2px 9px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent-soft) 50%, var(--surface)); font-weight: 600; color: var(--accent-soft-text); }
+.chaps .c.next { background: var(--accent); color: #fff; border-color: var(--accent); }
+.chaps .when { color: var(--faint); margin-left: 4px; }
+
+/* Compact rows inside one card */
+.rows { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+.r { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 9px 14px; }
+.r + .r { border-top: 1px solid var(--border); }
+.r .cv { width: 34px; font-size: 11px; border-radius: 5px; }
+.r .hd a { font-size: 15px; }
+.r .hd span { font-size: 12px; color: var(--faint); }
+.st { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; }
+.st button { width: 26px; height: 26px; padding: 0; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface); line-height: 1; }
+.st span { min-width: 70px; text-align: center; font-weight: 600; }
+.bar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.track { width: 120px; height: 6px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.track i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.go { font-size: 14px; font-weight: 600; color: var(--accent-text); white-space: nowrap; padding: 5px 9px; border-radius: 7px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); }
+
+.fix { border-color: var(--warn-border); background: color-mix(in srgb, var(--warn-soft) 50%, var(--surface)); }
+.fix form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.fix input { width: 96px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--warn-border); background: var(--surface); }
+.q { background: #fde68a; color: #78350f; border-radius: 5px; padding: 0 6px; font-weight: 700; }
+.hd span.q { color: #78350f; }
+.idle .cv { filter: saturate(.5); opacity: .8; }
+details.done { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: var(--muted); }
+details.done summary { cursor: pointer; }
+
+/* Detail panel (desktop: side, phone: below) */
+.panel { position: sticky; top: 84px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.panel-tag { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); padding: 10px 16px 0; }
+.ph { padding: 12px 16px 16px; display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 14px; background: linear-gradient(180deg, color-mix(in srgb, var(--c2) 60%, transparent), transparent); }
+.ph .cv { width: 88px; font-size: 26px; grid-row: auto; border-radius: 8px; }
+.ph h2 { margin: 0 0 6px; font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; font-size: 12px; }
+.tags span { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--surface-2) 85%, var(--border)); }
+.tags .a { background: var(--accent-soft); color: var(--accent-soft-text); font-weight: 600; }
+.ph p { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.pa { padding: 0 16px 14px; display: grid; gap: 10px; }
+.pa .btn { justify-content: center; font-size: 15px; padding: 9px 12px; }
+.pa .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.pp { border-top: 1px solid var(--border); padding: 12px 16px; font-size: 14px; }
+.pp h3 { margin: 0 0 6px; font-size: 13px; }
+.pp ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.pp li { display: flex; justify-content: space-between; gap: 10px; min-width: 0; }
+.pp li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp .dim { color: var(--faint); white-space: nowrap; }
+.pp a.u { color: var(--accent-text); text-decoration: underline; }
+.mobile-note { display: none; }
+
+@media (max-width: 900px) {
+  main.wrap { grid-template-columns: minmax(0, 1fr); }
+  .panel { position: static; }
+  .mobile-note { display: block; margin: 0 0 8px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+}
+@media (max-width: 640px) {
+  body { font-size: 14px; }
+  .brand { font-size: 16px; }
+  .nav { width: 100%; margin: 0 -6px; }
+  .nav a { padding: 5px 7px; font-size: 13px; }
+  .sec-h p { display: none; }
+  .card { grid-template-columns: 44px minmax(0, 1fr); padding: 12px; gap: 6px 12px; }
+  .card .cv { width: 44px; }
+  .card .act { grid-column: 1 / 3; grid-row: 3; justify-content: stretch; }
+  .card .act:empty { display: none; }
+  .card .act .btn { flex: 1; justify-content: center; }
+  .card .ex { grid-column: 2; grid-row: 2; }
+  .card.fix .ex { grid-column: 1 / 3; grid-row: 3; }
+  .card.fix .cv { grid-row: 1 / 3; }
+  .r { grid-template-columns: 34px minmax(0, 1fr); padding: 10px 12px; row-gap: 6px; }
+  .r .cv { grid-row: 1 / 3; }
+  .r .act { grid-column: 2; justify-content: space-between; }
+  .r .bar { flex: 1; }
+  .r .bar .track { flex: 1; }
+  .panel-tag { display: none; }
+  .hd a { font-size: 15px; white-space: normal; }
+}
+</style>
+</head>
+<body>
+<div class="mocknote">Vorschlag 4 von 4 · <b>Was steht an?</b> · statischer Mock, Vorbild MangaDex „Updates“, Trakt „Start Watching“ und Goodreads „Currently Reading“</div>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#"><span class="mark"><span><i></i><i></i></span></span>Read-Watch-Tracker</a>
+    <nav class="nav" aria-label="Hauptnavigation">
+      <a href="#" aria-current="page">Übersicht</a><a href="#">Schnell-Update</a><a href="#">Statistik</a><a href="#">Einstellungen</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="feed">
+    <h1 class="sr">Übersicht</h1>
+    <div class="hello">
+      <a class="sum" href="#neu"><span class="d"></span><b>5</b> neue Kapitel</a>
+      <a class="sum" href="#weiter"><span class="d g"></span><b>5</b> unterwegs</a>
+      <a class="sum" href="#pruefen"><span class="d w"></span><b>1</b> Stand unbekannt</a>
+      <a class="sum inbox" href="#">1 Zuordnung offen →</a>
+    </div>
+    <div class="filters">
+      <input class="search" type="search" placeholder="Suche …" aria-label="Titel suchen">
+      <select class="select" aria-label="Medientyp"><option>Alle Typen</option><option>Manga/Manhwa/Manhua</option><option>Light Novels</option><option>E-Books</option><option>Serien/Anime</option></select>
+    </div>
+
+    <section class="sec" id="neu" aria-labelledby="h-neu">
+      <div class="sec-h"><h2 id="h-neu">Neue Kapitel</h2><span class="n">2</span><p>neueste Entdeckung zuerst</p></div>
+      <article class="card sel t-lime">
+        <span class="cv">O</span>
+        <div class="hd"><a href="#">Overgeared</a><span>Manhwa · demonicscans.org · gelesen bis Kap. 345</span></div>
+        <div class="act"><a class="btn" href="#">Kap. 346 lesen ›</a><button class="icon" aria-label="Kapitel 346 als gelesen">+</button></div>
+        <div class="ex"><div class="chaps num"><span class="c next">346</span><span class="c">347</span><span class="c">348</span><span class="when">entdeckt vor 1 Std.</span></div></div>
+      </article>
+      <article class="card t-fuchsia">
+        <span class="cv">E</span>
+        <div class="hd"><a href="#">Eleceed</a><span>Manhwa · asuracomic.net · gelesen bis Kap. 421</span></div>
+        <div class="act"><a class="btn" href="#">Kap. 422 lesen ›</a><button class="icon" aria-label="Kapitel 422 als gelesen">+</button></div>
+        <div class="ex"><div class="chaps num"><span class="c next">422</span><span class="c">423</span><span class="when">entdeckt vor 3 Std.</span></div></div>
+      </article>
+    </section>
+
+    <section class="sec" id="weiter" aria-labelledby="h-weiter">
+      <div class="sec-h"><h2 id="h-weiter">Weiterlesen</h2><span class="n g">5</span><p>zuletzt aktiv zuerst</p></div>
+      <div class="rows">
+        <div class="r t-cyan"><span class="cv">F</span>
+          <div class="hd"><a href="#">Frieren</a><span>Anime · Crunchyroll · gestern</span></div>
+          <div class="act"><span class="st num"><button aria-label="zurück">−</button><span>S1 · F14</span><button aria-label="weiter">+</button></span><a class="go" href="#">Öffnen ›</a></div></div>
+        <div class="r t-emerald"><span class="cv">NM</span>
+          <div class="hd"><a href="#">Nano Machine</a><span>Manhwa · asuracomic.net · gestern</span></div>
+          <div class="act"><span class="st num"><button aria-label="zurück">−</button><span>Kap. 332</span><button aria-label="weiter">+</button></span><a class="go" href="#">Weiter ›</a></div></div>
+        <div class="r t-violet"><span class="cv">SS</span>
+          <div class="hd"><a href="#">Shadow Slave</a><span>Light Novel · WebNovel · vor 3 Tagen</span></div>
+          <div class="act"><span class="st num"><button aria-label="zurück">−</button><span>Kap. 1204</span><button aria-label="weiter">+</button></span><a class="go" href="#">Weiter ›</a></div></div>
+        <div class="r t-amber"><span class="cv">AS</span>
+          <div class="hd"><a href="#">Absolute Sword Sense</a><span>Manhwa · demonicscans.org · vor 4 Tagen</span></div>
+          <div class="act"><span class="st num"><button aria-label="zurück">−</button><span>Kap. 51</span><button aria-label="weiter">+</button></span><a class="go" href="#">Weiter ›</a></div></div>
+        <div class="r t-rose"><span class="cv">PH</span>
+          <div class="hd"><a href="#">Project Hail Mary</a><span>E-Book · Kindle · vor 5 Tagen</span></div>
+          <div class="act"><span class="bar num"><span class="track"><i style="width:43%"></i></span>43 %</span></div></div>
+      </div>
+    </section>
+
+    <section class="sec" id="pruefen" aria-labelledby="h-pruefen">
+      <div class="sec-h"><h2 id="h-pruefen">Stand prüfen</h2><span class="n w">1</span><p>aus dem Excel-Import ohne Kapitel</p></div>
+      <article class="card fix t-fuchsia">
+        <span class="cv">OR</span>
+        <div class="hd"><a href="#">Omniscient Reader's Viewpoint</a><span>Manhwa · keine Seite · Import · <span class="q num">Kap. ?</span></span></div>
+        <div class="act"></div>
+        <div class="ex"><form><label>Gelesen bis Kap. <input type="number" inputmode="decimal" placeholder="z. B. 180"></label><button class="ghost" type="button">Speichern</button></form></div>
+      </article>
+    </section>
+
+    <section class="sec" aria-labelledby="h-ruht">
+      <div class="sec-h"><h2 id="h-ruht">Ruht seit dem Import</h2><span class="n g">1</span><p>noch keine Seite zugeordnet</p></div>
+      <div class="rows idle">
+        <div class="r t-lime"><span class="cv">AS</span>
+          <div class="hd"><a href="#">Arcane Sniper</a><span>Manhwa · Kap. 95 · keine Seite</span></div>
+          <div class="act"><button class="ghost" type="button">Abbrechen</button></div></div>
+      </div>
+    </section>
+
+    <details class="done"><summary>Abgeschlossen · 1 Titel (Solo Leveling, Kap. 200)</summary></details>
+  </div>
+
+  <aside class="panel t-lime" aria-label="Detailseite, Ausschnitt">
+    <p class="mobile-note" style="padding:12px 16px 0;margin:0">Detailseite · Ausschnitt</p>
+    <div class="panel-tag">Ausgewählt</div>
+    <div class="ph">
+      <span class="cv">O</span>
+      <div>
+        <h2>Overgeared</h2>
+        <div class="tags"><span>Manhwa</span><span>Lese</span><span class="a num">Kap. 345</span></div>
+        <p>Neuestes Kapitel laut Serienseite: <b class="num">Kap. 348</b> (geprüft vor 1 Std.)</p>
+      </div>
+    </div>
+    <div class="pa">
+      <a class="btn" href="#">Weiterlesen · Kap. 346 ›</a>
+      <div class="row"><span>Stand</span><span class="st num"><button aria-label="zurück">−</button><span>Kap. 345</span><button aria-label="weiter">+</button></span></div>
+    </div>
+    <div class="pp">
+      <h3>Quellen</h3>
+      <ul><li><span>demonicscans.org · „Overgeared“</span><a class="u" href="#">Serienseite</a></li></ul>
+    </div>
+    <div class="pp">
+      <h3>Verlauf</h3>
+      <ul>
+        <li><span>Kap. 345 · Brave</span><span class="dim">vor 5 Std.</span></li>
+        <li><span>Kap. 344 · Brave</span><span class="dim">vor 5 Std.</span></li>
+        <li><span>Kap. 343 · Brave</span><span class="dim">gestern</span></li>
+      </ul>
+    </div>
+    <div class="pp"><a class="u" href="#">Ganze Detailseite öffnen →</a></div>
+  </aside>
+</main>
+</body>
+</html>

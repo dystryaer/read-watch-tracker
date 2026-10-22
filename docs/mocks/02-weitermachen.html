@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vorschlag 2 · Weitermachen-Leiste</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f4f4f5; --border: #e4e4e7; --border-strong: #d4d4d8;
+  --text: #18181b; --muted: #52525b; --faint: #71717a;
+  --accent: #0f766e; --accent-soft: #ccfbf1; --accent-soft-text: #134e4a; --accent-text: #115e59;
+  --warn-soft: #fef3c7; --warn-text: #78350f; --warn-border: #fcd34d;
+  --track: #e4e4e7;
+  --shadow: 0 1px 2px rgb(0 0 0 / .05), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #09090b; --surface: #18181b; --surface-2: #27272a; --border: #27272a; --border-strong: #3f3f46;
+    --text: #f4f4f5; --muted: #a1a1aa; --faint: #a1a1aa;
+    --accent-soft: rgb(19 78 74 / .7); --accent-soft-text: #ccfbf1; --accent-text: #5eead4;
+    --warn-soft: rgb(120 53 15 / .45); --warn-text: #fde68a; --warn-border: #92400e;
+    --track: #3f3f46;
+    --shadow: 0 1px 2px rgb(0 0 0 / .4);
+  }
+}
+.t-rose    { --c1:#ffe4e6; --c2:#fecdd3; --fg:#be123c; }
+.t-amber   { --c1:#fef3c7; --c2:#fde68a; --fg:#92400e; }
+.t-lime    { --c1:#ecfccb; --c2:#d9f99d; --fg:#3f6212; }
+.t-emerald { --c1:#d1fae5; --c2:#a7f3d0; --fg:#047857; }
+.t-cyan    { --c1:#cffafe; --c2:#a5f3fc; --fg:#155e75; }
+.t-sky     { --c1:#e0f2fe; --c2:#bae6fd; --fg:#0369a1; }
+.t-violet  { --c1:#ede9fe; --c2:#ddd6fe; --fg:#6d28d9; }
+.t-fuchsia { --c1:#fae8ff; --c2:#f5d0fe; --fg:#a21caf; }
+@media (prefers-color-scheme: dark) {
+  .t-rose    { --c1:#4c0519; --c2:#881337; --fg:#fda4af; }
+  .t-amber   { --c1:#451a03; --c2:#78350f; --fg:#fcd34d; }
+  .t-lime    { --c1:#1a2e05; --c2:#365314; --fg:#bef264; }
+  .t-emerald { --c1:#022c22; --c2:#064e3b; --fg:#6ee7b7; }
+  .t-cyan    { --c1:#083344; --c2:#164e63; --fg:#67e8f9; }
+  .t-sky     { --c1:#082f49; --c2:#0c4a6e; --fg:#7dd3fc; }
+  .t-violet  { --c1:#2e1065; --c2:#4c1d95; --fg:#c4b5fd; }
+  .t-fuchsia { --c1:#4a044e; --c2:#701a75; --fg:#f0abfc; }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 64rem; margin: 0 auto; padding: 0 16px; }
+.num { font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mocknote { background: repeating-linear-gradient(135deg, var(--surface-2) 0 10px, var(--bg) 10px 20px); border-bottom: 1px dashed var(--border-strong); font-size: 12px; color: var(--muted); text-align: center; padding: 4px 16px; }
+
+.top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+.top-in { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 20px; padding-top: 12px; padding-bottom: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 18px; letter-spacing: -.01em; white-space: nowrap; }
+.mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--accent); }
+.mark span { display: flex; gap: 2px; }
+.mark i { display: block; width: 10px; height: 14px; background: #fff; }
+.mark i:first-child { border-radius: 2px 0 0 2px; }
+.mark i:last-child { border-radius: 0 2px 2px 0; }
+.hsearch { width: 100%; max-width: 360px; justify-self: end; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); }
+.nav { display: flex; gap: 2px; font-size: 14px; overflow-x: auto; scrollbar-width: none; }
+.nav a { padding: 6px 10px; border-radius: 6px; color: var(--muted); white-space: nowrap; }
+.nav a[aria-current] { background: var(--accent-soft); color: var(--accent-soft-text); font-weight: 500; }
+
+main.wrap { padding-top: 20px; padding-bottom: 48px; }
+.banner { display: flex; justify-content: space-between; gap: 12px; align-items: center; background: var(--warn-soft); border: 1px solid var(--warn-border); color: var(--warn-text); border-radius: 8px; padding: 10px 14px; font-size: 14px; margin-bottom: 20px; }
+.banner a { font-weight: 600; text-decoration: underline; white-space: nowrap; }
+
+.sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 10px; }
+.sec-h h2 { margin: 0; font-size: 20px; letter-spacing: -.01em; }
+.sec-h p { margin: 0; font-size: 13px; color: var(--faint); }
+.arrows { display: inline-flex; gap: 6px; }
+.arrows button { width: 30px; height: 30px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 16px; line-height: 1; }
+
+/* The shelf row: scrolls inside itself, never the page */
+.rail { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 2px 12px; margin: 0 -2px; list-style: none; scrollbar-width: thin; }
+.rail > li { flex: 0 0 304px; scroll-snap-align: start; min-width: 0; }
+.next { position: relative; display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 14px; height: 100%; padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: linear-gradient(135deg, color-mix(in srgb, var(--c2) 75%, var(--surface)) 0%, var(--surface) 62%); box-shadow: var(--shadow); }
+.poster { position: relative; display: grid; place-items: center; width: 76px; aspect-ratio: 2 / 3; border-radius: 8px; background: radial-gradient(120% 80% at 20% 10%, var(--c1), var(--c2)); color: var(--fg); font-weight: 700; font-size: 22px; box-shadow: var(--shadow); outline: 1px solid rgb(0 0 0 / .06); outline-offset: -1px; }
+.ribbon { position: absolute; top: 10px; right: 10px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: #fff; }
+.body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.kicker { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 54px; }
+.ttl { font-weight: 650; font-size: 16px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.was { font-size: 13px; color: var(--muted); }
+.prog { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--faint); margin-top: 2px; }
+.track { flex: 1; height: 5px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.track i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.cta { display: flex; gap: 6px; margin-top: auto; padding-top: 8px; }
+.btn { flex: 1; display: inline-flex; justify-content: center; align-items: center; padding: 7px 10px; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; font-size: 14px; white-space: nowrap; box-shadow: var(--shadow); }
+.icon { flex: none; width: 34px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 18px; font-weight: 600; }
+
+.check { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 18px 0 30px; padding: 10px 14px; border-radius: 10px; border: 1px dashed var(--warn-border); background: color-mix(in srgb, var(--warn-soft) 55%, var(--surface)); font-size: 14px; }
+.check b { font-weight: 600; }
+.check .q { background: #fde68a; color: #78350f; border-radius: 5px; padding: 0 6px; font-weight: 600; }
+.check a { margin-left: auto; font-weight: 600; color: var(--warn-text); text-decoration: underline; white-space: nowrap; }
+
+/* Full list */
+.listbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px; font-size: 14px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 80%, var(--border)); }
+.seg button { border: 0; background: none; padding: 4px 11px; border-radius: 7px; font-size: 14px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: var(--shadow); }
+.listbar .br { flex-basis: 100%; height: 0; }
+.listbar label { display: inline-flex; align-items: center; gap: 6px; }
+.select { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 14px; }
+.chk { width: 16px; height: 16px; accent-color: var(--accent); }
+.list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.list li { display: grid; grid-template-columns: 32px minmax(0, 1fr) 9rem 10rem 6.5rem 5.5rem; align-items: center; gap: 4px 14px; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 14px; }
+.list li:first-child { border-top: 0; }
+.thumb { display: grid; place-items: center; width: 32px; height: 45px; border-radius: 5px; background: radial-gradient(120% 80% at 20% 10%, var(--c1), var(--c2)); color: var(--fg); font-size: 11px; font-weight: 700; }
+.t { min-width: 0; }
+.t a { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t span { font-size: 12px; color: var(--faint); }
+.new { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-soft-text); }
+.pos { display: inline-flex; align-items: center; gap: 6px; }
+.pos button { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface); line-height: 1; font-size: 14px; }
+.pos span { min-width: 64px; text-align: center; }
+.pos .q { background: #fde68a; color: #78350f; border-radius: 5px; font-weight: 600; padding: 1px 6px; min-width: 0; }
+.src { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--muted); }
+.src i { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--surface-2); outline: 1px solid var(--border); font-style: normal; font-size: 10px; font-weight: 700; }
+.src span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.src.none { color: var(--faint); }
+.when { color: var(--faint); white-space: nowrap; }
+.go { justify-self: end; font-size: 13px; font-weight: 600; color: var(--accent-text); white-space: nowrap; padding: 4px 8px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.count { margin: 0; font-size: 13px; color: var(--faint); }
+
+@media (max-width: 640px) {
+  body { font-size: 14px; }
+  .top-in { grid-template-columns: minmax(0, 1fr); }
+  .brand { font-size: 16px; }
+  .hsearch { max-width: none; grid-row: 3; }
+  .nav { margin: 0 -6px; }
+  .nav a { padding: 5px 7px; font-size: 13px; }
+  .sec-h h2 { font-size: 18px; }
+  .arrows { display: none; }
+  .rail { gap: 10px; }
+  .rail > li { flex-basis: 84%; }
+  .check a { margin-left: 0; }
+  .seg button { padding: 4px 9px; font-size: 13px; }
+  .list li { grid-template-columns: 32px minmax(0, 1fr) auto; padding: 10px 12px; gap: 6px 12px; }
+  .list .thumb { grid-row: span 2; align-self: start; }
+  .list .t { grid-column: 2 / 4; }
+  .list .pos { grid-column: 2; }
+  .list .src, .list .when { display: none; }
+  .list .meta-m { display: inline; }
+  .go { grid-column: 3; grid-row: 2; }
+}
+.meta-m { display: none; }
+</style>
+</head>
+<body>
+<div class="mocknote">Vorschlag 2 von 4 · <b>Weitermachen-Leiste</b> · statischer Mock, Vorbild Netflix/Plex „Weiterschauen“ und Trakt „Continue Watching“</div>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#"><span class="mark"><span><i></i><i></i></span></span>Read-Watch-Tracker</a>
+    <input class="hsearch" type="search" placeholder="Suche in allen Titeln …" aria-label="Titel suchen">
+    <nav class="nav" aria-label="Hauptnavigation">
+      <a href="#" aria-current="page">Übersicht</a><a href="#">Schnell-Update</a><a href="#">Statistik</a><a href="#">Einstellungen</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1 class="sr">Übersicht</h1>
+  <div class="banner" role="status"><span>1 neue Zuordnung wartet auf Bestätigung</span><a href="#">Prüfen →</a></div>
+
+  <section aria-labelledby="h-next">
+    <div class="sec-h">
+      <div><h2 id="h-next">Weitermachen</h2><p>Neue Kapitel zuerst, dann zuletzt aktiv · ein Klick öffnet das nächste Kapitel</p></div>
+      <span class="arrows"><button aria-label="Zurück">‹</button><button aria-label="Weiter">›</button></span>
+    </div>
+    <ul class="rail" aria-label="Weitermachen">
+      <li><article class="next t-fuchsia">
+        <span class="poster">E</span><span class="ribbon">2 neu</span>
+        <div class="body">
+          <span class="kicker">Manhwa · asuracomic.net</span>
+          <b class="ttl">Eleceed</b>
+          <span class="was num">Kap. 421 · vor 2 Std.</span>
+          <span class="prog num"><span class="track"><i style="width:99.5%"></i></span>421 / 423</span>
+          <span class="cta"><a class="btn" href="#">Kap. 422 lesen ›</a><button class="icon" aria-label="Kapitel 422 als gelesen">+</button></span>
+        </div>
+      </article></li>
+      <li><article class="next t-lime">
+        <span class="poster">O</span><span class="ribbon">3 neu</span>
+        <div class="body">
+          <span class="kicker">Manhwa · demonicscans.org</span>
+          <b class="ttl">Overgeared</b>
+          <span class="was num">Kap. 345 · vor 5 Std.</span>
+          <span class="prog num"><span class="track"><i style="width:99.1%"></i></span>345 / 348</span>
+          <span class="cta"><a class="btn" href="#">Kap. 346 lesen ›</a><button class="icon" aria-label="Kapitel 346 als gelesen">+</button></span>
+        </div>
+      </article></li>
+      <li><article class="next t-cyan">
+        <span class="poster">F</span>
+        <div class="body">
+          <span class="kicker">Anime · Crunchyroll</span>
+          <b class="ttl">Frieren</b>
+          <span class="was num">S1 · F14 · gestern</span>
+          <span class="prog">Folgenzahl der Staffel unbekannt</span>
+          <span class="cta"><a class="btn" href="#">F15 ansehen ›</a><button class="icon" aria-label="Folge 15 als gesehen">+</button></span>
+        </div>
+      </article></li>
+      <li><article class="next t-emerald">
+        <span class="poster">NM</span>
+        <div class="body">
+          <span class="kicker">Manhwa · asuracomic.net</span>
+          <b class="ttl">Nano Machine</b>
+          <span class="was num">Kap. 332 · gestern</span>
+          <span class="prog num"><span class="track"><i style="width:100%"></i></span>aktuell</span>
+          <span class="cta"><a class="btn" href="#">Kap. 333 lesen ›</a><button class="icon" aria-label="Kapitel 333 als gelesen">+</button></span>
+        </div>
+      </article></li>
+      <li><article class="next t-violet">
+        <span class="poster">SS</span>
+        <div class="body">
+          <span class="kicker">Light Novel · WebNovel</span>
+          <b class="ttl">Shadow Slave</b>
+          <span class="was num">Kap. 1204 · vor 3 Tagen</span>
+          <span class="prog">neuestes Kapitel unbekannt</span>
+          <span class="cta"><a class="btn" href="#">Kap. 1205 lesen ›</a><button class="icon" aria-label="Kapitel 1205 als gelesen">+</button></span>
+        </div>
+      </article></li>
+      <li><article class="next t-amber">
+        <span class="poster">AS</span>
+        <div class="body">
+          <span class="kicker">Manhwa · demonicscans.org</span>
+          <b class="ttl">Absolute Sword Sense</b>
+          <span class="was num">Kap. 51 · vor 4 Tagen</span>
+          <span class="prog">neuestes Kapitel unbekannt</span>
+          <span class="cta"><a class="btn" href="#">Kap. 52 lesen ›</a><button class="icon" aria-label="Kapitel 52 als gelesen">+</button></span>
+        </div>
+      </article></li>
+    </ul>
+  </section>
+
+  <div class="check" role="status">
+    <span><b>Stand prüfen:</b> <span>Omniscient Reader's Viewpoint</span> <span class="q num">Kap. ?</span></span>
+    <a href="#">Stand setzen →</a>
+  </div>
+
+  <section aria-labelledby="h-all">
+    <div class="sec-h"><div><h2 id="h-all">Alle Titel</h2></div><p class="count">9 Titel</p></div>
+    <div class="listbar">
+      <div class="seg" role="group" aria-label="Medientyp">
+        <button aria-pressed="true">Alle</button><button aria-pressed="false">Manga/Manhwa/Manhua</button><button aria-pressed="false">Light Novels</button><button aria-pressed="false">E-Books</button><button aria-pressed="false">Serien/Anime</button>
+      </div>
+      <span class="br"></span>
+      <label>Status <select class="select"><option>Lese</option></select></label>
+      <label>Sortierung <select class="select"><option>Zuletzt aktiv</option></select></label>
+      <label><input class="chk" type="checkbox"> Neue Kapitel</label>
+      <label><input class="chk" type="checkbox"> Stand unbekannt</label>
+    </div>
+    <ul class="list" aria-label="Titel">
+      <li class="t-fuchsia"><span class="thumb">E</span><div class="t"><a href="#">Eleceed</a><span>Manhwa</span><span class="new">2 neu</span><span class="meta-m"> · asuracomic.net · vor 2 Std.</span></div>
+        <span class="pos num"><button aria-label="zurück">−</button><span>Kap. 421</span><button aria-label="weiter">+</button></span>
+        <span class="src"><i>A</i><span>asuracomic.net</span></span><span class="when">vor 2 Std.</span><a class="go" href="#">Weiter ›</a></li>
+      <li class="t-lime"><span class="thumb">O</span><div class="t"><a href="#">Overgeared</a><span>Manhwa</span><span class="new">3 neu</span><span class="meta-m"> · demonicscans.org · vor 5 Std.</span></div>
+        <span class="pos num"><button aria-label="zurück">−</button><span>Kap. 345</span><button aria-label="weiter">+</button></span>
+        <span class="src"><i>D</i><span>demonicscans.org</span></span><span class="when">vor 5 Std.</span><a class="go" href="#">Weiter ›</a></li>
+      <li class="t-cyan"><span class="thumb">F</span><div class="t"><a href="#">Frieren</a><span>Anime</span><span class="meta-m"> · Crunchyroll · gestern</span></div>
+        <span class="pos num"><button aria-label="zurück">−</button><span>S1 · F14</span><button aria-label="weiter">+</button></span>
+        <span class="src"><i>C</i><span>Crunchyroll</span></span><span class="when">gestern</span><a class="go" href="#">Öffnen ›</a></li>
+      <li class="t-emerald"><span class="thumb">NM</span><div class="t"><a href="#">Nano Machine</a><span>Manhwa</span><span class="meta-m"> · asuracomic.net · gestern</span></div>
+        <span class="pos num"><button aria-label="zurück">−</button><span>Kap. 332</span><button aria-label="weiter">+</button></span>
+        <span class="src"><i>A</i><span>asuracomic.net</span></span><span class="when">gestern</span><a class="go" href="#">Weiter ›</a></li>
+      <li class="t-violet"><span class="thumb">SS</span><div class="t"><a href="#">Shadow Slave</a><span>Light Novel</span><span class="meta-m"> · WebNovel · vor 3 Tagen</span></div>
+        <span class="pos num"><button aria-label="zurück">−</button><span>Kap. 1204</span><button aria-label="weiter">+</button></span>
+        <span class="src"><i>W</i><span>WebNovel</span></span><span class="when">vor 3 Tagen</span><a class="go" href="#">Weiter ›</a></li>
+      <li class="t-amber"><span class="thumb">AS</span><div class="t"><a href="#">Absolute Sword Sense</a><span>Manhwa</span><span class="meta-m"> · demonicscans.org · vor 4 Tagen</span></div>
+        <span class="pos num"><button aria-label="zurück">−</button><span>Kap. 51</span><button aria-label="weiter">+</button></span>
+        <span class="src"><i>D</i><span>demonicscans.org</span></span><span class="when">vor 4 Tagen</span><a class="go" href="#">Weiter ›</a></li>
+      <li class="t-rose"><span class="thumb">PH</span><div class="t"><a href="#">Project Hail Mary</a><span>E-Book</span><span class="meta-m"> · Kindle · vor 5 Tagen</span></div>
+        <span class="pos num"><span>43 %</span></span>
+        <span class="src"><i>K</i><span>Kindle</span></span><span class="when">vor 5 Tagen</span><span></span></li>
+      <li class="t-fuchsia"><span class="thumb">OR</span><div class="t"><a href="#">Omniscient Reader's Viewpoint</a><span>Manhwa</span><span class="meta-m"> · keine Seite · Import</span></div>
+        <span class="pos num"><span class="q">Kap. ?</span></span>
+        <span class="src none"><span>– keine Seite</span></span><span class="when">Import</span><span></span></li>
+      <li class="t-lime"><span class="thumb">AS</span><div class="t"><a href="#">Arcane Sniper</a><span>Manhwa</span><span class="meta-m"> · keine Seite · Import</span></div>
+        <span class="pos num"><button aria-label="zurück">−</button><span>Kap. 95</span><button aria-label="weiter">+</button></span>
+        <span class="src none"><span>– keine Seite</span></span><span class="when">Import</span><span></span></li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
