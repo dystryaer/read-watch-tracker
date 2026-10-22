@@ -9,34 +9,51 @@ export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 export interface DbHandle {
   db: Db;
   driver: "pglite" | "postgres";
+  /** Embedded database with a data directory only: its files as a gzipped tarball (backups). */
+  dumpDataDir?: () => Promise<Blob>;
   close(): Promise<void>;
 }
 
 /**
- * `pglite:memory` or `pglite:<dir>` → embedded Postgres (local dev, tests);
- * `postgres://…` → node-postgres (Neon now, own server later). Same schema and migrations.
- * Drivers are imported lazily so production never loads the PGlite WASM.
+ * `pglite:<dir>` → embedded Postgres in a local folder (the tracker itself; `~/` is the home
+ * folder), `pglite:memory` → in memory (tests); `postgres://…` → node-postgres (own server later).
+ * Same schema and migrations. Drivers are imported lazily so a Postgres setup never loads the
+ * PGlite WASM. `loadDataDir` fills a new data directory from a backup.
  */
-export async function createDb(url: string): Promise<DbHandle> {
+export async function createDb(url: string, options: { loadDataDir?: Blob } = {}): Promise<DbHandle> {
   if (url.startsWith("pglite:")) {
-    const location = url.slice("pglite:".length);
-    const [{ PGlite }, { pg_trgm }, { drizzle }] = await Promise.all([
+    const [{ PGlite }, { pg_trgm }, { drizzle }, local] = await Promise.all([
       import("@electric-sql/pglite"),
       import("@electric-sql/pglite/contrib/pg_trgm"),
       import("drizzle-orm/pglite"),
+      import("./local"),
     ]);
-    const inMemory = location === "" || location === "memory";
-    if (!inMemory) {
+    const dataDir = local.pgliteDataDir(url);
+    let release = async () => {};
+    if (dataDir) {
       // PGlite creates the data directory itself, but not missing parents such as `.data/`.
       const [{ mkdir }, path] = await Promise.all([import("node:fs/promises"), import("node:path")]);
-      await mkdir(path.dirname(path.resolve(location)), { recursive: true });
+      await mkdir(path.dirname(dataDir), { recursive: true });
+      release = await local.lockDataDir(dataDir);
     }
     // Options-object form: with `undefined` as first argument PGlite would drop the extensions.
     const client = await PGlite.create({
-      dataDir: inMemory ? "memory://" : location,
+      dataDir: dataDir ?? "memory://",
       extensions: { pg_trgm },
+      loadDataDir: options.loadDataDir,
+    }).catch(async (error: unknown) => {
+      await release();
+      throw error;
     });
-    return { db: drizzle({ client, schema }), driver: "pglite", close: () => client.close() };
+    return {
+      db: drizzle({ client, schema }),
+      driver: "pglite",
+      ...(dataDir ? { dumpDataDir: () => client.dumpDataDir("gzip") } : {}),
+      close: async () => {
+        await client.close();
+        await release();
+      },
+    };
   }
 
   if (/^postgres(?:ql)?:\/\//.test(url)) {

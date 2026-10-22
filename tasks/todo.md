@@ -187,3 +187,11 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
   Behoben (Code-Review): Alarme werden nur angelegt, wenn sie fehlen (sonst feuerte „new-chapters“ nie); Serie vor dem Abruf belegen, 20-s-Timeout; unzugestellte Ergebnisse merken statt Seiten neu abrufen; offline ohne Strafe; eine Serienseite pro Werk (zuletzt genutzte Quelle); Statistik gegen den bisher höchsten Stand (keine Aufblähung durch Zusammenführen), Berliner Tag aus der DB; Teil-Listen nicht melden; nie geprüfte Serien zuerst; Back-off an die URL gebunden.
   Behoben (Security-Review): Weiterleitungen werden nicht verfolgt (kein Abruf beliebiger Hosts, auch nicht im Heimnetz), nur https; höchstens 3 Abrufe pro Host und Lauf; Parser mit Vorfilter und 1-s-Budget; `/latest-chapters` prüft Einträge einzeln und schreibt nur an Werke, die `/series-watch` liefern würde; kein Cookie, Referer oder Origin (E2E).
   Hingenommen: Seitenregel-Muster mit mehreren unbeschränkten Quantoren bleiben erlaubt (vom Besitzer geschrieben; ein einzelnes `exec` lässt sich nicht unterbrechen); Serienseiten, die per JavaScript laden oder `<base href>`/Links ohne Anführungszeichen nutzen, liefern nichts; Prüfung ist voreingestellt an (Doku + Option); ein Extension-Token kann die Liste der gelesenen Serien lesen.
+
+---
+
+## Lokaler Betrieb (`feat/lokaler-betrieb`)
+
+- [x] **T45 Datenbank lokal wie die Web-App** · M
+  Akz.: `DATABASE_URL=pglite:~/.read-watch-tracker/db` (Home-Ordner, gleicher Pfad für Web-App und CLI; CLI-Skripte lesen `apps/web/.env.local`); Sperrdatei `<ordner>.lock` gegen einen zweiten Prozess, Sperren beendeter Prozesse werden übernommen; mit `BACKUP_DIR` eine Sicherung pro Tag (beim Start vor den Migrationen, dann alle 6 h geprüft, 14 bleiben); `pnpm db:backup`, `pnpm db:restore` (alter Ordner bleibt daneben, defekte Sicherung stellt ihn wieder her); `pnpm start` nur auf `127.0.0.1`; Doku und SPEC v0.3 ohne Neon/Vercel (`docs/betrieb-lokal.md`); bestehende Daten aus `apps/web/.data/dev` übernommen
+  Offen: Shield und iPhone erreichen den lokalen Tracker nicht (SPEC §19)

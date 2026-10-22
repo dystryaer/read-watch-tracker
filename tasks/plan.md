@@ -20,7 +20,7 @@ Jeder Meilenstein liegt auf einem eigenen Branch. Die Branches bauen aufeinander
 | # | Entscheidung | Begründung |
 |---|---|---|
 | A1 | Die **Serverlogik ist framework-frei** in einem eigenen Paket `packages/server` und bekommt die DB als Parameter. Next.js-Route-Handler, Server Actions und der Excel-Import sind dünne Adapter darauf. | testbar ohne Next.js; Web-App und Import-Skript teilen dieselbe Logik |
-| A2 | **DB-Factory:** `DATABASE_URL=pglite:<pfad>` → PGlite (lokal, Tests, E2E), `postgres://…` → node-postgres (Neon, später eigener Server). Gleiches Drizzle-Schema, gleiche Migrationen. | lokale Entwicklung ohne Docker (nicht installiert), echtes Postgres inkl. `pg_trgm` in Tests |
+| A2 | **DB-Factory:** `DATABASE_URL=pglite:<pfad>` → PGlite (Betrieb, Tests, E2E), `postgres://…` → node-postgres (später eigener Server). Gleiches Drizzle-Schema, gleiche Migrationen. | Betrieb ohne Docker (nicht installiert), echtes Postgres inkl. `pg_trgm` in Tests |
 | A3 | `works.title_normalized` wird **in der Anwendung** per `normalizeTitle` gesetzt, nicht als SQL-generierte Spalte. | Die Normalisierung (Unicode, Tags) ist TypeScript; eine SQL-Kopie würde auseinanderlaufen |
 | A4 | **Kopplung ohne gespeicherten Token-Chiffretext:** Das Token wird beim ersten erfolgreichen Poll nach der Freigabe erzeugt; gespeichert wird nur sein SHA-256-Hash. | einfacher und sicherer als `token_ciphertext` (SPEC §5.1 wird angepasst) |
 | A5 | **URLs nur `http:`/`https:`** – geprüft beim Ingest (zod) und noch einmal beim Rendern (`safeHref`). | verhindert `javascript:`-XSS über `last_url` und `series_url` |
@@ -30,9 +30,10 @@ Jeder Meilenstein liegt auf einem eigenen Branch. Die Branches bauen aufeinander
 | A9 | **Die Shield-Logik ist ein reines Kotlin/JVM-Modul** (`apps/shield/logic`); die Android-App ist eine dünne Hülle. Die Outbox ist eine Datei-Queue statt Room, Tokens liegen in privaten SharedPreferences, weil EncryptedSharedPreferences abgekündigt ist. | schnelle JVM-Tests, weniger Abhängigkeiten (SPEC §8.4 wird angepasst) |
 | A10 | **Adapter für Streaming- und Bibliotheksseiten werden gegen synthetische Fixtures gebaut** und sind als „unverifiziert“ markiert, bis echte Seitenproben vorliegen (Spikes). | Diese Seiten erfordern deine Logins; ich rufe sie nicht auf |
 | A11 | Für **Manga-Seiten-Fixtures** gibt es nur synthetische Reader-Layouts, keine Kopien echter Scanlation-Seiten. Echte Fixtures kommen über `docs/testing/fixtures.md` von dir. | keine Inhalte urheberrechtlich fragwürdiger Seiten abrufen |
-| A12 | **Rate-Limit in-memory** (60/min pro Gerät). | Single-User; auf Vercel pro Instanz, dokumentiert |
+| A12 | **Rate-Limit in-memory** (60/min pro Gerät). | Single-User, ein Prozess |
 | A13 | **Statistik ohne eigene Tabelle:** Fortschritts-Deltas per SQL-Fensterfunktion (`lag` je Werk) aus `events`, Wochen/Monate in `Europe/Berlin` als reine Core-Funktion. | Event-Protokoll ist die Wahrheit; testbar ohne DB; keine Chart-Bibliothek (SPEC §4.8) |
 | A14 | **Neue Kapitel ohne DOM:** Der Service Worker liest `href`s per Regex aus dem HTML und prüft sie mit `detectChapterFromUrl`. Kein Offscreen-Dokument, keine neuen Berechtigungen, Planung (1×/Tag je Serie, 10 pro Stunde) in `chrome.storage.local`. | MV3-Service-Worker haben kein `DOMParser`; Offscreen wäre eine neue Berechtigung (SPEC §16 „erst fragen“) |
+| A15 | **Lokaler Betrieb statt Neon/Vercel:** Die Datenbank ist PGlite im Prozess der Web-App (`pnpm start` auf `127.0.0.1:3000`), Daten in `~/.read-watch-tracker/db`. `~/` macht den Pfad für Web-App (cwd `apps/web`) und CLI (cwd Repo) gleich; die CLI-Skripte lesen `apps/web/.env.local`. Eine Sperrdatei `<ordner>.lock` mit PID verhindert einen zweiten Prozess (Sperren beendeter Prozesse werden übernommen). Mit `BACKUP_DIR` sichert der Tracker täglich per `dumpDataDir` (14 bleiben); `db:restore` legt den alten Ordner daneben. | Keine Installation, keine neue Abhängigkeit; PGlite hat selbst keine Sperre, und zwei Schreiber zerstören den Datenordner; ohne Anbieter-Backups braucht es eigene |
 
 ## Abhängigkeiten
 
@@ -68,11 +69,12 @@ Excel-Import ── server
 | Nutzerregex (Seitenregeln) mit katastrophalem Backtracking | Niedrig | Längenlimits für Pattern (200) und URL (2048); Fehler werden abgefangen |
 | Better-Auth-/Next.js-API-Änderungen | Niedrig | Versionen beim Setup fixiert, Lockfile |
 | Kein Docker lokal → Portabilitätstest (Spec §17.11) nicht lokal prüfbar | Mittel | `docker-compose.yml` + Anleitung; der Test läuft auf einer Maschine mit Docker bzw. auf dem späteren Server |
-| Deployment (Neon, Vercel) braucht deine Accounts | – | Anleitung `docs/deploy.md`; Accounts und Secrets legst du an |
+| Festplatte defekt → Datenbank und Sicherungen weg | Hoch | Doku empfiehlt, `backups` auf einen anderen Datenträger zu kopieren (`docs/betrieb-lokal.md`) |
+| Shield und iPhone erreichen den lokalen Tracker nicht (nur `127.0.0.1`, kein https) | Hoch (M2/M3) | SPEC §19 offen: eigener Server oder HTTPS-Zugang im Heimnetz |
 | Serienseiten laden die Kapitelliste per JavaScript oder stecken hinter Bot-Schutz (M4) | Mittel | Dann kein Badge für diese Serie; überspringen, 7 Tage warten, nie umgehen (SPEC §7.11) |
 
 ## Offene Punkte (brauchen dich, blockieren aber nicht)
 
 - Spikes S1–S3 auf deinen Geräten bzw. mit deinen Accounts (Anleitungen kommen mit M2/M3)
 - Echte Kapitelseiten deiner Manga-Seiten als Fixtures (optional, verbessert die generische Erkennung)
-- Deployment-Accounts (Neon, Vercel)
+- Wie Shield und iPhone den lokalen Tracker erreichen (SPEC §19)

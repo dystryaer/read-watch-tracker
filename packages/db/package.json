@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./backup": "./src/backup.ts",
+    "./local": "./src/local.ts",
     "./migrate": "./src/migrate.ts",
     "./testing": "./src/testing.ts"
   },

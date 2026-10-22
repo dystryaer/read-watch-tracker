@@ -9,20 +9,25 @@ Persönlicher Tracker für Manga, Manhwa, Manhua, Light Novels, E-Books und Seri
 | `apps/web` | Next.js-App: Übersicht, Zuordnungen, Einstellungen, Geräte-API `/api/v1/*` |
 | `apps/extension` | Brave-Extension (WXT, Manifest V3) |
 | `packages/core` | Gemeinsame Regeln: Event-Vertrag, Normalisierung, Kapitel-Erkennung, Fortschritt |
-| `packages/db` | Drizzle-Schema, Migrationen, PGlite/Postgres-Factory |
+| `packages/db` | Drizzle-Schema, Migrationen, PGlite/Postgres-Factory, Sperre und Sicherungen der lokalen Datenbank |
 | `packages/server` | Serverlogik ohne Framework: Ingest, Zuordnung, Kopplung, Import |
 | `scripts/import-excel.ts` | Einmaliger Import der Excel-Liste |
 | `tests/e2e` | Playwright-Tests für Web-App und Extension |
 
-## Lokal entwickeln
+## Betrieb
+
+Tracker und Datenbank laufen lokal auf deinem Rechner. Die Datenbank ist ein eingebettetes Postgres (PGlite) in `~/.read-watch-tracker/db`; nichts zu installieren, kein Docker, keine Cloud. Details: [docs/betrieb-lokal.md](docs/betrieb-lokal.md).
 
 ```bash
 pnpm install
 cp apps/web/.env.example apps/web/.env.local   # Secret eintragen
-pnpm dev                                       # http://localhost:3000, eingebettete Datenbank in apps/web/.data
+pnpm build
+pnpm start                                     # http://localhost:3000, nur von diesem Rechner erreichbar
+pnpm db:backup                                 # Sicherung (der laufende Tracker sichert zusätzlich täglich)
+pnpm db:restore "<Sicherung>.tar.gz"           # Stand zurückspielen (Tracker vorher beenden)
 ```
 
-Docker ist dafür nicht nötig: `DATABASE_URL=pglite:./.data/dev` nutzt ein eingebettetes Postgres.
+Zum Entwickeln `pnpm dev` statt `pnpm start` (gleiche Datenbank, nicht beide gleichzeitig).
 
 ## Prüfen
 
@@ -37,7 +42,7 @@ pnpm test:e2e
 
 ## Anleitungen
 
-- [Deployment (Neon + Vercel)](docs/deploy.md)
+- [Lokaler Betrieb: Starten, Daten, Sicherung](docs/betrieb-lokal.md)
 - [Browser-Extension einrichten](docs/setup-extension.md)
 - [Nvidia Shield einrichten](docs/setup-shield.md)
 - [iPhone: Schnell-Update und Kurzbefehl „Lesestand“](docs/setup-iphone.md)

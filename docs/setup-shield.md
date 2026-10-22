@@ -6,7 +6,7 @@ Die Shield-App liest mit, was in Prime Video, Crunchyroll, Netflix und Disney+ l
 
 ## Voraussetzungen
 
-- Der Tracker ist per **https** erreichbar (Vercel oder eigener Server mit Caddy/Traefik). Über http verbindet sich die App nicht, damit das Geräte-Token nie unverschlüsselt durchs Netz geht.
+- Der Tracker ist per **https** im Netz erreichbar (eigener Server mit Caddy/Traefik, [server-umzug.md](server-umzug.md)). Über http verbindet sich die App nicht, damit das Geräte-Token nie unverschlüsselt durchs Netz geht. Der lokale Tracker auf deinem Rechner (`http://localhost:3000`) reicht dafür nicht (SPEC §19).
 - Auf deinem Rechner: die Android-Platform-Tools (`adb`). Mit dem Android-SDK unter `%LOCALAPPDATA%\Android\Sdk` liegen sie in `platform-tools\`.
 - Die APK: `apps/shield/app/build/outputs/apk/release/app-release.apk` (bauen mit `.\gradlew.bat assembleRelease` in `apps/shield`).
 
@@ -39,7 +39,7 @@ Die App nutzt die Berechtigung nur, um die laufenden Mediensitzungen zu sehen. B
 1. Die App „Read-Watch-Tracker“ auf der Shield öffnen und die Adresse deines Trackers eingeben. Schneller geht es von deinem Rechner aus:
 
    ```powershell
-   adb shell am start -n app.rwt.shield/.MainActivity --es apiUrl https://dein-tracker.vercel.app
+   adb shell am start -n app.rwt.shield/.MainActivity --es apiUrl https://tracker.example
    ```
 
    Die Adresse per adb gilt nur, solange die App noch nicht eingerichtet ist; eine andere Adresse verwirft Token und Kopplung (Schutz davor, dass eine andere App auf der Shield die Adresse umbiegt).

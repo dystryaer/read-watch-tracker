@@ -24,8 +24,10 @@ export default defineConfig({
     url: `${WEB_URL}/login`,
     reuseExistingServer: false,
     timeout: 300_000,
+    // Next.js also reads apps/web/.env.local here; empty values keep the tracker's own settings out.
     env: {
       DATABASE_URL: "pglite:./.data/e2e",
+      BACKUP_DIR: "",
       BETTER_AUTH_SECRET: "e2e-only-secret-e2e-only-secret-e2e",
       BETTER_AUTH_URL: WEB_URL,
       SETUP_TOKEN: "e2e-setup-token-0123456789",

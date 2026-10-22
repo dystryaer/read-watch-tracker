@@ -9,12 +9,15 @@
   "scripts": {
     "dev": "pnpm --filter @rwt/web dev",
     "build": "pnpm --filter @rwt/web build",
+    "start": "pnpm --filter @rwt/web start",
     "test": "vitest run",
     "typecheck": "pnpm -r typecheck && tsc -p scripts",
     "lint": "eslint .",
     "db:generate": "pnpm --filter @rwt/db generate",
-    "db:migrate": "tsx packages/db/src/cli-migrate.ts",
-    "import:excel": "tsx scripts/import-excel.ts",
+    "db:migrate": "tsx --env-file-if-exists=apps/web/.env.local packages/db/src/cli-migrate.ts",
+    "db:backup": "tsx --env-file-if-exists=apps/web/.env.local packages/db/src/cli-backup.ts backup",
+    "db:restore": "tsx --env-file-if-exists=apps/web/.env.local packages/db/src/cli-backup.ts restore",
+    "import:excel": "tsx --env-file-if-exists=apps/web/.env.local scripts/import-excel.ts",
     "test:e2e": "playwright test"
   },
   "devDependencies": {

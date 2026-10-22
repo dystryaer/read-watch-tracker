@@ -18,7 +18,7 @@ const OUTCOME_LABELS: Record<EventOutcome, string> = {
 };
 
 const percentFormat = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
-// Rendered on the server, whose zone (UTC on Vercel) is not the reader's.
+// Rendered on the server, whose zone (UTC in a container) need not be the reader's.
 const dateTimeFormat = new Intl.DateTimeFormat("de-DE", {
   timeZone: process.env.APP_TIME_ZONE ?? "Europe/Berlin",
   day: "2-digit",

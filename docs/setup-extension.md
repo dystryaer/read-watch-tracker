@@ -16,7 +16,7 @@ Nach einem Update erneut bauen und in `brave://extensions` auf **Neu laden** kli
 ## 2. Mit dem Tracker koppeln
 
 1. Rechtsklick auf das Extension-Symbol → **Optionen**.
-2. Adresse deines Trackers (z. B. `https://dein-tracker.vercel.app`) und einen Gerätenamen eintragen, **Koppeln** klicken.
+2. Adresse deines Trackers (lokal: `http://localhost:3000`, der Tracker muss laufen, siehe [betrieb-lokal.md](betrieb-lokal.md)) und einen Gerätenamen eintragen, **Koppeln** klicken.
 3. Brave fragt nach Zugriff auf genau diese Adresse → erlauben.
 4. Der sechsstellige Code erscheint. Im Tracker unter **Einstellungen → Gerät koppeln** eingeben (oder auf „Im Tracker öffnen“ klicken). Der Tracker zeigt, welches Gerät sich koppeln will; prüfen und **Koppeln bestätigen** klicken. Nach wenigen Sekunden zeigt die Optionsseite „Gekoppelt“.
 

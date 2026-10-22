@@ -1,16 +1,17 @@
 import { createDb } from "@rwt/db";
+import { DatabaseInUseError } from "@rwt/db/local";
 import { migrateDb } from "@rwt/db/migrate";
 import { ImportFormatError, importReadingList, parseReadingList } from "@rwt/server/excel-import";
 import ExcelJS from "exceljs";
 
-// Usage: DATABASE_URL=… pnpm import:excel "<Pfad zur Reading List.xlsx>" [--dry-run]
+// Usage: pnpm import:excel "<Pfad zur Reading List.xlsx>" [--dry-run] (DATABASE_URL from apps/web/.env.local)
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const file = args.find((arg) => !arg.startsWith("--"));
 const url = process.env.DATABASE_URL;
 
 if (!file || !url) {
-  console.error('Aufruf: DATABASE_URL=… pnpm import:excel "<Pfad>.xlsx" [--dry-run]');
+  console.error('Aufruf: pnpm import:excel "<Pfad>.xlsx" [--dry-run] (DATABASE_URL aus apps/web/.env.local)');
   process.exit(1);
 }
 
@@ -28,7 +29,11 @@ try {
   throw error;
 }
 
-const handle = await createDb(url);
+const handle = await createDb(url).catch((error: unknown) => {
+  if (!(error instanceof DatabaseInUseError)) throw error;
+  console.error(`Abbruch: ${error.message}`);
+  process.exit(1);
+});
 try {
   if (handle.driver === "pglite") await migrateDb(handle);
   const report = await importReadingList(handle.db, parsed.rows, { dryRun });

@@ -8,6 +8,8 @@ Light Novels (WebNovel-App) und E-Books (Kindle-App) aktualisierst du halbautoma
 | **Kurzbefehl „Lesestand“** aus dem Teilen-Menü | 3 Taps | direkt aus der WebNovel- oder Kindle-App |
 | **Bibliotheks-Sync** am Desktop | 1 Seitenaufruf | WebNovel- bzw. Kindle-Bibliothek in Brave öffnen (Extension) |
 
+> **Voraussetzung:** Schnell-Update und Kurzbefehl brauchen einen Tracker, den das iPhone per **https** erreicht (eigener Server, [server-umzug.md](server-umzug.md)). Der lokale Tracker auf deinem Rechner (`http://localhost:3000`) ist vom iPhone aus nicht erreichbar (SPEC §19). Der Bibliotheks-Sync am Desktop funktioniert auch lokal.
+
 ## 1. Schnell-Update auf den Homescreen
 
 1. In Safari deinen Tracker öffnen, anmelden und auf **Schnell-Update** gehen. Manche iOS-Versionen merken sich für das Icon die gerade offene Seite statt der Startseite der App.
@@ -30,7 +32,7 @@ Light Novels (WebNovel-App) und E-Books (Kindle-App) aktualisierst du halbautoma
 
 In der App **Kurzbefehle** einen neuen Kurzbefehl „Lesestand“ anlegen. Unter **Details** (ⓘ) **Im Teilen-Menü anzeigen** einschalten und als Typen **URLs** und **Text** wählen. Dann diese Aktionen in dieser Reihenfolge:
 
-1. **Text**: deine Tracker-Adresse, z. B. `https://dein-tracker.vercel.app`. Umbenennen in *Adresse*.
+1. **Text**: deine Tracker-Adresse, z. B. `https://tracker.example`. Umbenennen in *Adresse*.
 2. **Text**: den kopierten Token einfügen. Umbenennen in *Token*.
 3. **Inhalt von URL abrufen**
    - URL: *Adresse* `/api/v1/share`

@@ -1,8 +1,9 @@
 # Spec: Read-Watch-Tracker
 
-> Status: **Freigegeben v0.2** · 2026-10-21
+> Status: **Freigegeben v0.3** · 2026-10-22
 > Grundlage: bestätigtes Intent-Statement aus dem Interview vom 2026-10-21
 > v0.2: Antworten auf die offenen Fragen eingearbeitet (iPhone, wechselnde Manga-Seiten, Netflix/Disney+, Kindle in %, Stack bestätigt, Kapitel-Regel ohne Zeitlimit)
+> v0.3: Datenbank und Web-App laufen lokal auf meinem Rechner statt bei Neon/Vercel (§2.3, §11, §17.11)
 
 ---
 
@@ -34,7 +35,7 @@
 
 1. **Handy = iPhone.** Die halbautomatischen Pfade auf dem Handy laufen über die Web-App als PWA (über Safari „Zum Home-Bildschirm“) und einen **iOS-Kurzbefehl** im Teilen-Menü (§9). Ein Web-Share-Target gibt es auf iOS nicht.
 2. **Tech-Stack bestätigt** (§11): TypeScript-Monorepo, Next.js, PostgreSQL, Kotlin für die Shield-App.
-3. **Cloud = kostenlose Tarife** (Neon für Postgres, Vercel Hobby für die Web-App). Es werden keine anbieterspezifischen Features genutzt, damit der Umzug auf einen eigenen Server per `pg_dump` + Docker Compose möglich bleibt.
+3. **Betrieb lokal, ohne Cloud.** Web-App und Datenbank laufen auf meinem Rechner (`pnpm start`, nur `127.0.0.1:3000`). Die Datenbank ist ein eingebettetes Postgres (PGlite) im Prozess der Web-App, gespeichert in `~/.read-watch-tracker/db`, mit einer Sicherung pro Tag. Es werden keine anbieterspezifischen Features genutzt; `postgres://` bleibt unterstützt, damit ein späterer Umzug auf einen eigenen Server per Docker Compose möglich bleibt.
 4. **„Stand“ = zuletzt gelesenes Kapitel** (wie die Spalte „Last Read Chapter“ in der Excel-Liste). „Weiterlesen“ heißt damit Kapitel *n+1*.
 5. **Kein Rückschritt durch Automatik:** Wer ein älteres Kapitel nochmal liest, verändert den Stand nicht. Zurücksetzen geht nur manuell.
 6. **Die Extension trackt nur Seiten, die ich aktiv freischalte.** Sie läuft also nicht pauschal auf allen Websites.
@@ -72,8 +73,8 @@
                                  ▼
                      ┌───────────────────────┐
                      │ PostgreSQL            │
-                     │ (jetzt Neon, später   │
-                     │  eigener Server)      │
+                     │ (jetzt lokal: PGlite, │
+                     │  später eig. Server)  │
                      └───────────────────────┘
 ```
 
@@ -730,10 +731,10 @@ Siehe §7.9. Der Backfill füllt einen Teil der 63 Lücken für alles, was in de
 | Bereich | Wahl | Begründung |
 |---|---|---|
 | Sprache | TypeScript 6.0 (strict), Node ≥ 22 LTS, pnpm-Workspaces | ein Typensystem für Web, API, Extension und Core. TypeScript 7 erst, wenn typescript-eslint es unterstützt (aktuell `<6.1`). |
-| Web + API | Next.js (App Router), Tailwind CSS | Web-App und API in einem Deploy; läuft auf Vercel und in Docker |
-| DB | PostgreSQL 16+, Drizzle ORM + drizzle-kit, `pg_trgm` | Standard-Postgres → `pg_dump`-portabel; typsichere Migrationen |
-| Cloud (jetzt) | Neon (Postgres, Free Tier), Vercel Hobby | 0 €/Monat; Neon pausiert bei Inaktivität und wacht automatisch auf |
-| Server (später) | `docker-compose.yml` (web + postgres), ab Tag 1 im Repo | Umzug = Dump einspielen + `DATABASE_URL` umstellen |
+| Web + API | Next.js (App Router), Tailwind CSS | Web-App und API in einem Prozess; läuft lokal (`next start`) und in Docker |
+| DB | PostgreSQL 16+ (lokal: PGlite, eingebettet), Drizzle ORM + drizzle-kit, `pg_trgm` | Standard-Postgres-Schema, portabel; typsichere Migrationen |
+| Betrieb (jetzt) | lokal: `pnpm start` auf `127.0.0.1:3000`, Daten in `~/.read-watch-tracker/db`, Sperrdatei gegen einen zweiten Prozess, tägliche Sicherung (14 bleiben), `pnpm db:backup`/`db:restore` | keine Installation, kein Anbieterkonto, 0 €/Monat |
+| Server (später) | `docker-compose.yml` (web + postgres), ab Tag 1 im Repo | Umzug = SQL-Dump aus PGlite einspielen + `DATABASE_URL` umstellen |
 | Auth | Better Auth (E-Mail + Passwort; Registrierung nach dem ersten Account gesperrt) | keine selbstgebaute Auth |
 | Validierung | zod (+ zod → JSON Schema für den Shield-Vertrag) | eine Quelle der Wahrheit für das Event-Schema |
 | Extension | WXT, Manifest V3, Chromium (Brave) | MV3-Boilerplate, HMR, Playwright-tauglich |
@@ -741,7 +742,7 @@ Siehe §7.9. Der Backfill füllt einen Teil der 63 Lücken für alles, was in de
 | Excel | exceljs | nur für den Import-Script |
 | Tests | Vitest, PGlite (Postgres in-process, inkl. `pg_trgm`), Playwright, JUnit | siehe §15 |
 
-Konfiguration ausschließlich über Umgebungsvariablen: `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `TOKEN_ENCRYPTION_KEY`.
+Konfiguration ausschließlich über Umgebungsvariablen (`apps/web/.env.local`, auch von den CLI-Skripten gelesen): `DATABASE_URL`, `BACKUP_DIR`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `SETUP_TOKEN`.
 
 ---
 
@@ -749,7 +750,10 @@ Konfiguration ausschließlich über Umgebungsvariablen: `DATABASE_URL`, `AUTH_SE
 
 ```bash
 pnpm install                                   # Abhängigkeiten installieren
-pnpm dev                                       # Web-App + API lokal auf http://localhost:3000
+pnpm build && pnpm start                       # Tracker (Web-App + API + Datenbank) auf http://localhost:3000
+pnpm dev                                       # dasselbe im Entwicklungsmodus (gleiche Datenbank, nicht parallel)
+pnpm db:backup                                 # Sicherung nach ~/.read-watch-tracker/backups (Tracker beendet)
+pnpm db:restore "<Sicherung>.tar.gz"           # Stand zurückspielen; alter Datenordner bleibt daneben
 pnpm --filter @rwt/extension dev               # Extension im Dev-Modus (WXT)
 pnpm --filter @rwt/extension build             # Build → apps/extension/.output/chrome-mv3 (in Brave entpackt laden)
 pnpm test                                      # Unit- + Integrationstests (Vitest)
@@ -760,7 +764,7 @@ pnpm typecheck                                 # tsc --noEmit in allen Paketen
 pnpm db:generate                               # Migration aus Drizzle-Schema erzeugen
 pnpm db:migrate                                # Migrationen gegen $DATABASE_URL ausführen
 pnpm import:excel "C:\Users\hasse\Downloads\Reading List.xlsx" --dry-run
-docker compose up -d                           # lokale Postgres + Web wie auf späterem Server
+docker compose up -d                           # Postgres + Web wie auf späterem Server
 
 # Shield (in apps/shield; unter Windows gradlew.bat)
 ./gradlew test assembleDebug                   # JUnit (Logik, geteilte Folgen-Fixtures, Vertragstest gegen event.schema.json) + Debug-APK
@@ -857,7 +861,8 @@ export function comparePositions(a: Position, b: Position): number {
 | Event-Vertrag Shield ↔ API | Vertragstest: Kotlin-Payloads gegen `event.schema.json` | JUnit + JSON-Schema-Validator | `apps/shield/app/src/test/` |
 | Shield auf echtem Gerät | manuelle Abnahme-Checkliste | – | `docs/testing/shield-checkliste.md` |
 | iOS-Kurzbefehl auf echtem iPhone | manuelle Abnahme-Checkliste (WebNovel- und Kindle-Teilen, unbekannter Titel, Offline-Fehler) | – | `docs/testing/iphone-checkliste.md` |
-| Portabilität | Dump aus Neon → `docker compose` lokal → Smoke-Test | Skript + manuell, einmal vor Go-live | `docs/server-umzug.md` |
+| Lokale Datenbank: Sperre gegen zweiten Prozess, tägliche Sicherung, Wiederherstellen (inkl. defekter Sicherung) | Integration gegen echtes PGlite im Dateisystem | Vitest | `packages/db/test/` |
+| Portabilität | SQL-Dump aus PGlite → `docker compose` → Smoke-Test | manuell, beim Umzug | `docs/server-umzug.md` |
 
 ### 15.2 Regeln
 
@@ -877,7 +882,7 @@ export function comparePositions(a: Position, b: Position): number {
 - Jedes eingehende Event mit zod validieren; Fehler pro Event melden statt den ganzen Batch zu verwerfen
 - Änderungen an der generischen Erkennung und neue Code-Adapter nur mit Fixture-Tests
 - Seitenspezifisches Verhalten für Manga-Seiten als **Seitenregel (Daten)** lösen, nicht als Code
-- Code anbieterneutral halten: Standard-Postgres, Konfiguration über Umgebungsvariablen, keine Neon- oder Vercel-spezifischen APIs
+- Code anbieterneutral halten: Standard-Postgres, Konfiguration über Umgebungsvariablen, keine anbieterspezifischen APIs
 - UI-Texte auf Deutsch
 
 **Erst fragen:**
@@ -911,7 +916,7 @@ export function comparePositions(a: Position, b: Position): number {
 8. **Shield:** Eine Folge in einem gemappten Dienst steht ≤ 2 min später im Tracker, auf demselben Werk wie am Desktop. Für nicht mappbare Dienste ist der Verlaufs-Sync dokumentiert und funktioniert.
 9. **iPhone:** Kapitel +1 braucht ≤ 2 Taps ab dem Homescreen-Icon der PWA, der Kurzbefehl aus dem Teilen-Menü ≤ 3 Taps. Der WebNovel- und Kindle-Bibliotheks-Sync funktioniert, sofern die Spikes positiv ausfallen; andernfalls ist das Schnell-Update der dokumentierte Pfad.
 10. **Performance:** Der Core-Screen lädt mit 500 Werken in < 1,5 s und ist bei 375 px Breite ohne horizontales Scrollen bedienbar.
-11. **Portabilität:** Ein Dump aus der Cloud-DB läuft lokal per `docker compose up` unverändert mit denselben Daten.
+11. **Lokal und gesichert:** Tracker und Datenbank laufen mit `pnpm start` ohne Installation auf meinem Rechner. Jeden Tag entsteht eine Sicherung, und `pnpm db:restore` stellt einen gesicherten Stand unverändert wieder her.
 12. **Kosten:** 0 € pro Monat.
 13. **Datenschutz:** Ein E2E-Test belegt, dass von nicht freigeschalteten Seiten keine Requests ausgehen.
 14. **Wechselnde Seiten:** Nach einem Domain-Umzug oder einer Änderung des URL-Schemas einer Manga-Seite funktioniert das Tracking über einen Domain-Umzug im Popup bzw. eine angepasste Seitenregel in der Web-App weiter. Es braucht keinen neuen Extension-Build und keine erneute Bestätigung bereits zugeordneter Serien.
@@ -933,6 +938,7 @@ export function comparePositions(a: Position, b: Position): number {
 - **Inhalte lesen, hosten oder herunterladen.** Der Tracker speichert nur Metadaten und Fortschritt.
 - **Empfehlungen** und Entdecken neuer Titel.
 - **YouTube, Musik, Podcasts** und andere Medien außerhalb der genannten Typen.
+- **Cloud-Hosting** (Neon, Vercel o. Ä.). Tracker und Datenbank laufen lokal.
 - **Eigenen Server jetzt betreiben.** Der Umzug ist vorbereitet, aber nicht Teil der ersten Stufen.
 - **Serverseitiges Einloggen bei Drittanbietern** oder inoffizielle Anbieter-APIs mit gespeicherten Zugangsdaten.
 - **Automatisches Zusammenführen** per Ähnlichkeit, ohne meine Bestätigung.
@@ -956,3 +962,4 @@ export function comparePositions(a: Position, b: Position): number {
 ### Noch offen
 
 1. **Spikes S1–S3:** Die Ergebnisse können §7.6, §8 und §9 noch verändern; die Spec wird danach aktualisiert. Insbesondere offen: ob Disney+ eine auslesbare Verlaufsseite hat und was WebNovel bzw. Kindle beim Teilen auf dem iPhone übergeben.
+2. **Shield und iPhone bei lokalem Betrieb:** Beide brauchen eine https-Adresse im Netz; der lokale Tracker lauscht nur auf `127.0.0.1` und spricht http. Möglich sind ein eigener Server (§11) oder ein HTTPS-Zugang zu diesem Rechner im Heimnetz (Reverse-Proxy mit Zertifikat). Bis zur Entscheidung erreichen Shield-App und Kurzbefehl den Tracker nicht; die Extension in Brave auf diesem Rechner ist nicht betroffen.

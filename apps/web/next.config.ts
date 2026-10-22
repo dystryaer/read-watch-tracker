@@ -12,7 +12,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // Docker image (own server): a self-contained server bundle. Vercel and local runs stay unchanged.
+  // Docker image (own server): a self-contained server bundle. Local runs (`pnpm start`) stay unchanged.
   ...(process.env.NEXT_OUTPUT === "standalone"
     ? { output: "standalone" as const, outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)) }
     : {}),
