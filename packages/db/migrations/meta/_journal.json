@@ -57,6 +57,13 @@
       "when": 1792627396975,
       "tag": "0007_work_covers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792633547950,
+      "tag": "0008_rule_series_page",
+      "breakpoints": true
     }
   ]
 }

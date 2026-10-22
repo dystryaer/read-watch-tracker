@@ -311,6 +311,20 @@ test("new chapters reported by the extension show as a badge and through a filte
   await expect(page.getByText("Neuestes Kapitel laut Serienseite: Kap. 351")).toBeVisible();
 });
 
+test("a series page template in the site rule moves the checked page to the real series page", async ({ page, request }) => {
+  await login(page);
+  await page.goto(`/settings/sites/${encodeURIComponent("site:asuracomic-net")}`);
+  await page.getByLabel(/^Serienseiten-Vorlage/).fill("{origin}/comics/{series}");
+  // The live test shows the page the check will open, for the chapter URL I read last.
+  await expect(page.getByRole("cell", { name: "https://asuracomic.net/comics/overgeared", exact: true }).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Regel speichern" }).click();
+  await expect(page.getByText(/Regel gespeichert\. 1 Serienseite neu berechnet/)).toBeVisible();
+
+  const watch = await request.get("/api/v1/series-watch", { headers: { authorization: `Bearer ${token}` } });
+  expect((await watch.json()).series).toContainEqual(expect.objectContaining({ externalKey: "overgeared", seriesUrl: "https://asuracomic.net/comics/overgeared" }));
+});
+
 test("the statistics count this week's chapters as text, with decorative bars", async ({ page }) => {
   await login(page);
   await page.getByRole("link", { name: "Statistik" }).click();
