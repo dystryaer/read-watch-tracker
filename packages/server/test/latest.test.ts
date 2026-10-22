@@ -39,7 +39,7 @@ describe("seriesToWatch (SPEC §7.11)", () => {
     ]);
   });
 
-  it("leaves out finished works, unknown positions, links without a page, disabled sites and services", async () => {
+  it("leaves out unknown positions, links without a page, disabled sites and services", async () => {
     const source = await asura();
     const disabled = await seedSource(handle.db, { key: "site:old", trackingEnabled: false }, ["old.example"]);
     const netflix = await seedSource(handle.db, { key: "netflix", kind: "streaming" });
@@ -47,13 +47,33 @@ describe("seriesToWatch (SPEC §7.11)", () => {
       const work = await seedWork(handle.db, { ...values, title });
       await seedLink(handle.db, { workId: work.id, sourceId, externalKey: title, externalTitle: title, ...(seriesUrl === null ? {} : { seriesUrl }) });
     };
-    await link("completed", { title: "", chapter: 10, status: "completed" });
-    await link("unknown", { title: "" });
+    await link("unknown", { title: "", status: "completed" });
     await link("no-page", { title: "", chapter: 10 }, source.id, null);
     await link("disabled", { title: "", chapter: 10 }, disabled.id, "https://old.example/series/disabled");
     await link("dark", { title: "", type: "series", season: 1, episode: 2 }, netflix.id, "https://www.netflix.com/title/1");
 
     expect(await seriesToWatch(handle.db)).toEqual([]);
+  });
+
+  it("also lists finished and dropped works, after the works being read (SPEC §4.9)", async () => {
+    const source = await asura();
+    const cases = [
+      ["dropped-recent", "dropped", new Date("2026-10-20T00:00:00Z")],
+      ["reading-old", "reading", new Date("2026-01-01T00:00:00Z")],
+      ["completed-older", "completed", new Date("2026-06-01T00:00:00Z")],
+      ["reading-never", "reading", null],
+    ] as const;
+    for (const [title, status, lastProgressAt] of cases) {
+      const work = await seedWork(handle.db, { title, chapter: 50, status, lastProgressAt });
+      await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: title, externalTitle: title, seriesUrl: `https://asuracomic.net/series/${title}` });
+    }
+
+    expect((await seriesToWatch(handle.db)).map((series) => series.externalKey)).toEqual([
+      "reading-old",
+      "reading-never",
+      "dropped-recent",
+      "completed-older",
+    ]);
   });
 });
 
@@ -127,18 +147,18 @@ describe("recordLatestChapters", () => {
     expect(stored).toMatchObject({ latestChapter: 203, latestChapterAt: NOW, chapter: 200 });
   });
 
-  it("only writes to works being read through an enabled website, whatever a stolen token sends", async () => {
+  it("only writes to works with a known chapter through an enabled website, whatever a stolen token sends", async () => {
     const source = await asura();
     const kindle = await seedSource(handle.db, { key: "kindle", kind: "app" });
-    const done = await seedWork(handle.db, { title: "Done", chapter: 200, status: "completed" });
+    const unknown = await seedWork(handle.db, { title: "Unknown" });
     const book = await seedWork(handle.db, { title: "Book", type: "ebook", percent: 40 });
-    await seedLink(handle.db, { workId: done.id, sourceId: source.id, externalKey: "done", externalTitle: "Done", seriesUrl: "https://asuracomic.net/series/done" });
+    await seedLink(handle.db, { workId: unknown.id, sourceId: source.id, externalKey: "unknown", externalTitle: "Unknown", seriesUrl: "https://asuracomic.net/series/unknown" });
     await seedLink(handle.db, { workId: book.id, sourceId: kindle.id, externalKey: "B08FHBV4ZX", externalTitle: "Book" });
 
     const updated = await recordLatestChapters(
       handle.db,
       [
-        { sourceKey: "site:asura", externalKey: "done", latestChapter: 99999 },
+        { sourceKey: "site:asura", externalKey: "unknown", latestChapter: 99999 },
         { sourceKey: "kindle", externalKey: "B08FHBV4ZX", latestChapter: 99999 },
       ],
       NOW,
@@ -146,6 +166,26 @@ describe("recordLatestChapters", () => {
 
     expect(updated).toBe(0);
     expect((await handle.db.select().from(works)).map((work) => work.latestChapter)).toEqual([null, null]);
+  });
+
+  it("writes to finished and dropped works too, as series-watch lists them (SPEC §4.9)", async () => {
+    const source = await asura();
+    for (const status of ["completed", "dropped"] as const) {
+      const work = await seedWork(handle.db, { title: status, chapter: 200, status });
+      await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: status, externalTitle: status, seriesUrl: `https://asuracomic.net/series/${status}` });
+    }
+
+    const updated = await recordLatestChapters(
+      handle.db,
+      [
+        { sourceKey: "site:asura", externalKey: "completed", latestChapter: 201 },
+        { sourceKey: "site:asura", externalKey: "dropped", latestChapter: 230 },
+      ],
+      NOW,
+    );
+
+    expect(updated).toBe(2);
+    expect((await handle.db.select().from(works)).map((work) => work.latestChapter).sort()).toEqual([201, 230]);
   });
 
   it("takes the value the page shows now, also when it is lower", async () => {
