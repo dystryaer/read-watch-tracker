@@ -29,7 +29,7 @@ export function UpdateCard({ item }: { item: UpdateItem }) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={item.link.label}
-          className="group block rounded-[10px] focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-teal-600 dark:focus-visible:outline-teal-400"
+          className="group block rounded-[14px] focus-visible:outline-3 focus-visible:outline-offset-[6px] focus-visible:outline-teal-800 dark:focus-visible:outline-teal-200"
         >
           <span className={`${frame} transition-transform group-hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0`}>
             <UpdateCover src={item.cover} title={item.title} />
@@ -39,7 +39,8 @@ export function UpdateCard({ item }: { item: UpdateItem }) {
               aria-hidden="true"
               className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b-[10px] bg-linear-to-t from-zinc-950/90 to-transparent px-2 pt-8 pb-2 text-xs leading-tight font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none [@media(hover:none)]:hidden"
             >
-              {item.link.cta} ↗
+              {/* U+FE0E keeps the arrow a plain character; Windows would draw an emoji. */}
+              {item.link.cta} {"↗︎"}
             </span>
           </span>
         </a>
@@ -52,12 +53,13 @@ export function UpdateCard({ item }: { item: UpdateItem }) {
         </span>
       )}
 
+      {/* The visible title starts the name, so voice control finds the link by what it shows. */}
       <a
         href={`/works/${item.id}`}
+        aria-label={`${item.title}, Details`}
         className="mt-2.5 line-clamp-2 min-h-[2lh] rounded-sm text-[13px] leading-snug font-semibold break-words hover:text-teal-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 dark:hover:text-teal-300"
       >
         {item.title}
-        <span className="sr-only">, Details</span>
       </a>
       <p className="mt-0.5 text-xs text-zinc-600 tabular-nums dark:text-zinc-400">
         {item.positionLabel}
