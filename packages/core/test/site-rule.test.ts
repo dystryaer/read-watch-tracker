@@ -109,6 +109,27 @@ describe("SiteRule", () => {
   it("rejects overly long selectors", () => {
     expect(SiteRule.safeParse({ ...baseRule, titleSelector: "a".repeat(201) }).success).toBe(false);
   });
+
+  it("accepts a series page template and a chapter link pattern (SPEC §7.3, §7.11)", () => {
+    const rule = { ...baseRule, seriesUrlTemplate: "{origin}/manga/{series}", chapterLinkPattern: String.raw`[?&]chapter=(\d+(?:\.\d+)?)` };
+    expect(SiteRule.parse(rule)).toMatchObject(rule);
+  });
+
+  it.each([
+    ["no {series}", "{origin}/manga/", /muss \{series\} enthalten/],
+    ["another scheme", "javascript:{series}", /muss mit \{origin\} oder http\(s\):\/\/ beginnen/],
+    ["a placeholder of the next-URL template", "{origin}/manga/{series}/{next}", /unbekannter Platzhalter/],
+    ["{seriesUrl}, which it defines itself", "{seriesUrl}/{series}", /muss mit \{origin\}/],
+  ])("rejects a series page template with %s", (_name, seriesUrlTemplate, message) => {
+    const result = SiteRule.safeParse({ ...baseRule, seriesUrlTemplate });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toMatch(message);
+  });
+
+  it("checks the chapter link pattern like the other patterns", () => {
+    expect(SiteRule.safeParse({ ...baseRule, chapterLinkPattern: String.raw`chapter=\d+` }).success).toBe(false);
+    expect(SiteRule.safeParse({ ...baseRule, chapterLinkPattern: String.raw`chapter=(\d+)+` }).success).toBe(false);
+  });
 });
 
 describe("compileRulePattern", () => {
@@ -135,6 +156,11 @@ describe("parseRuleFields", () => {
     if (result.ok) return;
     expect(Object.keys(result.errors).sort()).toEqual(["chapterPattern", "nextUrlTemplate"]);
     expect(result.errors.chapterPattern).toBe("kein gültiger regulärer Ausdruck");
+  });
+
+  it("knows the fields of the new-chapter check", () => {
+    const result = parseRuleFields({ seriesUrlTemplate: " {origin}/manga/{series} ", chapterLinkPattern: "(unclosed" });
+    expect(result).toEqual({ ok: false, errors: { chapterLinkPattern: "kein gültiger regulärer Ausdruck" } });
   });
 
   it("validates against the given site", () => {

@@ -38,10 +38,14 @@ function html(body: string | ReadableStream<Uint8Array>, init: { status?: number
   return response;
 }
 
-async function setup(series: Series[], pages: Record<string, () => Response | Promise<Response>> = {}, options: { granted?: boolean } = {}) {
+async function setup(
+  series: Series[],
+  pages: Record<string, () => Response | Promise<Response>> = {},
+  options: { granted?: boolean; sites?: DeviceConfig["sites"] } = {},
+) {
   const store = createStore(fakeStorage());
   await saveSettings(store, paired);
-  await saveCachedConfig(store, { config, etag: null, fetchedAt: 0 });
+  await saveCachedConfig(store, { config: { ...config, sites: options.sites ?? config.sites }, etag: null, fetchedAt: 0 });
   let now = 1_000_000_000;
   let online = true;
   const deps = {
@@ -82,6 +86,24 @@ describe("checkNewChapters (SPEC §7.11)", () => {
     expect(deps.api.postLatestChapters).toHaveBeenCalledWith("https://tracker.example", "T".repeat(43), [
       { sourceKey: "site:asura", externalKey: "solo-leveling", latestChapter: 203 },
       { sourceKey: "site:asura", externalKey: "omniscient-reader", latestChapter: 100 },
+    ]);
+  });
+
+  it("reads a series page whose chapter links name the chapter only in the query, with the site's chapter link pattern", async () => {
+    // Synthetic page shaped like a list of links to a redirect script (A11), with a sidebar of another series.
+    const sites: DeviceConfig["sites"] = [
+      { sourceKey: "site:scans", domains: ["scans.example"], seriesUrlTemplate: "{origin}/manga/{series}", chapterLinkPattern: String.raw`[?&]chapter=(\d+(?:\.\d+)?)` },
+    ];
+    const solo: Series = { sourceKey: "site:scans", externalKey: "solo-leveling", seriesUrl: "https://scans.example/manga/Solo-Leveling", chapter: 200 };
+    const link = (manga: number, chapter: number) => `<li><a  href="/chaptered.php?manga=${manga}&amp;chapter=${chapter}" class="chplinks">Chapter ${chapter}</a></li>`;
+    const page = `<a id="read-first" href="/chaptered.php?manga=6&chapter=0">Read first</a>
+      <aside>${link(9, 410)}${link(9, 409)}</aside>
+      <div id="chapters-list">${[200.5, 200, 199, 198].map((chapter) => link(6, chapter)).join("")}</div>`;
+    const { deps } = await setup([solo], { [solo.seriesUrl]: () => html(page) }, { sites });
+
+    expect(await checkNewChapters(deps)).toEqual({ checked: 1, reported: 1 });
+    expect(deps.api.postLatestChapters).toHaveBeenCalledWith(expect.any(String), expect.any(String), [
+      { sourceKey: "site:scans", externalKey: "solo-leveling", latestChapter: 200.5 },
     ]);
   });
 

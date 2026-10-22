@@ -1,4 +1,4 @@
-export { cleanChapterTitle, detectChapterFromUrl, type UrlDetection } from "./detect-url";
+export { cleanChapterTitle, detectChapterFromUrl, detectChapterLink, type UrlDetection } from "./detect-url";
 export { type EpisodeInfo, parseEpisode, streamingSeriesKey } from "./episode";
 export * from "./event";
 export { normalizeTitle } from "./normalize";

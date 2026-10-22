@@ -1,4 +1,4 @@
-import { detectChapterFromUrl } from "./detect-url";
+import { detectChapterFromUrl, detectChapterLink } from "./detect-url";
 import { parseHttpUrl } from "./safe-url";
 import { normalizeDomain } from "./services";
 import type { SiteRule } from "./site-rule";
@@ -30,6 +30,8 @@ const HAS_DIGIT = /\d/;
  * The newest chapter a series page links to (SPEC §7.11), read without a DOM: every `href` on the
  * same site is checked with the chapter detection (and the site rule) of the reader, and the
  * highest chapter of this series wins. Null when the page lists none, e.g. it loads them by script.
+ * Links that name no series (`?manga=6&chapter=12`) count through the rule's chapter link pattern;
+ * of those, only the most common link form – the series' own list – counts, never a sidebar.
  * Each link is checked once, links without a number are skipped, and after the time budget the
  * highest chapter found so far is returned.
  */
@@ -46,6 +48,8 @@ export function latestChapterIn(
   const deadline = now() + budgetMs;
 
   let latest: number | null = null;
+  /** Links found only by the chapter link pattern, by link form: how many, and their highest chapter. */
+  const forms = new Map<string, { links: number; latest: number }>();
   let links = 0;
   const seen = new Set<string>();
   for (const match of html.matchAll(HREF)) {
@@ -64,10 +68,24 @@ export function latestChapterIn(
     if (!parseHttpUrl(url.href) || normalizeDomain(url.hostname) !== site) continue;
     if (now() > deadline) break;
     const detection = detectChapterFromUrl(url, "", rule);
-    if (detection?.seriesKey !== externalKey) continue;
-    latest = latest === null ? detection.chapter : Math.max(latest, detection.chapter);
+    if (detection?.seriesKey === externalKey) {
+      latest = latest === null ? detection.chapter : Math.max(latest, detection.chapter);
+      continue;
+    }
+    const link = detection ? null : detectChapterLink(url, rule);
+    if (link) {
+      const form = forms.get(link.form);
+      forms.set(link.form, { links: (form?.links ?? 0) + 1, latest: Math.max(form?.latest ?? 0, link.chapter) });
+    }
   }
-  return latest;
+  const listed = mostCommon([...forms.values()]);
+  return listed === null ? latest : Math.max(latest ?? 0, listed.latest);
+}
+
+/** The link form with the most links; null when there is none or two are equally common. */
+function mostCommon(forms: { links: number; latest: number }[]): { links: number; latest: number } | null {
+  const [first, second] = forms.toSorted((a, b) => b.links - a.links);
+  return first && first.links !== second?.links ? first : null;
 }
 
 /** True for an interstitial bot check (Cloudflare, DDoS-Guard, DataDome, Incapsula) instead of the page. */

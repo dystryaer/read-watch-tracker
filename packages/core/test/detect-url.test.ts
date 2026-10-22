@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanChapterTitle, detectChapterFromUrl } from "../src/detect-url";
+import { cleanChapterTitle, detectChapterFromUrl, detectChapterLink } from "../src/detect-url";
 import type { SiteRule } from "../src/site-rule";
 
 describe("detectChapterFromUrl – generic", () => {
@@ -178,6 +178,73 @@ describe("detectChapterFromUrl – with a site rule", () => {
 
     expect(detectChapterFromUrl(near, "", tail)?.chapter).toBe(12);
     expect(detectChapterFromUrl(far, "", tail)).toBeNull();
+  });
+});
+
+// Synthetic URLs shaped like a reader whose chapter path (/title/…) is no series page (A11).
+describe("detectChapterFromUrl – series page template (SPEC §7.3)", () => {
+  const site = { sourceKey: "site:scans", domains: ["scans.example"] };
+
+  it("builds the series page from the template instead of the path before the chapter", () => {
+    const rule: SiteRule = { ...site, seriesUrlTemplate: "{origin}/manga/{series}" };
+    expect(detectChapterFromUrl("https://scans.example/title/Solo-Leveling/chapter/200.5/1", "", rule)).toEqual({
+      chapter: 200.5,
+      seriesKey: "solo-leveling",
+      title: null,
+      seriesUrl: "https://scans.example/manga/Solo-Leveling",
+    });
+  });
+
+  it("fills in the series as the rule's series pattern captures it", () => {
+    const rule: SiteRule = {
+      ...site,
+      chapterPattern: String.raw`/read/[^/]+/(\d+)`,
+      seriesPattern: String.raw`/read/([^/]+)/`,
+      seriesUrlTemplate: "https://www.scans.example/series.php?name={series}",
+    };
+    expect(detectChapterFromUrl("https://scans.example/read/Solo-Leveling/201", "", rule)?.seriesUrl).toBe(
+      "https://www.scans.example/series.php?name=Solo-Leveling",
+    );
+  });
+
+  it("also names a series page when the series stands in the chapter segment", () => {
+    const rule: SiteRule = { ...site, seriesUrlTemplate: "{origin}/series/{series}" };
+    expect(detectChapterFromUrl("https://scans.example/read/overgeared-chapter-12", "", rule)?.seriesUrl).toBe(
+      "https://scans.example/series/overgeared",
+    );
+  });
+
+  it("names no series page when the series only comes from the page title", () => {
+    const rule: SiteRule = { ...site, seriesUrlTemplate: "{origin}/manga/{series}" };
+    expect(detectChapterFromUrl("https://scans.example/viewer?id=5", "Overgeared Chapter 12", rule)).toMatchObject({
+      chapter: 12,
+      seriesKey: "overgeared",
+      seriesUrl: null,
+    });
+  });
+});
+
+describe("detectChapterLink – chapter links of a series page (SPEC §7.11)", () => {
+  const rule: SiteRule = { sourceKey: "site:scans", domains: ["scans.example"], chapterLinkPattern: String.raw`[?&]chapter=(\d+(?:\.\d+)?)` };
+
+  it("finds the chapter in path and query and names the link's form without it", () => {
+    expect(detectChapterLink("https://scans.example/chaptered.php?manga=6&chapter=200.5", rule)).toEqual({
+      chapter: 200.5,
+      form: "/chaptered.php?manga=6&chapter=#",
+    });
+    expect(detectChapterLink(new URL("https://scans.example/chaptered.php?chapter=7&manga=6"), rule)?.form).toBe(
+      "/chaptered.php?chapter=#&manga=6",
+    );
+  });
+
+  it.each([
+    ["no chapter link pattern", "https://scans.example/chaptered.php?manga=6&chapter=2", { ...rule, chapterLinkPattern: undefined }],
+    ["no site rule", "https://scans.example/chaptered.php?manga=6&chapter=2", undefined],
+    ["a link the pattern does not match", "https://scans.example/manga/Solo-Leveling", rule],
+    ["a chapter beyond the supported maximum", "https://scans.example/chaptered.php?manga=6&chapter=123456", rule],
+    ["a link that is no http(s) URL", "javascript:alert('?chapter=1')", rule],
+  ])("finds nothing with %s", (_name, url, linkRule) => {
+    expect(detectChapterLink(url, linkRule)).toBeNull();
   });
 });
 

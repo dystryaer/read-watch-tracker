@@ -66,6 +66,17 @@ describe("detectChapter", () => {
     expect(detectChapter(document, URL_)?.title).toBe("Solo Leveling");
   });
 
+  it("sends the series page named by the rule's template, not the chapter path before the chapter (SPEC §7.3)", () => {
+    // Synthetic reader (A11): chapters under /title/<series>/…, the series page under /manga/<series>.
+    page("", '<a href="/manga/Solo-Leveling">Solo Leveling</a>', "Solo Leveling Chapter 200");
+    const rule: SiteRule = { sourceKey: "site:scans", domains: ["scans.example"], seriesUrlTemplate: "{origin}/manga/{series}" };
+    expect(detectChapter(document, "https://scans.example/title/Solo-Leveling/chapter/200/1", rule)).toMatchObject({
+      chapter: 200,
+      seriesKey: "solo-leveling",
+      seriesUrl: "https://scans.example/manga/Solo-Leveling",
+    });
+  });
+
   it("ignores an invalid selector instead of failing", () => {
     page("", "<h1>Solo Leveling</h1>");
     const rule: SiteRule = { sourceKey: "site:reader", domains: ["reader.example"], titleSelector: "div[[" };
