@@ -199,3 +199,10 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T46 Bilder pro Werk + Feinschliff der Web-App** · M
   Akz.: Extension liest `og:image` (nur https) und sendet `source.coverUrl`; `work_links`/`pending_matches.cover_url`, Tabelle `work_covers` (Migration 0007); Server lädt Seitenbilder nach Events und Bestätigungen (geschützter Download, Logo-Erkennung, Fehler 7 Tage gemerkt); Detailseite: Datei, Ziehen, Strg+V, Bildadresse, entfernen, Bild der Seite; `/works/[id]/cover` nur mit Sitzung, versioniert und ein Jahr cachebar; Kacheln mit Initialen; Übersicht als Karte mit Bildern, Kopfzeile mit Marke und aktiver Navigation, Titel auf dem Handy zweizeilig; Bilder auch in Schnell-Update und Zuordnungen (Kachel)
   Geprüft: 1296 Unit/Integration-Tests, 30 E2E (neu: Upload, `og:image` im Event), Brave-Lauf mit demonicscans: Solo Leveling bekommt sein Cover nach dem Zuordnen
+
+---
+
+## Übersicht als Cover-Regal (`feat/cover-regal`)
+
+- [x] **T48 Cover-Regal** · M
+  Akz.: Übersicht standardmäßig als Raster aus Cover-Karten (Desktop ~6, Handy 3 Spalten, kein seitliches Scrollen bei 375 px), Umschalter `Regal | Liste`, Wahl per Cookie vom Server gerendert (kein Umspringen); Karte: Cover 2:3 bzw. Kachel, Typ-Chip, „N neu“ (zählt beim [+] mit), Stand auf dem Bild mit `Kap. 345 / 348`, gelbes `Kap. ?`, [−][+] bei Maus und Tastaturfokus, darunter Titel (2 Zeilen), Quelle, Zeit, `Weiterlesen ›`/`Öffnen ›` und [+]; Sonderfälle `Stand: 43 %`, `Abgeschlossen`, `Stand setzen`, `Keine Seite`/`Kein Link`; Suche, Filter, Banner, WebNovel-Hinweis und Speichern des Steppers unverändert; Detailseite mit Kopf wie im Mock (großes Cover, Chips, neuestes Kapitel, `Weiterlesen · Kap. N ›`, Stepper); Initialen-Bug „Ranker's Return“ → `RR`; SPEC §4.1–§4.3; Mocks in `docs/mocks/`, Vorher/Nachher in `docs/screenshots/feat-cover-regal/`
