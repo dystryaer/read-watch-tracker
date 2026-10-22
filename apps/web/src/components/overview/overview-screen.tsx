@@ -2,6 +2,8 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import { filterAndSort, keepOrder, type OverviewFilter, type OverviewItem, type SortOrder, type StatusFilter, type Tab } from "@/lib/overview";
+import { type OverviewView, viewCookie } from "@/lib/shelf";
+import { WorkCard } from "./work-card";
 import { WorkRow } from "./work-row";
 
 const TABS: { value: Tab; label: string }[] = [
@@ -32,16 +34,47 @@ const SORTS: { value: SortOrder; label: string }[] = [
 const controlClass =
   "rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm shadow-xs dark:border-zinc-700 dark:bg-zinc-900";
 
+/** Four small squares and three lines, drawn with classes (the CSP allows no inline styles). */
+function ViewIcon({ view }: { view: OverviewView }) {
+  return view === "shelf" ? (
+    <span aria-hidden="true" className="grid grid-cols-2 gap-0.5">
+      {[0, 1, 2, 3].map((square) => (
+        <span key={square} className="size-1.5 rounded-[1px] bg-current" />
+      ))}
+    </span>
+  ) : (
+    <span aria-hidden="true" className="grid gap-0.5">
+      {[0, 1, 2].map((line) => (
+        <span key={line} className="h-0.5 w-3 rounded-[1px] bg-current" />
+      ))}
+    </span>
+  );
+}
+
+const VIEWS: { value: OverviewView; label: string }[] = [
+  { value: "shelf", label: "Regal" },
+  { value: "list", label: "Liste" },
+];
+
 export function OverviewScreen({
   items,
   pendingCount,
   webnovelHint = null,
+  initialView = "shelf",
 }: {
   items: OverviewItem[];
   pendingCount: number;
   /** "WebNovel zuletzt vor 9 Tagen synchronisiert." – shown quietly with a link to the library (SPEC §9.1). */
   webnovelHint?: string | null;
+  /** The view this browser chose last time, read from its cookie on the server. */
+  initialView?: OverviewView;
 }) {
+  const [view, setView] = useState(initialView);
+  const chooseView = (next: OverviewView) => {
+    setView(next);
+    // A plain preference, read by the server on the next visit (no flash of the other view).
+    document.cookie = viewCookie(next);
+  };
   const [filter, setFilter] = useState<OverviewFilter>({
     tab: "all",
     status: "reading",
@@ -164,6 +197,24 @@ export function OverviewScreen({
             />
             Neue Kapitel
           </label>
+          <div
+            role="group"
+            aria-label="Ansicht"
+            className="inline-flex overflow-hidden rounded-md border border-zinc-300 shadow-xs sm:ml-auto dark:border-zinc-700"
+          >
+            {VIEWS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={view === option.value}
+                onClick={() => chooseView(option.value)}
+                className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-700 aria-pressed:bg-teal-50 aria-pressed:font-semibold aria-pressed:text-teal-900 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 dark:aria-pressed:bg-teal-950 dark:aria-pressed:text-teal-100"
+              >
+                <ViewIcon view={option.value} />
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -187,14 +238,26 @@ export function OverviewScreen({
           <p className="mt-5 mb-2 text-sm text-zinc-500 dark:text-zinc-400">
             {visible.length === items.length ? `${items.length} Titel` : `${visible.length} von ${items.length} Titeln`}
           </p>
-          <ul
-            aria-label="Titel"
-            className="divide-y divide-zinc-200 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900"
-          >
-            {visible.map((item) => (
-              <WorkRow key={item.id} item={item} />
-            ))}
-          </ul>
+          {view === "shelf" ? (
+            // Six columns on a desktop, three on a phone; never wider than the screen.
+            <ul
+              aria-label="Titel"
+              className="grid grid-cols-3 gap-x-2.5 gap-y-5 sm:grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] sm:gap-x-4 sm:gap-y-6"
+            >
+              {visible.map((item) => (
+                <WorkCard key={item.id} item={item} />
+              ))}
+            </ul>
+          ) : (
+            <ul
+              aria-label="Titel"
+              className="divide-y divide-zinc-200 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              {visible.map((item) => (
+                <WorkRow key={item.id} item={item} />
+              ))}
+            </ul>
+          )}
         </>
       )}
     </main>
