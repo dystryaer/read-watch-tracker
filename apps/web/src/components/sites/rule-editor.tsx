@@ -55,7 +55,7 @@ export function RuleEditor({
                   <h3 className="text-sm font-semibold">Neue Kapitel erkennen</h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Nur nötig, wenn die Serienseite nicht der Pfad vor dem Kapitel ist oder ihre Links das Kapitel nur in der
-                    Query nennen (z. B. <span className="font-mono">?manga=6&amp;chapter=12</span>). Einen solchen Link kannst
+                    Query nennen (z. B. <span className="font-mono whitespace-nowrap">?manga=6&amp;chapter=12</span>). Einen solchen Link kannst
                     du unten im Live-Test einfügen. Beim Speichern werden die Serienseiten deiner Werke neu berechnet.
                   </p>
                 </div>
