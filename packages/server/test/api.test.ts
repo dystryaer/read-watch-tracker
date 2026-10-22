@@ -16,6 +16,7 @@ import {
   handleShareConfirm,
 } from "../src/api/handlers";
 import { approvePairing, createDeviceWithToken, revokeDevice } from "../src/devices";
+import { updateSiteRule } from "../src/site-admin";
 import { chapterEvent, seedLink, seedSource, seedWork } from "./helpers";
 
 let handle: DbHandle;
@@ -392,6 +393,30 @@ describe("new chapter endpoints (M4, SPEC §7.11)", () => {
     expect(await response.json()).toEqual({
       series: [{ sourceKey: "site:asura", externalKey: "solo-leveling", seriesUrl: "https://asuracomic.net/series/solo-leveling", chapter: 200 }],
     });
+  });
+
+  it("serves the real series page once the site rule names it, and hands the rule to the extension (T49)", async () => {
+    // Synthetic reader (A11): chapters under /title/<series>/…, the series page under /manga/<series>.
+    const source = await seedSource(handle.db, { key: "site:scans", trackingEnabled: true }, ["scans.example"]);
+    const work = await seedWork(handle.db, { title: "Solo Leveling", chapter: 199 });
+    await seedLink(handle.db, { workId: work.id, sourceId: source.id, externalKey: "solo-leveling", externalTitle: "Solo Leveling" });
+    const chapterUrl = "https://scans.example/title/Solo-Leveling/chapter/200/1";
+    // The extension without the rule sends the path before the chapter, which is no page there (404).
+    await handleEvents(
+      post("/api/v1/events", {
+        events: [chapterEvent({ source: { key: "site:scans", externalKey: "solo-leveling", url: chapterUrl, seriesUrl: "https://scans.example/title/Solo-Leveling" }, chapter: 200 })],
+      }),
+      context,
+    );
+    const watched = async () => ((await (await handleSeriesWatch(get(), context)).json()) as { series: { seriesUrl: string }[] }).series;
+    expect((await watched())[0]?.seriesUrl).toBe("https://scans.example/title/Solo-Leveling");
+
+    const rule = { seriesUrlTemplate: "{origin}/manga/{series}", chapterLinkPattern: String.raw`[?&]chapter=(\d+(?:\.\d+)?)` };
+    expect(await updateSiteRule(handle.db, source.id, rule)).toEqual({ ok: true, seriesPages: 1 });
+
+    expect((await watched())[0]?.seriesUrl).toBe("https://scans.example/manga/Solo-Leveling");
+    const config = await (await handleConfig(new Request("http://localhost/api/v1/config", { headers: { authorization: `Bearer ${token}` } }), context)).json();
+    expect(config.sites).toEqual([{ sourceKey: "site:scans", domains: ["scans.example"], ...rule }]);
   });
 
   it("takes the newest chapters the extension found", async () => {

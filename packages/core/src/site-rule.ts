@@ -5,6 +5,7 @@ export const MAX_PATTERN_LENGTH = 200;
 const MAX_SELECTOR_LENGTH = 200;
 const MAX_TEMPLATE_LENGTH = 500;
 const NEXT_URL_PLACEHOLDERS = new Set(["origin", "seriesUrl", "series", "next"]);
+const SERIES_URL_PLACEHOLDERS = new Set(["origin", "series"]);
 
 const HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
 
@@ -83,6 +84,19 @@ const NextUrlTemplate = z
   )
   .refine((template) => template.includes("{next}"), "muss {next} enthalten");
 
+/** The series page of a chapter (SPEC §7.3), for sites whose chapter path is no series page. */
+const SeriesUrlTemplate = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_TEMPLATE_LENGTH)
+  .refine((template) => /^(?:\{origin\}|https?:\/\/)/.test(template), "muss mit {origin} oder http(s):// beginnen")
+  .refine(
+    (template) => [...template.matchAll(/\{([^}]*)\}/g)].every((m) => SERIES_URL_PLACEHOLDERS.has(m[1] ?? "")),
+    "unbekannter Platzhalter (erlaubt: {origin}, {series})",
+  )
+  .refine((template) => template.includes("{series}"), "muss {series} enthalten");
+
 export const SiteRule = z.object({
   sourceKey: SourceKey,
   domains: z.array(Hostname).min(1).max(50),
@@ -91,11 +105,22 @@ export const SiteRule = z.object({
   titleSelector: Selector.optional(),
   endSelector: Selector.optional(),
   nextUrlTemplate: NextUrlTemplate.optional(),
+  // New-chapter check (SPEC §7.11): where the series page is, and how its chapter links look.
+  seriesUrlTemplate: SeriesUrlTemplate.optional(),
+  chapterLinkPattern: Pattern.optional(),
 });
 export type SiteRule = z.infer<typeof SiteRule>;
 
 /** The fields of a site rule the user edits (SPEC §7.3). */
-export const RULE_FIELDS = ["chapterPattern", "seriesPattern", "titleSelector", "endSelector", "nextUrlTemplate"] as const;
+export const RULE_FIELDS = [
+  "chapterPattern",
+  "seriesPattern",
+  "titleSelector",
+  "endSelector",
+  "nextUrlTemplate",
+  "seriesUrlTemplate",
+  "chapterLinkPattern",
+] as const;
 export type RuleField = (typeof RULE_FIELDS)[number];
 export type RuleFields = Partial<Record<RuleField, string>>;
 

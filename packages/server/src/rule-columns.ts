@@ -3,7 +3,13 @@ import type { sources } from "@rwt/db";
 
 type RuleColumns = Pick<
   typeof sources.$inferSelect,
-  "ruleChapterPattern" | "ruleSeriesPattern" | "ruleTitleSelector" | "ruleEndSelector" | "ruleNextUrlTemplate"
+  | "ruleChapterPattern"
+  | "ruleSeriesPattern"
+  | "ruleTitleSelector"
+  | "ruleEndSelector"
+  | "ruleNextUrlTemplate"
+  | "ruleSeriesUrlTemplate"
+  | "ruleChapterLinkPattern"
 >;
 
 /** The rule fields stored on a source row; unset columns are left out. */
@@ -14,6 +20,8 @@ export function storedRuleFields(source: RuleColumns): RuleFields {
     ...(source.ruleTitleSelector ? { titleSelector: source.ruleTitleSelector } : {}),
     ...(source.ruleEndSelector ? { endSelector: source.ruleEndSelector } : {}),
     ...(source.ruleNextUrlTemplate ? { nextUrlTemplate: source.ruleNextUrlTemplate } : {}),
+    ...(source.ruleSeriesUrlTemplate ? { seriesUrlTemplate: source.ruleSeriesUrlTemplate } : {}),
+    ...(source.ruleChapterLinkPattern ? { chapterLinkPattern: source.ruleChapterLinkPattern } : {}),
   };
 }
 
@@ -25,5 +33,7 @@ export function ruleColumns(fields: RuleFields): RuleColumns {
     ruleTitleSelector: fields.titleSelector ?? null,
     ruleEndSelector: fields.endSelector ?? null,
     ruleNextUrlTemplate: fields.nextUrlTemplate ?? null,
+    ruleSeriesUrlTemplate: fields.seriesUrlTemplate ?? null,
+    ruleChapterLinkPattern: fields.chapterLinkPattern ?? null,
   };
 }

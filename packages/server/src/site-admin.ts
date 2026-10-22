@@ -1,4 +1,12 @@
-import { isHostname, isServiceHost, normalizeDomain, parseRuleFields, type RuleFields } from "@rwt/core";
+import {
+  detectChapterFromUrl,
+  isHostname,
+  isServiceHost,
+  normalizeDomain,
+  parseRuleFields,
+  type RuleFields,
+  type SiteRule,
+} from "@rwt/core";
 import { type Db, events, sourceDomains, sources, workLinks } from "@rwt/db";
 import { and, asc, count, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { ruleColumns, storedRuleFields } from "./rule-columns";
@@ -82,9 +90,14 @@ export async function getSite(db: Db, key: string): Promise<SiteSummary | null> 
   return (await summarize(db, rows))[0] ?? null;
 }
 
-export type RuleUpdateResult = { ok: true } | { ok: false; errors: Partial<Record<keyof SiteRuleFields, string>> };
+export type RuleUpdateResult =
+  | { ok: true; /** Linked series whose page the new rule names differently. */ seriesPages: number }
+  | { ok: false; errors: Partial<Record<keyof SiteRuleFields, string>> };
 
-/** Saves the site rule (SPEC §7.3) after the same validation the devices apply; empty fields are cleared. */
+/**
+ * Saves the site rule (SPEC §7.3) after the same validation the devices apply; empty fields are
+ * cleared. The series pages of the site's links follow the new rule right away.
+ */
 export async function updateSiteRule(
   db: Db,
   sourceId: string,
@@ -94,11 +107,42 @@ export async function updateSiteRule(
   const parsed = parseRuleFields(fields);
   if (!parsed.ok) return { ok: false, errors: parsed.errors };
 
-  await db
-    .update(sources)
-    .set({ ...ruleColumns(parsed.rule), ruleUpdatedAt: now })
-    .where(eq(sources.id, sourceId));
-  return { ok: true };
+  return db.transaction(async (tx): Promise<RuleUpdateResult> => {
+    await tx
+      .update(sources)
+      .set({ ...ruleColumns(parsed.rule), ruleUpdatedAt: now })
+      .where(eq(sources.id, sourceId));
+    return { ok: true, seriesPages: await rederiveSeriesUrls(tx, sourceId, parsed.rule) };
+  });
+}
+
+/**
+ * Derives each link's series page again from the newest chapter URL read for it, with the rule
+ * the extension will use from now on. So a page that the old rule got wrong (404) is fixed
+ * without reading a chapter again – for a series I am caught up on, the next chapter would only
+ * be read after the check found it. Links whose URL the rule no longer recognizes stay as they are.
+ */
+async function rederiveSeriesUrls(db: Db, sourceId: string, rule: SiteRule): Promise<number> {
+  const newest = await db
+    .selectDistinctOn([events.externalKey], { externalKey: events.externalKey, url: events.url })
+    .from(events)
+    .where(and(eq(events.sourceId, sourceId), isNotNull(events.externalKey), isNotNull(events.url)))
+    .orderBy(events.externalKey, desc(events.occurredAt), desc(events.receivedAt));
+  const urlByKey = new Map(newest.map((row) => [row.externalKey, row.url]));
+  const links = await db
+    .select({ id: workLinks.id, externalKey: workLinks.externalKey, seriesUrl: workLinks.seriesUrl })
+    .from(workLinks)
+    .where(eq(workLinks.sourceId, sourceId));
+
+  let changed = 0;
+  for (const link of links) {
+    const url = urlByKey.get(link.externalKey);
+    const detection = url ? detectChapterFromUrl(url, "", rule) : null;
+    if (detection?.seriesKey !== link.externalKey || !detection.seriesUrl || detection.seriesUrl === link.seriesUrl) continue;
+    await db.update(workLinks).set({ seriesUrl: detection.seriesUrl }).where(eq(workLinks.id, link.id));
+    changed++;
+  }
+  return changed;
 }
 
 export async function setSiteTracking(db: Db, sourceId: string, enabled: boolean): Promise<void> {

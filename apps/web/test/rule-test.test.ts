@@ -51,6 +51,24 @@ describe("evaluateRule", () => {
     expect(evaluateRule({}, site, lines).results).toHaveLength(20);
   });
 
+  it("shows the series page the new-chapter check will open", () => {
+    const generic = evaluateRule({}, site, "https://reader.example/title/Solo-Leveling/chapter/200/1");
+    const templated = evaluateRule({ seriesUrlTemplate: "{origin}/manga/{series}" }, site, "https://reader.example/title/Solo-Leveling/chapter/200/1");
+
+    expect(generic.results[0]?.detection?.seriesUrl).toBe("https://reader.example/title/Solo-Leveling");
+    expect(templated.results[0]?.detection?.seriesUrl).toBe("https://reader.example/manga/Solo-Leveling");
+    expect(templated.usesRule).toBe(true);
+  });
+
+  it("recognizes a pasted link of the series page by the chapter link pattern", () => {
+    const fields = { chapterLinkPattern: String.raw`[?&]chapter=(\d+(?:\.\d+)?)` };
+    const result = evaluateRule(fields, site, ["https://reader.example/chaptered.php?manga=6&chapter=200.5", "https://reader.example/manga/x/chapter-3"].join("\n"));
+
+    expect(result.results[0]).toMatchObject({ detection: null, linkChapter: 200.5, next: null });
+    expect(result.results[1]).toMatchObject({ detection: { chapter: 3 }, linkChapter: null });
+    expect(evaluateRule({}, site, "https://reader.example/chaptered.php?manga=6&chapter=2").results[0]?.linkChapter).toBeNull();
+  });
+
   it("validates a site without domains against a placeholder", () => {
     expect(evaluateRule({ chapterPattern: String.raw`/c(\d+)` }, { sourceKey: "site:x", domains: [] }, "").errors).toEqual({});
   });

@@ -1,4 +1,4 @@
-import { type DbHandle, events, sourceDomains, sources } from "@rwt/db";
+import { type DbHandle, events, sourceDomains, sources, workLinks } from "@rwt/db";
 import { createTestDb, resetDb } from "@rwt/db/testing";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -74,7 +74,7 @@ describe("updateSiteRule", () => {
       NOW,
     );
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, seriesPages: 0 });
     const [stored] = await handle.db.select().from(sources).where(eq(sources.id, source.id));
     expect(stored).toMatchObject({
       ruleChapterPattern: String.raw`/chapter/(\d+)`,
@@ -82,6 +82,104 @@ describe("updateSiteRule", () => {
       ruleNextUrlTemplate: "{seriesUrl}/chapter/{next}",
       ruleUpdatedAt: NOW,
     });
+  });
+
+  it("stores the fields of the new-chapter check", async () => {
+    const source = await seedSource(handle.db, { key: "site:scans" }, ["scans.example"]);
+
+    await updateSiteRule(handle.db, source.id, { seriesUrlTemplate: "{origin}/manga/{series}", chapterLinkPattern: String.raw`[?&]chapter=(\d+)` }, NOW);
+
+    const site = await getSite(handle.db, "site:scans");
+    expect(site?.rule).toEqual({ seriesUrlTemplate: "{origin}/manga/{series}", chapterLinkPattern: String.raw`[?&]chapter=(\d+)` });
+  });
+});
+
+describe("updateSiteRule – series pages follow the rule (SPEC §7.3)", () => {
+  // Synthetic reader (A11): chapters under /title/<series>/…, the series page under /manga/<series>.
+  async function readOnScans() {
+    const source = await seedSource(handle.db, { key: "site:scans" }, ["scans.example"]);
+    const work = await seedWork(handle.db, { title: "Solo Leveling", chapter: 200 });
+    const link = await seedLink(handle.db, {
+      workId: work.id,
+      sourceId: source.id,
+      externalKey: "solo-leveling",
+      externalTitle: "Solo Leveling",
+      seriesUrl: "https://scans.example/title/Solo-Leveling",
+    });
+    const read = (url: string | null, minutesAgo: number, externalKey = "solo-leveling") => ({
+      id: crypto.randomUUID(),
+      kind: "read" as const,
+      sourceId: source.id,
+      externalKey,
+      url,
+      chapter: 200,
+      occurredAt: new Date(NOW.getTime() - minutesAgo * 60_000),
+      outcome: "applied" as const,
+    });
+    return { source, work, link, read };
+  }
+  const seriesUrlOf = async (id: string) => (await handle.db.select().from(workLinks).where(eq(workLinks.id, id)))[0]?.seriesUrl;
+
+  it("derives each linked series page again from the newest chapter URL read there", async () => {
+    const { source, link, read } = await readOnScans();
+    await handle.db.insert(events).values([
+      read("https://scans.example/title/Solo-Leveling/chapter/199/1", 60),
+      read("https://scans.example/title/Solo-Leveling/chapter/200/1", 30),
+      read(null, 10),
+    ]);
+
+    const result = await updateSiteRule(handle.db, source.id, { seriesUrlTemplate: "{origin}/manga/{series}" }, NOW);
+
+    expect(result).toEqual({ ok: true, seriesPages: 1 });
+    expect(await seriesUrlOf(link.id)).toBe("https://scans.example/manga/Solo-Leveling");
+  });
+
+  it("puts the path before the chapter back when the template is cleared", async () => {
+    const { source, link, read } = await readOnScans();
+    await handle.db.insert(events).values(read("https://scans.example/title/Solo-Leveling/chapter/200/1", 30));
+    await updateSiteRule(handle.db, source.id, { seriesUrlTemplate: "{origin}/manga/{series}" }, NOW);
+
+    await updateSiteRule(handle.db, source.id, {}, NOW);
+
+    expect(await seriesUrlOf(link.id)).toBe("https://scans.example/title/Solo-Leveling");
+  });
+
+  it("keeps the page when the rule no longer finds this series in the newest URL", async () => {
+    const { source, link, read } = await readOnScans();
+    await handle.db.insert(events).values(read("https://scans.example/title/Solo-Leveling/chapter/200/1", 30));
+
+    // A series pattern that yields another key, and a chapter pattern that matches no more.
+    const otherKey = await updateSiteRule(
+      handle.db,
+      source.id,
+      { seriesPattern: String.raw`/(title)/`, seriesUrlTemplate: "{origin}/manga/{series}" },
+      NOW,
+    );
+    const noChapter = await updateSiteRule(handle.db, source.id, { chapterPattern: String.raw`/c(\d+)$`, seriesUrlTemplate: "{origin}/manga/{series}" }, NOW);
+
+    expect([otherKey, noChapter]).toEqual([
+      { ok: true, seriesPages: 0 },
+      { ok: true, seriesPages: 0 },
+    ]);
+    expect(await seriesUrlOf(link.id)).toBe("https://scans.example/title/Solo-Leveling");
+  });
+
+  it("leaves the links of other sites alone", async () => {
+    const { source, read } = await readOnScans();
+    const other = await seedSource(handle.db, { key: "site:other" }, ["other.example"]);
+    const work = await seedWork(handle.db, { title: "Eleceed", chapter: 5 });
+    const otherLink = await seedLink(handle.db, {
+      workId: work.id,
+      sourceId: other.id,
+      externalKey: "eleceed",
+      externalTitle: "Eleceed",
+      seriesUrl: "https://other.example/title/Eleceed",
+    });
+    await handle.db.insert(events).values({ ...read("https://other.example/title/Eleceed/chapter/5/1", 5, "eleceed"), sourceId: other.id });
+
+    await updateSiteRule(handle.db, source.id, { seriesUrlTemplate: "{origin}/manga/{series}" }, NOW);
+
+    expect(await seriesUrlOf(otherLink.id)).toBe("https://other.example/title/Eleceed");
   });
 
   it("reports invalid fields without saving anything", async () => {

@@ -199,3 +199,13 @@ Standard-Prüfung jeder Aufgabe (nicht wiederholt): `pnpm typecheck && pnpm lint
 - [x] **T46 Bilder pro Werk + Feinschliff der Web-App** · M
   Akz.: Extension liest `og:image` (nur https) und sendet `source.coverUrl`; `work_links`/`pending_matches.cover_url`, Tabelle `work_covers` (Migration 0007); Server lädt Seitenbilder nach Events und Bestätigungen (geschützter Download, Logo-Erkennung, Fehler 7 Tage gemerkt); Detailseite: Datei, Ziehen, Strg+V, Bildadresse, entfernen, Bild der Seite; `/works/[id]/cover` nur mit Sitzung, versioniert und ein Jahr cachebar; Kacheln mit Initialen; Übersicht als Karte mit Bildern, Kopfzeile mit Marke und aktiver Navigation, Titel auf dem Handy zweizeilig; Bilder auch in Schnell-Update und Zuordnungen (Kachel)
   Geprüft: 1296 Unit/Integration-Tests, 30 E2E (neu: Upload, `og:image` im Event), Brave-Lauf mit demonicscans: Solo Leveling bekommt sein Cover nach dem Zuordnen
+
+---
+
+## Serienseiten (`fix/serienseiten-erkennung`)
+
+- [x] **T49 Serienseite und Kapitel-Links per Seitenregel** · M
+  Anlass: demonicscans liest Kapitel unter `/title/<serie>/chapter/<n>/1`, die Serienseite liegt unter `/manga/<serie>` (der Pfad vor dem Kapitel liefert 404), und ihre Kapitelliste verlinkt nur `/chaptered.php?manga=6&chapter=<n>`.
+  Akz.: Regelfelder `seriesUrlTemplate` (`{origin}`, `{series}`) und `chapterLinkPattern` (Pfad + Query, häufigste Linkform zählt) in core, `/config`, Spalten `rule_series_url_template`, `rule_chapter_link_pattern` (Migration 0008); Regel-Editor mit Live-Test-Spalte „Serienseite“ und Links der Serienseite; beim Speichern werden `work_links.series_url` der Seite aus der neuesten Kapitel-URL neu abgeleitet (SPEC §5.1, §7.3, §7.11)
+  Geprüft: synthetische Fixtures (A11) in core, Extension und Server-Integration, Web-E2E für Editor + `/series-watch`; einmalig gegen die echten Seiten (nicht eingecheckt): demonicscans mit Regel → Serienseite 200, Kapitel 200.5; asurascans.com (`/comics/<serie>-<hash>`) mit der bestehenden Regel → 365 Kapitel-Links im HTML, erkannt
+  Hingenommen: alte asuracomic.net-Serienseiten leiten um (301 auf die Startseite, andere Hashes 302) und werden nie verfolgt; sie werden erst mit einer auf asurascans.com gelesenen Kapitel-URL richtig. Bewertung Cronjob mit Agent: `docs/research/neue-kapitel-cronjob.md`

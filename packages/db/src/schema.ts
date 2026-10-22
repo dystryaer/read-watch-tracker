@@ -56,6 +56,9 @@ export const sources = pgTable("sources", {
   ruleTitleSelector: text("rule_title_selector"),
   ruleEndSelector: text("rule_end_selector"),
   ruleNextUrlTemplate: text("rule_next_url_template"),
+  /** New-chapter check (SPEC §7.11): the series page of a chapter, and the chapter links on it. */
+  ruleSeriesUrlTemplate: text("rule_series_url_template"),
+  ruleChapterLinkPattern: text("rule_chapter_link_pattern"),
   ruleUpdatedAt: timestamptz("rule_updated_at"),
   /** When a library page of this app or service last came in, unchanged ones included (SPEC §9.1). */
   lastLibrarySyncAt: timestamptz("last_library_sync_at"),

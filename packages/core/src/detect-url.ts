@@ -79,12 +79,33 @@ export function detectChapterFromUrl(
   const seriesKey = normalizeSeriesKey(series?.raw ?? "") || normalizeSeriesKey(title ?? "");
   if (seriesKey === "") return null;
 
-  return {
-    chapter: chapterMatch.chapter,
-    seriesKey,
-    title,
-    seriesUrl: series?.path ? `${url.origin}${series.path}` : null,
-  };
+  let seriesUrl = series?.path ? `${url.origin}${series.path}` : null;
+  // Some readers keep chapters under another path than the series page (/title/x/… vs /manga/x).
+  if (rule?.seriesUrlTemplate) seriesUrl = series ? fillSeriesUrl(rule.seriesUrlTemplate, url.origin, series.raw) : null;
+
+  return { chapter: chapterMatch.chapter, seriesKey, title, seriesUrl };
+}
+
+/**
+ * A link on a series page that only the rule's `chapterLinkPattern` recognizes as a chapter
+ * (SPEC §7.11), e.g. "/chaptered.php?manga=6&chapter=12": the pattern runs on path and query.
+ * `form` is the link without its chapter number; the links of one series' list share it.
+ */
+export function detectChapterLink(input: string | URL, rule?: SiteRule): { chapter: number; form: string } | null {
+  if (!rule?.chapterLinkPattern) return null;
+  const url = parseHttpUrl(typeof input === "string" ? input : input.href);
+  if (url === null) return null;
+  const link = (url.pathname + url.search).slice(0, MAX_RULE_INPUT_LENGTH);
+  const match = compileRulePattern(rule.chapterLinkPattern, "id")?.exec(link);
+  const span = match?.indices?.[1];
+  const chapter = toChapter(match?.[1]);
+  if (!span || chapter === null) return null;
+  return { chapter, form: `${link.slice(0, span[0])}#${link.slice(span[1])}` };
+}
+
+function fillSeriesUrl(template: string, origin: string, series: string): string | null {
+  const filled = template.replaceAll("{origin}", origin).replaceAll("{series}", series);
+  return parseHttpUrl(filled)?.href ?? null;
 }
 
 function toChapter(raw: string | undefined): number | null {

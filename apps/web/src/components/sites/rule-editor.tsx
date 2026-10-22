@@ -1,7 +1,7 @@
 "use client";
 
 import "@/lib/zod-locale";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { saveRuleAction } from "@/app/(app)/settings/sites/actions";
 import { ActionForm } from "@/components/action-form";
 import { evaluateRule, RULE_FIELDS, type RuleField, type RuleFields } from "@/lib/rule-test";
@@ -12,7 +12,16 @@ const LABELS: Record<RuleField, { label: string; hint: string; placeholder: stri
   titleSelector: { label: "Titel-Selektor", hint: "CSS-Selektor für den Serientitel", placeholder: "h1.series-title" },
   endSelector: { label: "Kapitelende-Selektor", hint: "CSS-Selektor, der am Kapitelende sichtbar wird", placeholder: "a.next-chapter" },
   nextUrlTemplate: { label: "Weiterlesen-Vorlage", hint: "Platzhalter: {origin}, {seriesUrl}, {series}, {next}", placeholder: "{seriesUrl}/chapter/{next}" },
+  seriesUrlTemplate: { label: "Serienseiten-Vorlage", hint: "Platzhalter: {origin}, {series}", placeholder: "{origin}/manga/{series}" },
+  chapterLinkPattern: {
+    label: "Kapitel-Links der Serienseite",
+    hint: "Regex auf Pfad und Query der Links, Gruppe 1 = Kapitelnummer",
+    placeholder: String.raw`[?&]chapter=(\d+(?:\.\d+)?)`,
+  },
 };
+
+/** The first field of the new-chapter check (SPEC §7.11) gets a short introduction. */
+const NEW_CHAPTER_FIELD: RuleField = "seriesUrlTemplate";
 
 const inputClass =
   "w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900";
@@ -40,21 +49,33 @@ export function RuleEditor({
         {RULE_FIELDS.map((field) => {
           const error = evaluation.errors[field];
           return (
-            <label key={field} className="block space-y-1 text-sm">
-              <span className="font-medium">{LABELS[field].label}</span>
-              <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">{LABELS[field].hint}</span>
-              <input
-                name={field}
-                value={fields[field] ?? ""}
-                onChange={(event) => setFields((current) => ({ ...current, [field]: event.target.value }))}
-                placeholder={LABELS[field].placeholder}
-                spellCheck={false}
-                autoComplete="off"
-                aria-invalid={error ? true : undefined}
-                className={`${inputClass} ${error ? "border-red-600" : ""}`}
-              />
-              {error ? <span className="block text-xs text-red-700 dark:text-red-400">{error}</span> : null}
-            </label>
+            <Fragment key={field}>
+              {field === NEW_CHAPTER_FIELD ? (
+                <div className="space-y-1 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                  <h3 className="text-sm font-semibold">Neue Kapitel erkennen</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Nur nötig, wenn die Serienseite nicht der Pfad vor dem Kapitel ist oder ihre Links das Kapitel nur in der
+                    Query nennen (z. B. <span className="font-mono whitespace-nowrap">?manga=6&amp;chapter=12</span>). Einen solchen Link kannst
+                    du unten im Live-Test einfügen. Beim Speichern werden die Serienseiten deiner Werke neu berechnet.
+                  </p>
+                </div>
+              ) : null}
+              <label className="block space-y-1 text-sm">
+                <span className="font-medium">{LABELS[field].label}</span>
+                <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">{LABELS[field].hint}</span>
+                <input
+                  name={field}
+                  value={fields[field] ?? ""}
+                  onChange={(event) => setFields((current) => ({ ...current, [field]: event.target.value }))}
+                  placeholder={LABELS[field].placeholder}
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-invalid={error ? true : undefined}
+                  className={`${inputClass} ${error ? "border-red-600" : ""}`}
+                />
+                {error ? <span className="block text-xs text-red-700 dark:text-red-400">{error}</span> : null}
+              </label>
+            </Fragment>
           );
         })}
       </ActionForm>
@@ -64,7 +85,9 @@ export function RuleEditor({
           Live-Test {evaluation.usesRule ? "(mit dieser Regel)" : "(generische Erkennung)"}
         </h3>
         <label className="block space-y-1 text-sm">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Eine URL pro Zeile, optional „URL | Seitentitel“</span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            Eine URL pro Zeile, optional „URL | Seitentitel“; auch Links von der Serienseite
+          </span>
           <textarea
             value={samples}
             onChange={(event) => setSamples(event.target.value)}
@@ -81,6 +104,7 @@ export function RuleEditor({
                   <th scope="col" className="py-1 pr-3 font-medium">URL</th>
                   <th scope="col" className="py-1 pr-3 font-medium">Kapitel</th>
                   <th scope="col" className="py-1 pr-3 font-medium">Serienschlüssel</th>
+                  <th scope="col" className="py-1 pr-3 font-medium">Serienseite</th>
                   <th scope="col" className="py-1 font-medium">Weiterlesen</th>
                 </tr>
               </thead>
@@ -88,8 +112,17 @@ export function RuleEditor({
                 {evaluation.results.map((result, index) => (
                   <tr key={`${index}:${result.url}`} className="border-t border-zinc-200 align-top dark:border-zinc-800">
                     <td className="max-w-64 truncate py-1 pr-3 font-mono" title={result.url}>{result.url}</td>
-                    <td className="py-1 pr-3">{result.detection ? result.detection.chapter : "nicht erkannt"}</td>
+                    <td className="py-1 pr-3">
+                      {result.detection
+                        ? result.detection.chapter
+                        : result.linkChapter !== null
+                          ? `${result.linkChapter} (Link der Serienseite)`
+                          : "nicht erkannt"}
+                    </td>
                     <td className="py-1 pr-3 font-mono">{result.detection?.seriesKey ?? "–"}</td>
+                    <td className="max-w-64 truncate py-1 pr-3 font-mono" title={result.detection?.seriesUrl ?? ""}>
+                      {result.detection?.seriesUrl ?? "–"}
+                    </td>
                     <td className="max-w-64 truncate py-1 font-mono" title={result.next ?? ""}>{result.next ?? "–"}</td>
                   </tr>
                 ))}

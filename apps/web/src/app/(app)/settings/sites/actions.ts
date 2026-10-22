@@ -19,6 +19,8 @@ const RuleInput = z.object({
   titleSelector: optionalText(1000),
   endSelector: optionalText(1000),
   nextUrlTemplate: optionalText(1000),
+  seriesUrlTemplate: optionalText(1000),
+  chapterLinkPattern: optionalText(1000),
 });
 const DomainInput = z.object({ siteKey: SourceKey, domain: z.string().trim().min(1).max(253), makeCurrent: z.literal("on").optional() });
 
@@ -28,9 +30,19 @@ const FIELD_NAMES = {
   titleSelector: "Titel-Selektor",
   endSelector: "Kapitelende-Selektor",
   nextUrlTemplate: "Weiterlesen-Vorlage",
+  seriesUrlTemplate: "Serienseiten-Vorlage",
+  chapterLinkPattern: "Kapitel-Links der Serienseite",
 } as const;
 
-const FIELD_ORDER = ["chapterPattern", "seriesPattern", "titleSelector", "endSelector", "nextUrlTemplate"] as const;
+const FIELD_ORDER = [
+  "chapterPattern",
+  "seriesPattern",
+  "titleSelector",
+  "endSelector",
+  "nextUrlTemplate",
+  "seriesUrlTemplate",
+  "chapterLinkPattern",
+] as const;
 
 export async function setTrackingAction(_previous: FormState, formData: FormData): Promise<FormState> {
   const db = await getAuthorizedDb();
@@ -70,7 +82,11 @@ export async function saveRuleAction(_previous: FormState, formData: FormData): 
     return { error: `Nicht gespeichert – ${details.join("; ")}` };
   }
   refresh();
-  return { message: "Regel gespeichert. Die Extension übernimmt sie beim nächsten Abgleich (spätestens nach 15 Minuten)." };
+  const pages =
+    result.seriesPages === 0
+      ? ""
+      : ` ${result.seriesPages === 1 ? "1 Serienseite" : `${result.seriesPages} Serienseiten`} neu berechnet; die Prüfung auf neue Kapitel nutzt sie spätestens nach 6 Stunden.`;
+  return { message: `Regel gespeichert.${pages} Die Extension übernimmt die Regel beim nächsten Abgleich (spätestens nach 15 Minuten).` };
 }
 
 export async function addDomainAction(_previous: FormState, formData: FormData): Promise<FormState> {

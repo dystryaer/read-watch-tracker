@@ -76,6 +76,42 @@ describe("latestChapterIn (SPEC §7.11)", () => {
     expect(calls).toBeLessThan(5);
   });
 
+  describe("with a chapter link pattern: links that carry the chapter only in the query", () => {
+    // Shaped like a series page whose list links to a redirect script, without the series' slug.
+    const PAGE = "https://scans.example/manga/Solo-Leveling";
+    const rule = SiteRule.parse({ sourceKey: "site:scans", domains: ["scans.example"], chapterLinkPattern: String.raw`[?&]chapter=(\d+(?:\.\d+)?)` });
+    const list = (manga: number, chapters: number[]) =>
+      chapters.map((chapter) => `<li><a  href="/chaptered.php?manga=${manga}&amp;chapter=${chapter}" class="chplinks">Chapter ${chapter}</a></li>`).join("\n");
+
+    it("finds none without the pattern: the links name neither series nor chapter in the path", () => {
+      expect(latestChapterIn(list(6, [200.5, 200, 199]), PAGE, "solo-leveling")).toBeNull();
+    });
+
+    it("finds the newest chapter of the list", () => {
+      const html = `<a id="read-first" href="/chaptered.php?manga=6&chapter=0">First</a><ul>${list(6, [200.5, 200, 199])}</ul>`;
+      expect(latestChapterIn(html, PAGE, "solo-leveling", rule)).toBe(200.5);
+    });
+
+    it("ignores the chapters of other series in a sidebar: the series' own list is the most common link form", () => {
+      const html = `<aside>${list(12, [350, 349])}${list(31, [80])}</aside><ul>${list(6, [200, 199, 198])}</ul>`;
+      expect(latestChapterIn(html, PAGE, "solo-leveling", rule)).toBe(200);
+    });
+
+    it("reports nothing when two link forms are equally common: which one is the series is unclear", () => {
+      const html = `${list(12, [350, 349])}${list(6, [2, 1])}`;
+      expect(latestChapterIn(html, PAGE, "solo-leveling", rule)).toBeNull();
+    });
+
+    it("still counts the links the chapter detection recognizes for this series", () => {
+      const html = `<a href="/title/Solo-Leveling/chapter/201/1">201</a>${list(6, [200, 199])}`;
+      expect(latestChapterIn(html, PAGE, "solo-leveling", rule)).toBe(201);
+    });
+
+    it("ignores matching links on other hosts", () => {
+      expect(latestChapterIn(`<a href="https://other.example/chaptered.php?manga=6&chapter=999">x</a>`, PAGE, "solo-leveling", rule)).toBeNull();
+    });
+  });
+
   it("does not read oversized pages", () => {
     const html = `<a href="/series/solo-leveling/chapter-200">200</a>${" ".repeat(2 * 1024 * 1024)}`;
     expect(latestChapterIn(html, SERIES, "solo-leveling")).toBeNull();
