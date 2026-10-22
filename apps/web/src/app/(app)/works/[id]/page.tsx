@@ -4,13 +4,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { ActionForm } from "@/components/action-form";
-import { CoverThumb } from "@/components/cover-thumb";
+import { CoverThumb, coverWash } from "@/components/cover-thumb";
+import { PositionStepper } from "@/components/overview/position-stepper";
 import { CoverEditor } from "@/components/work-detail/cover-editor";
 import { HistoryTable } from "@/components/work-detail/history-table";
 import { coverSrc } from "@/lib/cover";
 import { getAuthorizedDb } from "@/lib/dal";
 import { positionText } from "@/lib/format";
-import { formatRelative, MEDIA_TYPE_LABELS } from "@/lib/overview";
+import { formatRelative, MEDIA_TYPE_LABELS, newChapterCount } from "@/lib/overview";
+import type { StepperState } from "@/lib/stepper";
+import { headContinueLink } from "@/lib/work-head";
 import { mergeAction, setPositionFormAction, setStatusFormAction, unlinkAction, updateMetaAction } from "./actions";
 
 const inputClass =
@@ -35,27 +38,69 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
   const { work, links, events } = detail;
   const unit = positionUnitFor(work.type);
   const workIdField = <input type="hidden" name="workId" value={work.id} />;
+  const position = positionText(work);
+  const fresh = unit === "chapter" ? newChapterCount(work.chapter, work.latestChapter) : null;
+  const continueLink = headContinueLink(work, detail.lastSource);
+  const stepper: StepperState | null =
+    unit === "chapter"
+      ? { unit, value: work.chapter, season: null }
+      : unit === "episode"
+        ? { unit, value: work.episode, season: work.season }
+        : null;
 
   return (
     <main className="max-w-3xl">
-      <Link href="/" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
-        <span aria-hidden="true">←</span> Übersicht
-      </Link>
-      <div className="mt-3 mb-6 flex items-start gap-5">
-        <CoverThumb src={coverSrc(work.id, detail.cover.version)} title={work.title} size="lg" />
-        <div className="min-w-0 pt-1">
-          <h1 className="text-2xl font-semibold tracking-tight break-words">{work.title}</h1>
-          <p className="mt-2 flex flex-wrap gap-2 text-sm">
+      {/* The head as on the shelf (SPEC §4.3): big cover, chips, newest chapter, continue and −/+. */}
+      <div
+        className={`mb-6 flex gap-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white bg-linear-to-b ${coverWash(work.title)} to-transparent to-85% p-6 shadow-sm max-sm:flex-col max-sm:items-center max-sm:gap-4 max-sm:p-4 max-sm:text-center dark:border-zinc-800 dark:bg-zinc-900`}
+      >
+        <div className="relative w-32 shrink-0 max-sm:w-28">
+          <CoverThumb src={coverSrc(work.id, detail.cover.version)} title={work.title} size="fill" />
+          {fresh !== null ? (
+            <span className="absolute top-2 right-2 rounded-full bg-teal-700 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
+              <span aria-hidden="true">{fresh} neu</span>
+              <span className="sr-only">{fresh === 1 ? "1 neues Kapitel" : `${fresh} neue Kapitel`}</span>
+            </span>
+          ) : null}
+        </div>
+        <div className="min-w-0 flex-1">
+          <Link href="/" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
+            <span aria-hidden="true">←</span> Übersicht
+          </Link>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight break-words sm:text-[1.65rem] sm:leading-tight">{work.title}</h1>
+          <p className="mt-2 flex flex-wrap gap-2 text-sm max-sm:justify-center">
             <span className="rounded-full bg-zinc-200/70 px-2.5 py-0.5 dark:bg-zinc-800">{MEDIA_TYPE_LABELS[work.type]}</span>
             <span className="rounded-full bg-zinc-200/70 px-2.5 py-0.5 dark:bg-zinc-800">{STATUS_LABELS[work.status]}</span>
-            <span className="rounded-full bg-teal-100 px-2.5 py-0.5 font-medium text-teal-900 tabular-nums dark:bg-teal-900/50 dark:text-teal-100">
-              {positionText(work)}
-            </span>
+            {position === "–" && unit !== "none" ? (
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                Stand unbekannt
+              </span>
+            ) : (
+              <span className="rounded-full bg-teal-100 px-2.5 py-0.5 font-medium text-teal-900 tabular-nums dark:bg-teal-900/50 dark:text-teal-100">
+                {position}
+              </span>
+            )}
           </p>
           {unit === "chapter" && work.latestChapter !== null && work.latestChapterAt !== null && work.latestChapter >= Math.floor(work.chapter ?? 0) ? (
             <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
-              Neuestes Kapitel laut Serienseite: Kap. {work.latestChapter} (geprüft {formatRelative(work.latestChapterAt, new Date())})
+              Neuestes Kapitel laut Serienseite: <span className="font-semibold text-zinc-900 tabular-nums dark:text-zinc-100">Kap. {work.latestChapter}</span>{" "}
+              (geprüft {formatRelative(work.latestChapterAt, new Date())})
             </p>
+          ) : null}
+          {continueLink || stepper ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3 max-sm:justify-center">
+              {continueLink ? (
+                <a
+                  href={continueLink.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-lg bg-teal-700 px-4 py-2 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-teal-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                >
+                  {continueLink.label}&nbsp;<span aria-hidden="true">›</span>
+                </a>
+              ) : null}
+              {stepper ? <PositionStepper workId={work.id} title={work.title} initial={stepper} size="lg" /> : null}
+            </div>
           ) : null}
         </div>
       </div>
