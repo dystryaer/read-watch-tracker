@@ -5,12 +5,15 @@ export function coverSrc(workId: string, version: number | null): string | null 
 
 export const TILE_TONES = 8;
 
+// Letters and digits; an apostrophe between them stays in the word ("Ranker’s", "I’ll").
+const WORD = /[\p{L}\p{N}]+(?:['’ʼ][\p{L}\p{N}]+)*/gu;
+
 /**
- * The tile for a work without a picture: up to two initials ("Solo Leveling" → "SL") and one of
- * `TILE_TONES` colors, the same for a title every time.
+ * The tile for a work without a picture: up to two initials ("Solo Leveling" → "SL",
+ * "Ranker’s Return" → "RR") and one of `TILE_TONES` colors, the same for a title every time.
  */
 export function coverTile(title: string): { initials: string; tone: number } {
-  const words = title.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const words = title.match(WORD) ?? [];
   const initials = words
     .slice(0, 2)
     .map((word) => word[0]?.toUpperCase() ?? "")

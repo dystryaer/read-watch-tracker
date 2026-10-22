@@ -14,6 +14,13 @@ describe("coverTile", () => {
     ["Overgeared", "O"],
     ["The Beginning After the End", "TB"],
     ["„Ω-Ranker’s Return“", "ΩR"],
+    // An apostrophe belongs to its word, typographic or straight (titles from the Excel import).
+    ["Ranker’s Return", "RR"],
+    ["Ranker's Return", "RR"],
+    ["Swordmaster’s Youngest Son", "SY"],
+    ["Swordmaster's Youngest Son", "SY"],
+    ["I’ll Be Taking A Break", "IB"],
+    ["'Tis the Season", "TT"],
     ["86", "8"],
     ["!!!", "?"],
   ])("uses up to two initials for %s", (title, initials) => {

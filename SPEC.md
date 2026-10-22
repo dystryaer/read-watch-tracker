@@ -111,46 +111,55 @@ Der einzige Hauptbildschirm. Er beantwortet die Frage: *Wo stehe ich, und wie ko
 
 ### 4.1 Layout (Desktop)
 
+Standard ist das **Regal** (Vorbild AniList-Karten und Mihon-Bibliothek, Entwürfe in `docs/mocks/`): ein Raster aus Cover-Karten, auf dem Desktop etwa 6 Spalten, auf dem Handy 3, ohne seitliches Scrollen bei 375 px. Der Umschalter `Regal | Liste` zeigt stattdessen die Zeilenliste (Titel, Typ, Stand mit [−][+], Quelle, Zeit, Weiterlesen). Der Browser merkt sich die Wahl in einem Cookie; der Server liefert die Seite gleich in der gemerkten Ansicht, sie springt also nicht um.
+
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│ Read-Watch-Tracker                                  [ Suche…            ]  [⚙] │
+│ Read-Watch-Tracker               Übersicht · Schnell-Update · Statistik · ⚙    │
 ├────────────────────────────────────────────────────────────────────────────────┤
-│ ⚠ 3 neue Zuordnungen warten auf Bestätigung                         [Prüfen →] │
+│ ⚠ 3 neue Zuordnungen warten auf Bestätigung                        [Prüfen →]  │
+│ [ Suche …                                                                  ]   │
+│ [Alle] [Manga/Manhwa/Manhua] [Light Novels] [E-Books] [Serien/Anime]           │
+│ Status [Lese ▾]  Sortierung [Zuletzt aktiv ▾]  ☐ Stand unbekannt ☐ Neue Kapitel│
+│                                                           [▦ Regal | ☰ Liste]  │
 ├────────────────────────────────────────────────────────────────────────────────┤
-│ [Alle] [Manga/Manhwa/Manhua] [Light Novels] [E-Books] [Serien/Anime]          │
-│ Status: [Lese ▾]                                  Sortierung: [Zuletzt aktiv ▾]│
-├────────────────────────────────────────────────────────────────────────────────┤
-│ Swordmaster's Youngest Son  Manhwa   Kap. 216   ◉ asuracomic.net  vor 2 Std.  │
-│                                       [−][+]                  [Weiterlesen ›] │
-│ Frieren                     Anime    S1 · F14   ◉ Crunchyroll     gestern     │
-│                                                               [Öffnen ›]      │
-│ Overgeared                  Manhwa   Kap. 344   – keine Seite   Import        │
-│                                       [−][+]                                   │
-│ Ranker's Return             Manhwa   Kap. ?     – keine Seite   Import        │
-│ Shadow Slave                Novel    Kap. 1204  ◉ WebNovel       vor 3 Tagen  │
-│ Project Hail Mary           E-Book   43 %       ◉ Kindle         vor 5 Tagen  │
+│ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐    │
+│ │Manhwa     2 neu│ │Anime           │ │Manhwa          │ │E-Book          │    │
+│ │                │ │                │ │                │ │                │    │
+│ │     [Bild]     │ │       F        │ │       RR       │ │       PH       │    │
+│ │                │ │                │ │                │ │                │    │
+│ │Kap. 421 / 423  │ │S1 · F14  [−][+]│ │Kap. ?          │ │43 %            │    │
+│ └────────────────┘ └────────────────┘ └────────────────┘ └▓▓▓▓▓▓▓─────────┘    │
+│ Eleceed            Frieren            Ranker's Return    Project Hail …        │
+│ A asuracomic.net   C Crunchyroll      – keine Seite      K Kindle              │
+│ vor 2 Std.         gestern            Import             vor 5 Tagen           │
+│ [Weiterlesen ›][+] [Öffnen ›]    [+]  [Stand setzen]     [Stand: 43 %]         │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+Frieren zeigt den Zustand „Maus über der Karte“: Dann (und wenn die Tastatur in der Karte ist) erscheinen [−][+] auf dem Bild.
 
 ### 4.2 Elemente und Verhalten
 
 | Element | Verhalten |
 |---|---|
 | **Zuordnungs-Banner** | Erscheint nur, wenn offene Zuordnungen existieren (§5.3). Führt zur Inbox. |
-| **Typ-Tabs** | Filtern nach Medientyp. Manga, Manhwa und Manhua teilen sich einen Tab (der Typ steht als Label in der Zeile). |
+| **Ansicht** | `Regal` (Standard) · `Liste`. Filter, Suche, Sortierung und Speichern verhalten sich in beiden gleich. Die Wahl gilt pro Browser (Cookie). |
+| **Typ-Tabs** | Filtern nach Medientyp. Manga, Manhwa und Manhua teilen sich einen Tab (der Typ steht als Chip auf dem Bild bzw. als Label in der Zeile). |
 | **Status-Filter** | `Lese` (Standard) · `Abgeschlossen` · `Abgebrochen` · `Alle` |
 | **Sortierung** | `Zuletzt aktiv` (Standard; Titel ohne Aktivität stehen unten) · `Titel A–Z` |
 | **Suche** | Clientseitige Volltextsuche über Titel und Aliasse, normalisiert (Groß-/Kleinschreibung, Apostrophe, Satzzeichen egal). |
-| **Stand** | `Kap. 216`, `Kap. 105.5`, `S1 · F14`, `43 %`, oder `Kap. ?` (unbekannt, optisch hervorgehoben). |
-| **Bild** | Kleines Cover links in jeder Zeile. Es kommt vom Vorschaubild (`og:image`) der Lese-Seite, das die Extension mitschickt; der Server lädt es einmal herunter und speichert es in der Datenbank. Oder ich füge es auf der Detailseite selbst ein. Ohne Bild: farbige Kachel mit den Initialen des Titels. Der Browser lädt nie Bilder von fremden Servern. |
+| **Stand** | `Kap. 216`, `Kap. 105.5`, `S1 · F14`, `43 %`, oder `Kap. ?` (unbekannt, gelb hervorgehoben). Im Regal unten auf dem Bild, dazu das neueste Kapitel der Serienseite (`Kap. 345 / 348`), sobald es bekannt ist und nicht schon überholt; bei E-Books ein Balken an der Unterkante. |
+| **Bild** | Im Regal das große Cover der Karte (2:3), in der Liste klein links in jeder Zeile. Bilder laden erst, wenn sie in die Nähe des sichtbaren Bereichs kommen (`loading="lazy"`), und sind für Screenreader Beiwerk; jede Karte hat einen Tab-Stopp für den Titel-Link. Das Bild kommt vom Vorschaubild (`og:image`) der Lese-Seite, das die Extension mitschickt; der Server lädt es einmal herunter und speichert es in der Datenbank. Oder ich füge es auf der Detailseite selbst ein. Ohne Bild: farbige Kachel mit den Initialen des Titels. Der Browser lädt nie Bilder von fremden Servern. |
 | **Quelle** | Buchstaben-Badge + Domain bzw. Dienstname der *zuletzt genutzten* Quelle. Favicons werden bewusst nicht geladen, damit keine externen Requests entstehen. `– keine Seite` bei importierten Titeln ohne Sichtung. |
-| **[−][+]** | Inline-Stepper für Kapitel und Folgen. Speichert entprellt (500 ms) als manuelle Änderung. |
-| **Weiterlesen ›** | Öffnet das nächste Kapitel in einem neuen Tab (Regeln in §4.4). Fehlt, wenn keine URL bekannt ist. |
-| **„3 neu“** (M4) | Badge in der Titelzelle (neben dem Typ, weil die Stand-Spalte den Stepper trägt), wenn das neueste Kapitel der Serie (§7.11) über dem gelesenen liegt: `floor(latest) − floor(chapter)`. Ein Filter `Neue Kapitel` zeigt nur solche Werke. Ohne bekannten Stand kein Badge. |
+| **[−][+]** | Inline-Stepper für Kapitel und Folgen. Speichert entprellt (500 ms) als manuelle Änderung; Karten und Zeilen bleiben dabei an ihrem Platz, bis sich der Filter ändert. Im Regal erscheinen [−][+] auf dem Bild, wenn die Maus über der Karte steht oder die Tastatur in ihr ist (nie nur per Maus erreichbar); das „+“ unter dem Bild ist immer da und zählt mit. Bei unbekanntem Stand gibt es im Regal keinen Stepper, sondern `Stand setzen`. |
+| **Weiterlesen ›** | Öffnet das nächste Kapitel in einem neuen Tab (Regeln in §4.4). Fehlt, wenn keine URL bekannt ist. Auf dem Handy heißt er im Regal `Weiter ›`. An seiner Stelle zeigt die Karte: `Stand setzen` (Stand unbekannt, führt zur Detailseite), `Stand: 43 %` (E-Book), `Abgeschlossen` bzw. `Abgebrochen` (Bild blasser, abgeschlossene mit „✓ Fertig“), `Keine Seite` (noch nie auf einer Seite gesehen) oder `Kein Link` (Quelle ohne Adresse, z. B. WebNovel). |
+| **„3 neu“** (M4) | Badge oben rechts auf dem Bild bzw. in der Titelzelle der Liste (neben dem Typ), wenn das neueste Kapitel der Serie (§7.11) über dem gelesenen liegt: `floor(latest) − floor(chapter)`. Im Regal zählt es beim Klick auf [+] sofort mit herunter. Ein Filter `Neue Kapitel` zeigt nur solche Werke. Ohne bekannten Stand kein Badge. |
 | **Titel anklicken** | Öffnet die Detailseite (§4.3). Eine eigene Seite statt eines Drawers: direkt verlinkbar, per Formular auch ohne JavaScript bedienbar. |
 
 ### 4.3 Detailseite (`/works/[id]`)
 
+- **Kopf** wie die Karte im Regal: großes Cover (mit „N neu“), Chips für Typ, Status und Stand, „Neuestes Kapitel laut Serienseite“, ein großer Button `Weiterlesen · Kap. 422 ›` (bzw. `Zuletzt gelesen · Kap. 421 ›`, `Öffnen ›`; Regeln in §4.4) und der Stepper.
 - **Bild:** großes Cover im Kopf. Ändern per Datei, Ziehen, Strg+V (Bild aus der Zwischenablage) oder Bildadresse; der Browser verkleinert Dateien vorher auf höchstens 300 × 450 px. „Bild entfernen“ zeigt wieder die Kachel und hält auch das Bild der Seite fern; „Bild der Seite verwenden“ holt es zurück.
 - Titel umbenennen, Typ ändern, Status setzen
 - Stand manuell setzen (auch rückwärts)

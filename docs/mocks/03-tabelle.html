@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vorschlag 3 · Tabelle mit Gruppen</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f4f4f5; --row-hover: #f8fafc; --border: #e4e4e7; --border-strong: #d4d4d8;
+  --text: #18181b; --muted: #52525b; --faint: #71717a;
+  --accent: #0f766e; --accent-soft: #ccfbf1; --accent-soft-text: #134e4a; --accent-text: #115e59;
+  --warn-soft: #fef3c7; --warn-text: #78350f; --warn-border: #fcd34d;
+  --s-reading: #0d9488; --s-done: #0284c7; --s-dropped: #a1a1aa;
+  --track: #e4e4e7; --focus: #0f766e;
+  --shadow: 0 1px 2px rgb(0 0 0 / .05), 0 2px 6px rgb(0 0 0 / .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #09090b; --surface: #18181b; --surface-2: #27272a; --row-hover: #1f1f23; --border: #27272a; --border-strong: #3f3f46;
+    --text: #f4f4f5; --muted: #a1a1aa; --faint: #a1a1aa;
+    --accent-soft: rgb(19 78 74 / .7); --accent-soft-text: #ccfbf1; --accent-text: #5eead4;
+    --warn-soft: rgb(120 53 15 / .45); --warn-text: #fde68a; --warn-border: #92400e;
+    --s-reading: #2dd4bf; --s-done: #38bdf8; --s-dropped: #71717a;
+    --track: #3f3f46; --focus: #2dd4bf;
+    --shadow: 0 1px 2px rgb(0 0 0 / .4);
+  }
+}
+.t-rose    { --c1:#ffe4e6; --c2:#fecdd3; --fg:#be123c; }
+.t-amber   { --c1:#fef3c7; --c2:#fde68a; --fg:#92400e; }
+.t-lime    { --c1:#ecfccb; --c2:#d9f99d; --fg:#3f6212; }
+.t-emerald { --c1:#d1fae5; --c2:#a7f3d0; --fg:#047857; }
+.t-cyan    { --c1:#cffafe; --c2:#a5f3fc; --fg:#155e75; }
+.t-sky     { --c1:#e0f2fe; --c2:#bae6fd; --fg:#0369a1; }
+.t-violet  { --c1:#ede9fe; --c2:#ddd6fe; --fg:#6d28d9; }
+.t-fuchsia { --c1:#fae8ff; --c2:#f5d0fe; --fg:#a21caf; }
+@media (prefers-color-scheme: dark) {
+  .t-rose    { --c1:#4c0519; --c2:#881337; --fg:#fda4af; }
+  .t-amber   { --c1:#451a03; --c2:#78350f; --fg:#fcd34d; }
+  .t-lime    { --c1:#1a2e05; --c2:#365314; --fg:#bef264; }
+  .t-emerald { --c1:#022c22; --c2:#064e3b; --fg:#6ee7b7; }
+  .t-cyan    { --c1:#083344; --c2:#164e63; --fg:#67e8f9; }
+  .t-sky     { --c1:#082f49; --c2:#0c4a6e; --fg:#7dd3fc; }
+  .t-violet  { --c1:#2e1065; --c2:#4c1d95; --fg:#c4b5fd; }
+  .t-fuchsia { --c1:#4a044e; --c2:#701a75; --fg:#f0abfc; }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 72rem; margin: 0 auto; padding: 0 16px; }
+.num { font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mocknote { background: repeating-linear-gradient(135deg, var(--surface-2) 0 10px, var(--bg) 10px 20px); border-bottom: 1px dashed var(--border-strong); font-size: 12px; color: var(--muted); text-align: center; padding: 4px 16px; }
+
+.top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+.top-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding-top: 10px; padding-bottom: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; letter-spacing: -.01em; }
+.mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--accent); }
+.mark span { display: flex; gap: 2px; }
+.mark i { display: block; width: 9px; height: 13px; background: #fff; }
+.mark i:first-child { border-radius: 2px 0 0 2px; }
+.mark i:last-child { border-radius: 0 2px 2px 0; }
+.nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.nav a { padding: 6px 10px; border-radius: 6px; color: var(--muted); white-space: nowrap; }
+.nav a[aria-current] { background: var(--accent-soft); color: var(--accent-soft-text); font-weight: 500; }
+
+main.wrap { padding-top: 16px; padding-bottom: 48px; }
+
+/* Toolbar: one line on desktop */
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.search { flex: 1 1 260px; min-width: 0; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); }
+.select, .tbtn { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); }
+.tbtn { display: inline-flex; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--warn-border); background: var(--warn-soft); color: var(--warn-text); font-weight: 600; white-space: nowrap; }
+
+.statusbar { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; margin-top: 14px; border-bottom: 1px solid var(--border); }
+.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.tabs a { padding: 8px 12px; border-bottom: 2px solid transparent; color: var(--muted); white-space: nowrap; margin-bottom: -1px; }
+.tabs a[aria-current] { border-color: var(--accent); color: var(--text); font-weight: 600; }
+.tabs b { font-weight: 500; color: var(--faint); margin-left: 4px; font-size: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent-soft-text); font-weight: 600; }
+.chip .dot { width: 7px; height: 7px; border-radius: 99px; background: var(--accent); }
+.chip .dot.q { background: #f59e0b; }
+
+/* The table */
+.table { width: 100%; margin-top: 12px; border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.table th { text-align: left; font-size: 12px; font-weight: 600; color: var(--faint); padding: 8px 10px; background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table th.sort { color: var(--text); }
+.table th .ar { font-size: 10px; margin-left: 3px; color: var(--accent-text); }
+.table th .ar.off { color: var(--border-strong); }
+.table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.table tr.row:hover td { background: var(--row-hover); }
+.table tr.row td:first-child { border-left: 4px solid var(--s-reading); padding-left: 8px; }
+.table tr.done td:first-child { border-left-color: var(--s-done); }
+.table tr.focus td { background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
+.table tr.focus td:first-child { box-shadow: inset 2px 0 0 var(--focus); }
+.group td { background: var(--surface); font-weight: 650; font-size: 13px; padding: 10px 12px 6px; color: var(--text); border-bottom: 1px solid var(--border); }
+.group .g { display: inline-flex; align-items: center; gap: 8px; }
+.group .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--s-reading); }
+.group.done .sw { background: var(--s-done); }
+.group .c { font-weight: 500; color: var(--faint); }
+.exp { width: 22px; height: 22px; display: inline-grid; place-items: center; border-radius: 5px; border: 0; background: none; color: var(--faint); font-size: 11px; }
+.tc { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.thumb { flex: none; display: grid; place-items: center; width: 28px; height: 40px; border-radius: 4px; background: radial-gradient(120% 80% at 20% 10%, var(--c1), var(--c2)); color: var(--fg); font-size: 10px; font-weight: 700; }
+.tn { min-width: 0; }
+.tn a { font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 290px; }
+.tn .sub { display: none; font-size: 12px; color: var(--faint); }
+.type { color: var(--muted); white-space: nowrap; }
+.step { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.step button { width: 22px; height: 22px; padding: 0; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 13px; line-height: 1; }
+.step span { min-width: 64px; text-align: center; font-weight: 600; }
+.q { background: #fde68a; color: #78350f; border-radius: 4px; padding: 1px 6px; font-weight: 700; }
+.newc { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.newc .plus { font-weight: 700; color: var(--accent-text); min-width: 22px; }
+.mini { width: 54px; height: 4px; border-radius: 9px; background: var(--track); overflow: hidden; }
+.mini i { display: block; height: 100%; background: var(--accent); }
+.newc .of { font-size: 12px; color: var(--faint); }
+.dash { color: var(--border-strong); }
+.src { display: flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--muted); }
+.src i { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--surface-2); outline: 1px solid var(--border); font-style: normal; font-size: 10px; font-weight: 700; }
+.src.none { color: var(--faint); }
+.when { color: var(--faint); white-space: nowrap; }
+.go { display: inline-block; font-weight: 600; color: #fff; background: var(--accent); padding: 4px 10px; border-radius: 6px; white-space: nowrap; font-size: 13px; }
+.right { text-align: right; }
+
+/* Expanded row: a quick look at the detail page */
+.more td { background: color-mix(in srgb, var(--accent-soft) 22%, var(--surface)); padding: 0; }
+.more td:first-child { border-left: 4px solid var(--s-reading); }
+.peek { display: grid; grid-template-columns: 1.1fr 1fr 1.2fr; gap: 0; }
+.peek section { padding: 12px 16px 14px; min-width: 0; }
+.peek section + section { border-left: 1px solid var(--border); }
+.peek h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
+.peek p { margin: 0 0 6px; }
+.peek ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.peek li { display: flex; justify-content: space-between; gap: 10px; }
+.peek li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peek .dim { color: var(--faint); white-space: nowrap; }
+.peek a.u { color: var(--accent-text); text-decoration: underline; }
+.url { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+
+.keys { margin: 12px 0 0; font-size: 12px; color: var(--faint); display: flex; flex-wrap: wrap; gap: 6px 14px; }
+kbd { font: 11px/1 ui-monospace, Consolas, monospace; padding: 2px 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--surface); color: var(--text); }
+.msort { display: none; }
+
+@media (max-width: 760px) {
+  .brand { font-size: 16px; }
+  .nav { width: 100%; margin: 0 -6px; }
+  .nav a { padding: 5px 7px; font-size: 13px; }
+  .tools .select, .tools .tbtn { flex: 1 1 auto; }
+  .tools .col { display: none; }
+  .chips { padding-bottom: 10px; }
+  .tabs a { padding: 8px 7px; font-size: 13px; }
+  .msort { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .table thead { display: none; }
+  .table, .table tbody { display: block; }
+  .table tr { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 4px; align-items: center; padding: 8px 12px 8px 10px; border-bottom: 1px solid var(--border); border-left: 4px solid var(--s-reading); }
+  .table tr.done { border-left-color: var(--s-done); }
+  .table tr.group, .table tr.more { display: block; padding: 0; border-left: 0; }
+  .table tr.more { border-left: 4px solid var(--s-reading); }
+  .table td { display: block; padding: 0; border: 0 !important; background: none !important; box-shadow: none !important; }
+  .table tr.focus { background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
+  .table td.c-exp, .table td.c-type, .table td.c-src, .table td.c-when, .table td.c-new { display: none; }
+  .table td.c-title { grid-column: 1 / 3; }
+  .table td.c-go { grid-column: 3; grid-row: 1 / 3; align-self: center; }
+  .table td.c-pos { grid-column: 2; }
+  .tn a { max-width: none; white-space: normal; }
+  .tn .sub { display: block; }
+  .tc { align-items: flex-start; }
+  .table tr .thumb { grid-row: span 2; }
+  .group td { padding: 10px 12px 6px !important; }
+  .more td { display: block; }
+  .peek { grid-template-columns: 1fr; }
+  .peek section + section { border-left: 0; border-top: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+<div class="mocknote">Vorschlag 3 von 4 · <b>Tabelle mit Gruppen</b> · statischer Mock, Vorbild MyAnimeList-Liste (Statusfarben, Spalten) und Kenmei</div>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#"><span class="mark"><span><i></i><i></i></span></span>Read-Watch-Tracker</a>
+    <nav class="nav" aria-label="Hauptnavigation">
+      <a href="#" aria-current="page">Übersicht</a><a href="#">Schnell-Update</a><a href="#">Statistik</a><a href="#">Einstellungen</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1 class="sr">Übersicht</h1>
+  <div class="tools">
+    <input class="search" type="search" placeholder="Suche …  ( / )" aria-label="Titel suchen">
+    <select class="select" aria-label="Medientyp"><option>Alle Typen</option><option>Manga/Manhwa/Manhua</option><option>Light Novels</option><option>E-Books</option><option>Serien/Anime</option></select>
+    <button class="tbtn col">Spalten ▾</button>
+    <a class="pill" href="#">1 Zuordnung offen →</a>
+  </div>
+
+  <div class="statusbar">
+    <nav class="tabs" aria-label="Status">
+      <a href="#" aria-current="page">Alle<b>10</b></a><a href="#">Lese<b>9</b></a><a href="#">Abgeschlossen<b>1</b></a><a href="#">Abgebrochen<b>0</b></a>
+    </nav>
+    <div class="chips">
+      <button class="chip" aria-pressed="false"><span class="dot"></span>Neue Kapitel · 2</button>
+      <button class="chip" aria-pressed="false"><span class="dot q"></span>Stand unbekannt · 1</button>
+    </div>
+  </div>
+  <div class="msort"><span>10 Titel</span><label>Sortierung <select class="select"><option>Zuletzt aktiv</option></select></label></div>
+
+  <table class="table" aria-label="Titel">
+    <thead>
+      <tr>
+        <th><span class="sr">Aufklappen</span></th>
+        <th class="sort">Titel <span class="ar off">▲▼</span></th>
+        <th>Typ</th>
+        <th class="sort">Stand <span class="ar off">▲▼</span></th>
+        <th class="sort">Neu <span class="ar off">▲▼</span></th>
+        <th>Quelle</th>
+        <th class="sort">Zuletzt <span class="ar">▼</span></th>
+        <th class="right"><span class="sr">Aktion</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="group"><td colspan="8"><span class="g"><span class="sw"></span>Lese <span class="c">· 9</span></span></td></tr>
+
+      <tr class="row focus t-fuchsia" aria-expanded="true">
+        <td class="c-exp"><button class="exp" aria-label="Zuklappen">▼</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">E</span><div class="tn"><a href="#">Eleceed</a><span class="sub">Manhwa · <b style="color:var(--accent-text)">2 neu</b> · vor 2 Std.</span></div></div></td>
+        <td class="c-type type">Manhwa</td>
+        <td class="c-pos"><span class="step num"><button aria-label="zurück">−</button><span>Kap. 421</span><button aria-label="weiter">+</button></span></td>
+        <td class="c-new"><span class="newc num"><span class="plus">+2</span><span class="mini"><i style="width:99%"></i></span><span class="of">von 423</span></span></td>
+        <td class="c-src"><span class="src"><i>A</i>asuracomic.net</span></td>
+        <td class="c-when when">vor 2 Std.</td>
+        <td class="c-go right"><a class="go" href="#">Weiter ›</a></td>
+      </tr>
+      <tr class="more"><td colspan="8">
+        <div class="peek">
+          <section>
+            <h3>Nächstes Kapitel</h3>
+            <p><b>Kap. 422</b> · neuestes laut Serienseite: Kap. 423 (geprüft vor 3 Std.)</p>
+            <p class="url">asuracomic.net/series/eleceed-1a2b/chapter/422</p>
+          </section>
+          <section>
+            <h3>Quellen</h3>
+            <ul>
+              <li><span>asuracomic.net · „Eleceed“</span><a class="u" href="#">Serienseite</a></li>
+              <li><span>demonicscans.org · „Eleceed“</span><a class="u" href="#">Serienseite</a></li>
+            </ul>
+          </section>
+          <section>
+            <h3>Verlauf</h3>
+            <ul>
+              <li><span>Kap. 421 · Brave</span><span class="dim">vor 2 Std.</span></li>
+              <li><span>Kap. 420 · Brave</span><span class="dim">gestern</span></li>
+              <li><span><a class="u" href="#">Zur Detailseite →</a></span><span class="dim">Stand, Status, Bild</span></li>
+            </ul>
+          </section>
+        </div>
+      </td></tr>
+
+      <tr class="row t-lime">
+        <td class="c-exp"><button class="exp" aria-label="Aufklappen">▶</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">O</span><div class="tn"><a href="#">Overgeared</a><span class="sub">Manhwa · <b style="color:var(--accent-text)">3 neu</b> · vor 5 Std.</span></div></div></td>
+        <td class="c-type type">Manhwa</td>
+        <td class="c-pos"><span class="step num"><button aria-label="zurück">−</button><span>Kap. 345</span><button aria-label="weiter">+</button></span></td>
+        <td class="c-new"><span class="newc num"><span class="plus">+3</span><span class="mini"><i style="width:99%"></i></span><span class="of">von 348</span></span></td>
+        <td class="c-src"><span class="src"><i>D</i>demonicscans.org</span></td>
+        <td class="c-when when">vor 5 Std.</td>
+        <td class="c-go right"><a class="go" href="#">Weiter ›</a></td>
+      </tr>
+      <tr class="row t-cyan">
+        <td class="c-exp"><button class="exp" aria-label="Aufklappen">▶</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">F</span><div class="tn"><a href="#">Frieren</a><span class="sub">Anime · gestern</span></div></div></td>
+        <td class="c-type type">Anime</td>
+        <td class="c-pos"><span class="step num"><button aria-label="zurück">−</button><span>S1 · F14</span><button aria-label="weiter">+</button></span></td>
+        <td class="c-new"><span class="dash">–</span></td>
+        <td class="c-src"><span class="src"><i>C</i>Crunchyroll</span></td>
+        <td class="c-when when">gestern</td>
+        <td class="c-go right"><a class="go" href="#">Öffnen ›</a></td>
+      </tr>
+      <tr class="row t-emerald">
+        <td class="c-exp"><button class="exp" aria-label="Aufklappen">▶</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">NM</span><div class="tn"><a href="#">Nano Machine</a><span class="sub">Manhwa · gestern</span></div></div></td>
+        <td class="c-type type">Manhwa</td>
+        <td class="c-pos"><span class="step num"><button aria-label="zurück">−</button><span>Kap. 332</span><button aria-label="weiter">+</button></span></td>
+        <td class="c-new"><span class="newc num"><span class="plus" style="color:var(--faint)">0</span><span class="mini"><i style="width:100%"></i></span><span class="of">aktuell</span></span></td>
+        <td class="c-src"><span class="src"><i>A</i>asuracomic.net</span></td>
+        <td class="c-when when">gestern</td>
+        <td class="c-go right"><a class="go" href="#">Weiter ›</a></td>
+      </tr>
+      <tr class="row t-violet">
+        <td class="c-exp"><button class="exp" aria-label="Aufklappen">▶</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">SS</span><div class="tn"><a href="#">Shadow Slave</a><span class="sub">Light Novel · vor 3 Tagen</span></div></div></td>
+        <td class="c-type type">Light Novel</td>
+        <td class="c-pos"><span class="step num"><button aria-label="zurück">−</button><span>Kap. 1204</span><button aria-label="weiter">+</button></span></td>
+        <td class="c-new"><span class="dash">–</span></td>
+        <td class="c-src"><span class="src"><i>W</i>WebNovel</span></td>
+        <td class="c-when when">vor 3 Tagen</td>
+        <td class="c-go right"><a class="go" href="#">Weiter ›</a></td>
+      </tr>
+      <tr class="row t-amber">
+        <td class="c-exp"><button class="exp" aria-label="Aufklappen">▶</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">AS</span><div class="tn"><a href="#">Absolute Sword Sense</a><span class="sub">Manhwa · vor 4 Tagen</span></div></div></td>
+        <td class="c-type type">Manhwa</td>
+        <td class="c-pos"><span class="step num"><button aria-label="zurück">−</button><span>Kap. 51</span><button aria-label="weiter">+</button></span></td>
+        <td class="c-new"><span class="dash">–</span></td>
+        <td class="c-src"><span class="src"><i>D</i>demonicscans.org</span></td>
+        <td class="c-when when">vor 4 Tagen</td>
+        <td class="c-go right"><a class="go" href="#">Weiter ›</a></td>
+      </tr>
+      <tr class="row t-rose">
+        <td class="c-exp"><button class="exp" aria-label="Aufklappen">▶</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">PH</span><div class="tn"><a href="#">Project Hail Mary</a><span class="sub">E-Book · Kindle · vor 5 Tagen</span></div></div></td>
+        <td class="c-type type">E-Book</td>
+        <td class="c-pos"><span class="step num"><span>43 %</span></span></td>
+        <td class="c-new"><span class="newc num"><span class="mini"><i style="width:43%"></i></span><span class="of">43 %</span></span></td>
+        <td class="c-src"><span class="src"><i>K</i>Kindle</span></td>
+        <td class="c-when when">vor 5 Tagen</td>
+        <td class="c-go right"></td>
+      </tr>
+      <tr class="row t-fuchsia">
+        <td class="c-exp"><button class="exp" aria-label="Aufklappen">▶</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">OR</span><div class="tn"><a href="#">Omniscient Reader's Viewpoint</a><span class="sub">Manhwa · keine Seite · Import</span></div></div></td>
+        <td class="c-type type">Manhwa</td>
+        <td class="c-pos"><span class="step num"><span><span class="q">Kap. ?</span></span></span></td>
+        <td class="c-new"><span class="dash">–</span></td>
+        <td class="c-src"><span class="src none">– keine Seite</span></td>
+        <td class="c-when when">Import</td>
+        <td class="c-go right"></td>
+      </tr>
+      <tr class="row t-lime">
+        <td class="c-exp"><button class="exp" aria-label="Aufklappen">▶</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">AS</span><div class="tn"><a href="#">Arcane Sniper</a><span class="sub">Manhwa · keine Seite · Import</span></div></div></td>
+        <td class="c-type type">Manhwa</td>
+        <td class="c-pos"><span class="step num"><button aria-label="zurück">−</button><span>Kap. 95</span><button aria-label="weiter">+</button></span></td>
+        <td class="c-new"><span class="dash">–</span></td>
+        <td class="c-src"><span class="src none">– keine Seite</span></td>
+        <td class="c-when when">Import</td>
+        <td class="c-go right"></td>
+      </tr>
+
+      <tr class="group done"><td colspan="8"><span class="g"><span class="sw"></span>Abgeschlossen <span class="c">· 1</span></span></td></tr>
+      <tr class="row done t-sky">
+        <td class="c-exp"><button class="exp" aria-label="Aufklappen">▶</button></td>
+        <td class="c-title"><div class="tc"><span class="thumb">SL</span><div class="tn"><a href="#">Solo Leveling</a><span class="sub">Manhwa · vor 3 Monaten</span></div></div></td>
+        <td class="c-type type">Manhwa</td>
+        <td class="c-pos"><span class="step num"><span>Kap. 200</span></span></td>
+        <td class="c-new"><span class="newc num"><span class="mini"><i style="width:100%;background:var(--s-done)"></i></span><span class="of">200 / 200</span></span></td>
+        <td class="c-src"><span class="src"><i>A</i>asuracomic.net</span></td>
+        <td class="c-when when">vor 3 Monaten</td>
+        <td class="c-go right"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="keys"><span><kbd>/</kbd> Suche</span><span><kbd>↑</kbd> <kbd>↓</kbd> Zeile</span><span><kbd>+</kbd> <kbd>−</kbd> Stand</span><span><kbd>Enter</kbd> Weiterlesen</span><span><kbd>Leertaste</kbd> Aufklappen</span></p>
+</main>
+</body>
+</html>

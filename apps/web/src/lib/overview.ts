@@ -40,6 +40,8 @@ export interface OverviewItem {
   lastProgressAt: number | null;
   /** "3 neu": whole chapters on the series page beyond the one read (SPEC §4.2, M4); null for none. */
   newChapters: number | null;
+  /** Newest chapter on the series page, for "Kap. 345 / 348" on the shelf; null when not known. */
+  latestChapter: number | null;
 }
 
 export const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
@@ -145,10 +147,11 @@ export function toOverviewItem(row: OverviewRow, now: Date): OverviewItem {
     searchText: [row.title, ...row.aliases].map(normalizeTitle).join("\n"),
     lastProgressAt: row.lastProgressAt?.getTime() ?? null,
     newChapters: newChapterCount(row.chapter, row.latestChapter),
+    latestChapter: row.latestChapter,
   };
 }
 
-function newChapterCount(chapter: number | null, latest: number | null): number | null {
+export function newChapterCount(chapter: number | null, latest: number | null): number | null {
   if (chapter === null || latest === null) return null;
   const count = Math.floor(latest) - Math.floor(chapter);
   return count > 0 ? count : null;

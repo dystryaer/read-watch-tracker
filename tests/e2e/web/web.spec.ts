@@ -153,20 +153,58 @@ test("assigning a new work applies the waiting events", async ({ page }) => {
   await expect(continueLink).toHaveAttribute("rel", "noopener noreferrer");
 });
 
-test("the stepper saves the chapter after quick clicks", async ({ page }) => {
+test("the shelf's −/+ and the + under the picture save the chapter after quick clicks", async ({ page }) => {
   await login(page);
   await page.goto("/");
-  const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Overgeared", exact: true }) });
+  const card = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Overgeared", exact: true }) });
   const saved = actionAnswered(page);
-  await row.getByRole("button", { name: "Ein Kapitel weiter" }).click();
-  await row.getByRole("button", { name: "Ein Kapitel weiter" }).click();
-  await expect(row.getByText("Kap. 347")).toBeVisible();
+  await card.hover();
+  await card.getByRole("button", { name: "Ein Kapitel weiter bei Overgeared" }).click();
+  // Both buttons share one count and one save.
+  await card.getByRole("button", { name: "Overgeared: Kapitel 347 als gelesen markieren" }).click();
+  await expect(card.getByText("Kap. 347")).toBeVisible();
   await saved;
 
   await page.reload();
   await expect(
     page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Overgeared", exact: true }) }).getByText("Kap. 347"),
   ).toBeVisible();
+});
+
+test("−/+ on the picture show up for the keyboard, not only under the mouse", async ({ page }) => {
+  await login(page);
+  await page.goto("/");
+  const card = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Overgeared", exact: true }) });
+  const back = card.getByRole("button", { name: "Ein Kapitel zurück bei Overgeared" });
+  await expect(back.locator("..")).toHaveCSS("opacity", "0");
+
+  // One tab stop for the title (the picture's link is skipped), then the buttons on the picture.
+  await card.getByRole("link", { name: "Overgeared", exact: true }).focus();
+  await page.keyboard.press("Tab");
+  await expect(back).toBeFocused();
+  await expect(back.locator("..")).toHaveCSS("opacity", "1");
+});
+
+test("the list stays one click away, and the browser remembers it without a flash of the shelf", async ({ page, browser, baseURL }) => {
+  await login(page);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Regal" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Liste" }).click();
+  await expect(page.getByRole("button", { name: "Liste" })).toHaveAttribute("aria-pressed", "true");
+  const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Overgeared", exact: true }) });
+  await expect(row.getByRole("button", { name: "Ein Kapitel weiter bei Overgeared" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Liste" })).toHaveAttribute("aria-pressed", "true");
+  // The server renders the remembered view: without any script the page is the list already.
+  const plain = await browser.newContext({ baseURL, storageState: await page.context().storageState(), javaScriptEnabled: false });
+  const plainPage = await plain.newPage();
+  await plainPage.goto("/");
+  await expect(plainPage.getByRole("button", { name: "Liste" })).toHaveAttribute("aria-pressed", "true");
+  await plain.close();
+
+  await page.getByRole("button", { name: "Regal" }).click();
+  await expect(page.getByRole("button", { name: "Regal" })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("a picture added on the detail page is stored small and shows up in the list", async ({ page, request }) => {
@@ -303,12 +341,18 @@ test("new chapters reported by the extension show as a badge and through a filte
   await page.goto("/");
   const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Overgeared", exact: true }) });
   await expect(row.getByText("3 neue Kapitel")).toBeAttached();
+  // The picture names the newest chapter beside the one read.
+  await expect(row.getByText("/ 351")).toBeVisible();
   await page.getByRole("checkbox", { name: "Neue Kapitel" }).check();
   await expect(page.getByRole("link", { name: "Overgeared", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Shadow Slave", exact: true })).toHaveCount(0);
 
   await page.getByRole("link", { name: "Overgeared", exact: true }).click();
   await expect(page.getByText("Neuestes Kapitel laut Serienseite: Kap. 351")).toBeVisible();
+  // The head's big button names the chapter it opens.
+  const next = page.getByRole("link", { name: "Weiterlesen · Kap. 349" });
+  await expect(next).toHaveAttribute("href", "https://asuracomic.net/series/overgeared/chapter/349");
+  await expect(next).toHaveAttribute("rel", "noopener noreferrer");
 });
 
 test("the statistics count this week's chapters as text, with decorative bars", async ({ page }) => {
@@ -360,10 +404,16 @@ test("app pages reveal nothing without a session, even to crafted RSC requests",
   await anonymous.dispose();
 });
 
-test("the list fits a phone screen without horizontal scrolling", async ({ page }) => {
+test("the shelf fits a phone screen in three columns, without horizontal scrolling", async ({ page }) => {
   await login(page);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
+  const cards = await page
+    .getByRole("list", { name: "Titel" })
+    .getByRole("listitem")
+    .evaluateAll((items) => items.slice(0, 3).map((item) => item.getBoundingClientRect()));
+  expect(cards).toHaveLength(3);
+  expect(new Set(cards.map((card) => Math.round(card.top))).size).toBe(1);
   const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
   expect(widths.scroll).toBeLessThanOrEqual(widths.inner);
 });

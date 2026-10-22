@@ -70,6 +70,40 @@ describe("getWorkDetail", () => {
     expect((await getWorkDetail(handle.db, work.id))?.events).toHaveLength(50);
   });
 
+  it("names what the continue button needs from the last used source (SPEC §4.4)", async () => {
+    const source = await seedSource(
+      handle.db,
+      { key: "site:asura", name: "Asura", ruleNextUrlTemplate: "{seriesUrl}/chapter/{next}" },
+      ["asura.gg", "asuracomic.net"],
+    );
+    const other = await seedSource(handle.db, { key: "site:demonic", name: "Demonic" });
+    const work = await seedWork(handle.db, {
+      title: "Overgeared",
+      chapter: 3,
+      lastSourceId: source.id,
+      lastUrl: "https://asura.gg/series/overgeared/chapter/3",
+    });
+    await seedLink(handle.db, { workId: work.id, sourceId: other.id, externalKey: "og", externalTitle: "Overgeared", seriesUrl: "https://demonic.example/og" });
+    await seedLink(handle.db, {
+      workId: work.id,
+      sourceId: source.id,
+      externalKey: "overgeared",
+      externalTitle: "Overgeared",
+      seriesUrl: "https://asura.gg/series/overgeared",
+    });
+
+    expect((await getWorkDetail(handle.db, work.id))?.lastSource).toEqual({
+      nextUrlTemplate: "{seriesUrl}/chapter/{next}",
+      currentDomain: "asuracomic.net",
+      seriesUrl: "https://asura.gg/series/overgeared",
+    });
+  });
+
+  it("has no last source for a work only imported", async () => {
+    const work = await seedWork(handle.db, { title: "Overgeared", chapter: 3 });
+    expect((await getWorkDetail(handle.db, work.id))?.lastSource).toBeNull();
+  });
+
   it("returns null for an unknown work", async () => {
     expect(await getWorkDetail(handle.db, randomUUID())).toBeNull();
   });
